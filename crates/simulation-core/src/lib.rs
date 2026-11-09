@@ -40,6 +40,7 @@ pub use metrics::{MetricKind, MetricSpec, Metrics};
 pub use model::{ModelDescriptor, ModelFamily};
 pub use params::{ApplyPolicy, ParamKind, ParamSet, ParamSpec, ParamValue};
 pub use rng::SimRng;
+pub use runner::{Control, Published, Runner, RunnerConfig, RunnerStatus, SessionControl, Speed};
 pub use simulation::{DynSimulation, Erased, Simulation, erase};
 pub use snapshot::Snapshot;
 pub use spatial::SpatialGrid;

@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+use crate::error::SimError;
 use crate::history::{HistoryConfig, SnapshotHistory, UndoStack};
 use crate::metrics::Metrics;
 use crate::model::ModelDescriptor;
@@ -70,6 +71,12 @@ impl Default for RunnerConfig {
 
 /// Closure executed on the simulation thread.
 pub type SimFn<S> = Box<dyn FnOnce(&mut S) + Send>;
+
+/// Reusable mode-specific action (e.g. "clear the world").
+pub type SimHook<S> = Arc<dyn Fn(&mut S) + Send + Sync>;
+
+/// Reusable mode-specific action taking a seed (e.g. "randomize").
+pub type SeededHook<S> = Arc<dyn Fn(&mut S, u64) + Send + Sync>;
 
 /// Messages accepted by a [`Runner`].
 pub enum Control<S: Simulation> {
@@ -185,6 +192,8 @@ pub struct Runner<S: Simulation> {
     shared: Arc<Shared<S>>,
     descriptor: ModelDescriptor,
     handle: Option<JoinHandle<()>>,
+    clear_hook: Option<SimHook<S>>,
+    randomize_hook: Option<SeededHook<S>>,
 }
 
 impl<S: Simulation> Runner<S> {
@@ -208,7 +217,20 @@ impl<S: Simulation> Runner<S> {
             .name(format!("sim-{}", descriptor.id))
             .spawn(move || Worker::new(sim, rx, worker_shared, config).run())
             .expect("failed to spawn simulation thread");
-        Self { tx, shared, descriptor, handle: Some(handle) }
+        Self { tx, shared, descriptor, handle: Some(handle), clear_hook: None, randomize_hook: None }
+    }
+
+    /// Declares how this model is cleared, enabling the generic "Clear" control.
+    pub fn with_clear(mut self, hook: impl Fn(&mut S) + Send + Sync + 'static) -> Self {
+        self.clear_hook = Some(Arc::new(hook));
+        self
+    }
+
+    /// Declares how this model is randomised from a seed, enabling the generic
+    /// "Randomize" control.
+    pub fn with_randomize(mut self, hook: impl Fn(&mut S, u64) + Send + Sync + 'static) -> Self {
+        self.randomize_hook = Some(Arc::new(hook));
+        self
     }
 
     /// Descriptor of the model (captured at spawn time).
@@ -279,6 +301,126 @@ impl<S: Simulation> Runner<S> {
     /// Removes and returns error messages produced by commands.
     pub fn take_errors(&self) -> Vec<String> {
         std::mem::take(&mut *lock(&self.shared.errors))
+    }
+}
+
+/// Type-erased control surface of a running simulation. Generic user
+/// interface code (time controls, metric plots, history timeline, save/load)
+/// works through this trait without knowing the model type.
+pub trait SessionControl: Send + Sync {
+    /// Model descriptor.
+    fn descriptor(&self) -> &ModelDescriptor;
+    /// Current runner status.
+    fn status(&self) -> RunnerStatus;
+    /// Start running.
+    fn play(&self);
+    /// Pause.
+    fn pause(&self);
+    /// Toggle play/pause.
+    fn toggle_play(&self);
+    /// Run `n` ticks now.
+    fn step(&self, n: u64);
+    /// Change the target speed.
+    fn set_speed(&self, speed: Speed);
+    /// Reset to the scenario's initial state (undoable).
+    fn reset(&self);
+    /// Undo the last edit.
+    fn undo(&self);
+    /// Redo the last undone edit.
+    fn redo(&self);
+    /// Restore the n-th stored history snapshot.
+    fn jump_to_history(&self, index: usize);
+    /// Configure periodic history snapshots.
+    fn set_history(&self, config: HistoryConfig);
+    /// Change a parameter (the resulting apply policy appears in the status).
+    fn set_param(&self, key: &str, value: ParamValue);
+    /// Drain buffered metric samples.
+    fn drain_metrics(&self) -> Vec<Metrics>;
+    /// Drain error messages.
+    fn take_errors(&self) -> Vec<String>;
+    /// Ask for a snapshot of the current state.
+    fn request_snapshot(&self) -> Receiver<Result<Snapshot, SimError>>;
+    /// Restore a snapshot (pauses the run).
+    fn restore(&self, snapshot: Snapshot);
+    /// Whether this model supports clearing.
+    fn can_clear(&self) -> bool;
+    /// Clear the world (undoable). No-op when unsupported.
+    fn clear(&self);
+    /// Whether this model supports randomisation.
+    fn can_randomize(&self) -> bool;
+    /// Randomise the world with a seed (undoable). No-op when unsupported.
+    fn randomize(&self, seed: u64);
+}
+
+impl<S: Simulation> SessionControl for Runner<S> {
+    fn descriptor(&self) -> &ModelDescriptor {
+        &self.descriptor
+    }
+    fn status(&self) -> RunnerStatus {
+        Runner::status(self)
+    }
+    fn play(&self) {
+        self.send(Control::Play);
+    }
+    fn pause(&self) {
+        self.send(Control::Pause);
+    }
+    fn toggle_play(&self) {
+        self.send(Control::TogglePlay);
+    }
+    fn step(&self, n: u64) {
+        self.send(Control::Step(n));
+    }
+    fn set_speed(&self, speed: Speed) {
+        self.send(Control::SetSpeed(speed));
+    }
+    fn reset(&self) {
+        self.send(Control::Reset);
+    }
+    fn undo(&self) {
+        self.send(Control::Undo);
+    }
+    fn redo(&self) {
+        self.send(Control::Redo);
+    }
+    fn jump_to_history(&self, index: usize) {
+        self.send(Control::JumpToHistory(index));
+    }
+    fn set_history(&self, config: HistoryConfig) {
+        self.send(Control::SetHistory(config));
+    }
+    fn set_param(&self, key: &str, value: ParamValue) {
+        self.send(Control::SetParam(key.to_string(), value));
+    }
+    fn drain_metrics(&self) -> Vec<Metrics> {
+        Runner::drain_metrics(self)
+    }
+    fn take_errors(&self) -> Vec<String> {
+        Runner::take_errors(self)
+    }
+    fn request_snapshot(&self) -> Receiver<Result<Snapshot, SimError>> {
+        self.request(|sim| sim.snapshot())
+    }
+    fn restore(&self, snapshot: Snapshot) {
+        self.send(Control::Restore(snapshot));
+    }
+    fn can_clear(&self) -> bool {
+        self.clear_hook.is_some()
+    }
+    fn clear(&self) {
+        if let Some(hook) = &self.clear_hook {
+            let hook = Arc::clone(hook);
+            self.send(Control::ExecEdit(Box::new(move |sim| hook(sim))));
+        }
+    }
+    fn can_randomize(&self) -> bool {
+        self.randomize_hook.is_some()
+    }
+    fn randomize(&self, seed: u64) {
+        if let Some(hook) = &self.randomize_hook {
+            let hook = Arc::clone(hook);
+            self.send(Control::ExecEdit(Box::new(move |sim| hook(sim, seed))));
+        }
     }
 }
 
@@ -763,6 +905,24 @@ mod tests {
         let st = wait_for(&runner, |s| s.last_param_change.is_some());
         assert_eq!(st.last_param_change, Some(("step_max".to_string(), ApplyPolicy::NextTick)));
         assert_eq!(st.params.i64_or("step_max", 0), 10);
+    }
+
+    #[test]
+    fn session_control_hooks() {
+        let runner = Runner::spawn(Walker::new(2), RunnerConfig::default())
+            .with_clear(|sim: &mut Walker| sim.value = 0)
+            .with_randomize(|sim: &mut Walker, seed| sim.value = seed);
+        let session: &dyn SessionControl = &runner;
+        assert!(session.can_clear() && session.can_randomize());
+        session.randomize(77);
+        wait_for(&runner, |s| s.can_undo);
+        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(value, 77);
+        session.clear();
+        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(value, 0);
+        let snapshot = session.request_snapshot().recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+        assert_eq!(snapshot.model_id, "test.walker");
     }
 
     #[test]
