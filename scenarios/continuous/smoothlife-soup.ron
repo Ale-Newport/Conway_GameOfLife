@@ -1,0 +1,34 @@
+// Emergence Lab scenario (continuous). See docs/models/continuous.md for the file format.
+(
+    header: (
+        id: "smoothlife.soup",
+        name: "SmoothLife disc soup",
+        description: "Rafler's smooth-glider rule (r_a = 21, discrete stepping) started from 74 random filled discs with radii between r_i = 7 and r_a = 21 (about N²/(2r_a²) discs). Discrete SmoothLife soups are chaotic: which structures survive depends on the seed and even on floating-point rounding, and about half of all seeds die out. With seed 7 the soup churns as irregular blobs for about 150 steps and then condenses into smooth gliders (mass about 799 each): one glider with FFT and with direct convolution, two with a translated copy of the same soup, whose FFT rounding differs.",
+        seed: 7,
+    ),
+    width: 256,
+    height: 256,
+    rule: SmoothLife(
+        outer_radius: 21.0,
+        radius_ratio: 3.0,
+        rim: 1.0,
+        birth: (0.278, 0.365),
+        survival: (0.267, 0.445),
+        alpha_n: 0.028,
+        alpha_m: 0.147,
+        mixing: bounds,
+        stepping: discrete,
+        dt: 0.1,
+    ),
+    init: [
+        RandomDiscs(
+            count: 74,
+            min_radius: 7.0,
+            max_radius: 21.0,
+            value: 1.0,
+        ),
+    ],
+    notes: [
+        "Parameters from S. Rafler, arXiv:1111.1567, Fig. 1 caption (facts, no code used).",
+    ],
+)

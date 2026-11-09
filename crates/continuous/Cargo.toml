@@ -1,0 +1,28 @@
+[package]
+name = "continuous"
+description = "Continuous cellular automata: Lenia, SmoothLife and Flow-Lenia with FFT convolution."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+simulation-core.workspace = true
+serde.workspace = true
+rayon.workspace = true
+rustfft.workspace = true
+thiserror.workspace = true
+ron.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+postcard.workspace = true
+
+[[bench]]
+name = "continuous"
+harness = false
+
+[lints]
+workspace = true

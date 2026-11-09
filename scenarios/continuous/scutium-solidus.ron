@@ -1,0 +1,44 @@
+// Emergence Lab scenario (continuous). See docs/models/continuous.md for the file format.
+(
+    header: (
+        id: "lenia.scutium_solidus",
+        name: "Scutium solidus",
+        description: "A shield-shaped Lenia glider (code S1s), the Lenia rediscovery of SmoothLife's smooth glider: R = 13, T = 10, μ = 0.29, σ = 0.045, polynomial core and growth. Mass about 140, speed about 0.36 cells per tick.",
+        seed: 1,
+    ),
+    width: 128,
+    height: 128,
+    rule: Lenia(
+        radius: 13.0,
+        time_resolution: 10.0,
+        channels: 1,
+        normalization: sum,
+        kernels: [
+            (
+                relative_radius: 1.0,
+                beta: [1.0],
+                core: polynomial,
+                growth: polynomial,
+                mu: 0.29,
+                sigma: 0.045,
+                weight: 1.0,
+                source: 0,
+                destination: 0,
+            ),
+        ],
+    ),
+    init: [
+        Creature(
+            name: "Scutium solidus",
+            cells: Rle([
+                "5.pGQ$6.sUsDqRR$4.VpXrJwKvNtXrW$2.ApVrGrWsIwKyOyDwTuNO$2.qArOrIqIpPpTxH2yOyIvKqG$rVpIrNrJpH4.xP3yOvFqWA$sKvNsKqE5.pI4yOuHqPC$sNxBuMpD5.JuN3yOwXsUpN$sGxFyOT5.pCtIyF3yOuKqUH$rPwXyOxT5.qKtSxS3yOvIrQT$pQwK2yOtWXJXqHsGuWxW3yOvPsApC$.vQ3yOuVsLsGsXuMwOyK3yOvHrVpC$.rKyK3yOxEwBwCwXyE3yOxQuMrJU$.WvC5yOyM5yOwFtJqOL$2.rVwO9yOwWuMsApOC$2.pLtBwK6yOyJwQuTsQqLP$3.qHsWvEwUxTyCxRwWvRuGsNqSpA$3.HqBrUtHuGuPuLtVsXrSqIXB$4.DpDqEqW2rIqWqGpJN$6.ENTUPHA!",
+            ]),
+            x: 0.5,
+            y: 0.5,
+        ),
+    ],
+    notes: [
+        "Cells and parameters from Chakazul/Lenia Python/animals.json (https://github.com/Chakazul/Lenia @ adfc5429), MIT License, Copyright (c) 2018 Bert Chan.",
+        "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
+    ],
+)

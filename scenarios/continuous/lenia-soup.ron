@@ -1,0 +1,42 @@
+// Emergence Lab scenario (continuous). See docs/models/continuous.md for the file format.
+(
+    header: (
+        id: "lenia.soup",
+        name: "Lenia random soup",
+        description: "A disc of random matter (radius 48 cells, density 0.5) under the Orbium rule. This dense soup spreads within about 300 ticks into a space-filling chaotic phase (mass about 13600, about 23 % of cells active) that persists; sparser or fainter soups (density 0.15, or amplitude 0.5) die out instead. Orbium itself is a narrow attractor that random soups at these parameters rarely reach.",
+        seed: 7,
+    ),
+    width: 256,
+    height: 256,
+    rule: Lenia(
+        radius: 13.0,
+        time_resolution: 10.0,
+        channels: 1,
+        normalization: sum,
+        kernels: [
+            (
+                relative_radius: 1.0,
+                beta: [1.0],
+                core: gaussian_bump,
+                growth: gaussian,
+                mu: 0.15,
+                sigma: 0.015,
+                weight: 1.0,
+                source: 0,
+                destination: 0,
+            ),
+        ],
+    ),
+    init: [
+        Soup(
+            x: 0.5,
+            y: 0.5,
+            radius: 48.0,
+            shape: disc,
+            density: 0.5,
+            amplitude: 1.0,
+        ),
+    ],
+    notes: [
+    ],
+)

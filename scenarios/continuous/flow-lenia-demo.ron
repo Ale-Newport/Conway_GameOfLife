@@ -1,0 +1,77 @@
+// Emergence Lab scenario (continuous). See docs/models/continuous.md for the file format.
+(
+    header: (
+        id: "flow_lenia.demo",
+        name: "Flow-Lenia membrane",
+        description: "One-channel Flow-Lenia with seven Gaussian-ring kernels (R = 33, dt = 0.2, s = 0.65, n = 2, θ_A = 1). A 40×40 patch of uniform random matter self-organises within a few hundred ticks into a large membrane-like structure (about 10 % of the cells active) that keeps reorganising and drifts slowly, while the total mass stays constant to about 2e-8. Kernel parameters were found by a seeded random search within the ranges of Plantec et al. (2023), Table 1.",
+        seed: 3,
+    ),
+    width: 128,
+    height: 128,
+    rule: FlowLenia(
+        radius: 33.0,
+        dt: 0.2,
+        channels: 1,
+        kernels: [
+            (
+                relative_radius: 0.37,
+                rings: [(center: 0.5, height: 0.53, width: 0.5), (center: 0.17, height: 0.4, width: 0.48), (center: 0.56, height: 0.47, width: 0.26)],
+                mu: 0.21,
+                sigma: 0.111,
+                weight: 0.59,
+            ),
+            (
+                relative_radius: 0.53,
+                rings: [(center: 0.67, height: 0.33, width: 0.33), (center: 0.34, height: 0.28, width: 0.08), (center: 0.88, height: 0.85, width: 0.43)],
+                mu: 0.433,
+                sigma: 0.081,
+                weight: 0.89,
+            ),
+            (
+                relative_radius: 0.26,
+                rings: [(center: 0.95, height: 0.17, width: 0.04), (center: 0.31, height: 0.87, width: 0.09), (center: 0.4, height: 0.9, width: 0.47)],
+                mu: 0.225,
+                sigma: 0.093,
+                weight: 0.75,
+            ),
+            (
+                relative_radius: 0.4,
+                rings: [(center: 0.14, height: 0.98, width: 0.3), (center: 0.69, height: 0.13, width: 0.41), (center: 0.3, height: 0.34, width: 0.23)],
+                mu: 0.197,
+                sigma: 0.032,
+                weight: 0.91,
+            ),
+            (
+                relative_radius: 0.78,
+                rings: [(center: 0.17, height: 0.42, width: 0.23), (center: 0.93, height: 0.89, width: 0.3), (center: 0.47, height: 0.47, width: 0.49)],
+                mu: 0.104,
+                sigma: 0.028,
+                weight: 0.91,
+            ),
+            (
+                relative_radius: 0.46,
+                rings: [(center: 0.45, height: 0.91, width: 0.41), (center: 0.61, height: 0.07, width: 0.41), (center: 0.44, height: 0.31, width: 0.12)],
+                mu: 0.323,
+                sigma: 0.155,
+                weight: 0.03,
+            ),
+            (
+                relative_radius: 0.99,
+                rings: [(center: 0.85, height: 0.92, width: 0.02), (center: 0.7, height: 0.62, width: 0.14), (center: 0.96, height: 0.81, width: 0.42)],
+                mu: 0.483,
+                sigma: 0.112,
+                weight: 0.9,
+            ),
+        ],
+        critical_mass: 1.0,
+        alpha_exponent: 2.0,
+        temperature: 0.65,
+        window: 5,
+    ),
+    init: [
+        Soup(x: 0.5, y: 0.5, radius: 20.0, shape: square, density: 1.0, amplitude: 1.0),
+    ],
+    notes: [
+        "Model and parameter ranges from E. Plantec et al., arXiv:2212.07906 (facts; no code used). Kernel parameters selected by a seeded random search (trial 1227) with this engine.",
+    ],
+)
