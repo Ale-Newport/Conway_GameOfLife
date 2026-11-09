@@ -1,0 +1,96 @@
+Attribution / provenance - Quaternius (CC0 1.0; attribution NOT required, given as courtesy)
+=========================================================================================
+Author:   Quaternius (https://quaternius.com, https://poly.pizza/u/Quaternius)
+License:  CC0 1.0 Universal - see LICENSE.txt
+Obtained: 2026-11-09 from the Poly Pizza CDN (direct, login-free GLB links):
+          https://static.poly.pizza/<resource-uuid>.glb   (model page: https://poly.pizza/m/<id>)
+          The quaternius.com "Download" buttons point to Google Drive folders, which returned
+          "Quota exceeded" for anonymous downloads on 2026-11-09, so Poly Pizza was used instead.
+          Poly Pizza GLBs are produced by Poly Pizza from the uploaded FBX (generator "FBX2glTF v0.9.7").
+
+Modifications made by Emergence Lab (scratchpad tool glbtool.py, pure Python, recorded in each
+GLB's asset.extras.emergence_lab_processed):
+  * animals/*: removed duplicate animation takes prefixed "AnimalArmature|" (FBX2glTF exported every
+    clip twice; the un-prefixed set is kept) and garbage-collected unused buffer data.
+  * all: pbrMetallicRoughness.metallicFactor 0.4 -> 0.0 (organic surfaces; 0.4 was a converter default).
+  * critters/wasp.glb: 6 vertices with NaN skin weights repaired (copied from nearest valid vertex).
+  * nature/*: embedded PNG textures moved to nature/textures/ (shared, referenced by relative URI,
+    so Bevy's AssetServer loads each texture once); foliage materials (Leaves*, Flowers)
+    alphaMode BLEND -> MASK (cutoff 0.5) + doubleSided; Grass doubleSided.
+
+Files (local path | pack | Poly Pizza page | direct GLB URL):
+
+  animals/fox.glb                    | Ultimate Animated Animal Pack | https://poly.pizza/m/Bc97C66HKi | https://static.poly.pizza/e18e86df-1692-48d8-ac6e-1e25ab4ad574.glb
+  animals/wolf.glb                   | Ultimate Animated Animal Pack | https://poly.pizza/m/P1gU3Qkr9r | https://static.poly.pizza/f1d12388-e39b-4157-b32a-646a1d089fc4.glb
+  animals/wild_dog_husky.glb         | Ultimate Animated Animal Pack | https://poly.pizza/m/wcWiuEqwzq | https://static.poly.pizza/611d25c7-430f-4bb5-ab2c-d8f5f3cb9712.glb
+  animals/wild_dog_shiba.glb         | Ultimate Animated Animal Pack | https://poly.pizza/m/y4wdQpg767 | https://static.poly.pizza/ba6d0ee3-bcc0-4ef0-9d3c-a3e245b41c77.glb
+  animals/deer.glb                   | Ultimate Animated Animal Pack | https://poly.pizza/m/T6Cs7tmMHJ | https://static.poly.pizza/4b6c2a41-43c7-404c-ae37-e8c4645ff93b.glb
+  animals/stag.glb                   | Ultimate Animated Animal Pack | https://poly.pizza/m/tQdzbZ1Cmw | https://static.poly.pizza/a9c69fbc-bf7c-4585-9a49-a82e0be1ac6b.glb
+  animals/horse.glb                  | Ultimate Animated Animal Pack | https://poly.pizza/m/qvTrSG9pZF | https://static.poly.pizza/d37dbc87-ca61-4b2c-a2da-d2f0c4240bef.glb
+  animals/horse_white.glb            | Ultimate Animated Animal Pack | https://poly.pizza/m/bEdE4rmZy9 | https://static.poly.pizza/3edc2bd9-3378-4b43-a50d-d5e1f858562b.glb
+  animals/donkey.glb                 | Ultimate Animated Animal Pack | https://poly.pizza/m/qmX6nhnvp7 | https://static.poly.pizza/ca29f94e-0874-41b6-8334-66642af56a61.glb
+  animals/cow.glb                    | Ultimate Animated Animal Pack | https://poly.pizza/m/26zM1outCr | https://static.poly.pizza/382b3d4a-a7c9-4c03-9858-3df630d90047.glb
+  animals/bull.glb                   | Ultimate Animated Animal Pack | https://poly.pizza/m/a8PIIYwF7r | https://static.poly.pizza/5704ef69-2c27-4de8-a942-70a29458af21.glb
+  animals/alpaca.glb                 | Ultimate Animated Animal Pack | https://poly.pizza/m/bCVFD48i2l | https://static.poly.pizza/444228bb-745d-49b2-89ef-cc12805deaa8.glb
+  animals/sheep.glb                  | Farm Animal Pack              | https://poly.pizza/m/C39AUXUUes | https://static.poly.pizza/a4bd2c4e-fe71-4dbd-9881-cf3ac8a00bbf.glb
+  animals/pig.glb                    | Farm Animal Pack              | https://poly.pizza/m/TNvG3QUFlp | https://static.poly.pizza/665ee586-6494-4fbd-be46-fcbe600f653e.glb
+  animals/zebra.glb                  | Farm Animal Pack              | https://poly.pizza/m/iclPBR6SBZ | https://static.poly.pizza/ff99ce31-85dd-4863-b145-24a6646a2b20.glb
+  critters/rat.glb                   | Easy Enemy Pack               | https://poly.pizza/m/iltq5bVNaV | https://static.poly.pizza/64cb7150-8031-44ab-a0c9-e1529a572b23.glb
+  critters/spider.glb                | Easy Enemy Pack               | https://poly.pizza/m/yRYJiAJyiM | https://static.poly.pizza/4259fbdb-afb5-4d40-9108-363625dd6b6e.glb
+  critters/wasp.glb                  | Easy Enemy Pack               | https://poly.pizza/m/3aQgc75sUR | https://static.poly.pizza/71cadefd-8e65-423a-9a95-3cdf7e012586.glb
+  critters/snake.glb                 | Easy Enemy Pack               | https://poly.pizza/m/x9x0viZs8V | https://static.poly.pizza/0f3a551e-743e-48f5-936f-804c6c3b88bd.glb
+  critters/frog.glb                  | Easy Enemy Pack               | https://poly.pizza/m/9Z2V8fpazF | https://static.poly.pizza/08416495-b056-4ed7-b23b-5a10e82277a0.glb
+  critters/bat.glb                   | Animated Monster Pack         | https://poly.pizza/m/hNO9XvjlKa | https://static.poly.pizza/4ae13ae9-c257-41ed-86b5-1b4760924ebc.glb
+  fish/fish_perch.glb                | Animated Fish Pack            | https://poly.pizza/m/XWl86YFtpF | https://static.poly.pizza/311a79f6-ba3e-47aa-80ce-04185fc76b2a.glb
+  fish/fish_clown.glb                | Animated Fish Pack            | https://poly.pizza/m/BEcU9rjiAq | https://static.poly.pizza/6805b99c-5fd7-4aab-bf57-3bb645e1108a.glb
+  fish/fish_bream.glb                | Animated Fish Pack            | https://poly.pizza/m/Ymu8ftrmuT | https://static.poly.pizza/8410757e-6594-4011-817a-633730fbcaf8.glb
+  fish/shark.glb                     | Animated Fish Pack            | https://poly.pizza/m/AyHTK3zUSG | https://static.poly.pizza/d2d374ea-eb1d-4659-8cc7-816a83b82470.glb
+  fish/dolphin.glb                   | Animated Fish Pack            | https://poly.pizza/m/3LzFgI3GLO | https://static.poly.pizza/fcea284f-cafc-4be1-a701-2a0fd811ad5c.glb
+  fish/whale.glb                     | Animated Fish Pack            | https://poly.pizza/m/JGFwp6xWgk | https://static.poly.pizza/7300e697-2543-4a9a-a77d-dedf29251fd7.glb
+  fish/manta_ray.glb                 | Animated Fish Pack            | https://poly.pizza/m/yzD8b7ZHZm | https://static.poly.pizza/32b4e08e-4605-4356-8bd3-e0cf32335a0f.glb
+  nature/tree_broadleaf_a.glb        | Stylized Nature MegaKit       | https://poly.pizza/m/QVOop92WmG | https://static.poly.pizza/2c5938cb-4005-4958-829b-e191be39b3b9.glb
+  nature/tree_broadleaf_b.glb        | Stylized Nature MegaKit       | https://poly.pizza/m/YWjGDJ9F7g | https://static.poly.pizza/856b5db4-21c1-406b-a800-d96843d1ec69.glb
+  nature/tree_broadleaf_c.glb        | Stylized Nature MegaKit       | https://poly.pizza/m/aVOxaHRPWe | https://static.poly.pizza/7bf2aa94-cc44-40d9-a93c-9489eb09e008.glb
+  nature/tree_broadleaf_d.glb        | Stylized Nature MegaKit       | https://poly.pizza/m/qZtx0AHhcy | https://static.poly.pizza/24cf9df9-435f-408e-971b-640d670ce973.glb
+  nature/tree_broadleaf_e.glb        | Stylized Nature MegaKit       | https://poly.pizza/m/t9KbsfYdXz | https://static.poly.pizza/7f84a768-ac30-48d4-9c5d-f760492e7867.glb
+  nature/tree_pine_a.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/699sFuLCN2 | https://static.poly.pizza/c55b8641-4679-4a85-8bd8-2a20e79abecd.glb
+  nature/tree_pine_b.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/79gmlLnweB | https://static.poly.pizza/082c2026-56af-4e3f-bea7-9ae5de71101f.glb
+  nature/tree_pine_c.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/Zt62gceKXZ | https://static.poly.pizza/be462d46-2e48-401e-8da9-2f4d9bc9df0c.glb
+  nature/tree_pine_d.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/igSu0cPoBz | https://static.poly.pizza/712aaefa-ae7f-4cb3-8834-a1b8860df3b2.glb
+  nature/tree_pine_e.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/rfnxJv0Rqa | https://static.poly.pizza/3fc02c15-0e5e-4757-a553-2d065e3d0f44.glb
+  nature/tree_twisted_a.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/7PDBpElkQr | https://static.poly.pizza/229336e6-4632-4bc7-af2e-ec1f3c8245f7.glb
+  nature/tree_twisted_b.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/8oraKn9m0x | https://static.poly.pizza/24873d46-c90a-4c3e-8981-a98d3bd816c5.glb
+  nature/tree_twisted_c.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/9aWlx82xUf | https://static.poly.pizza/c6b8d04d-8ca3-4898-a180-e2ca2b936863.glb
+  nature/tree_twisted_d.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/GVTsMmuzv7 | https://static.poly.pizza/0e8292f8-f8ac-4483-987f-93386f07ea58.glb
+  nature/tree_twisted_e.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/edSPJNECM7 | https://static.poly.pizza/7ca42e52-d57b-45c6-89c6-0216dda8b97e.glb
+  nature/tree_dead_a.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/CD4edbPSGm | https://static.poly.pizza/4db29f97-8e10-413d-be54-39ecda1a7c8d.glb
+  nature/tree_dead_b.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/Mcd2zYqyww | https://static.poly.pizza/d12c21bd-a5d1-41c9-b370-28e3708e61cc.glb
+  nature/tree_dead_c.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/MlmK5488ou | https://static.poly.pizza/41121684-abaa-4298-a42e-5b538184d11e.glb
+  nature/tree_dead_d.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/n8FhMgMldD | https://static.poly.pizza/c02771ac-10db-420b-9426-86f26ae0869a.glb
+  nature/tree_dead_e.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/oM95bD8buf | https://static.poly.pizza/64d345fd-02d5-44c5-9968-439a8b799acd.glb
+  nature/bush.glb                    | Stylized Nature MegaKit       | https://poly.pizza/m/EoTERLq3z2 | https://static.poly.pizza/5d3066f4-58ac-46d4-899c-39d9e566e9df.glb
+  nature/bush_flowering.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/U1ymDy8tbY | https://static.poly.pizza/af83abca-9b41-4229-9652-e336a5f5eaba.glb
+  nature/clover_a.glb                | Stylized Nature MegaKit       | https://poly.pizza/m/IQ9NVyVpUw | https://static.poly.pizza/b03d60f5-bcfa-487b-9064-65f3b0f8ad6b.glb
+  nature/clover_b.glb                | Stylized Nature MegaKit       | https://poly.pizza/m/u5SOgBFiut | https://static.poly.pizza/319982c7-df90-47d7-bde1-68453148dc63.glb
+  nature/fern.glb                    | Stylized Nature MegaKit       | https://poly.pizza/m/jqcanvH7D6 | https://static.poly.pizza/f94d836f-4eb4-4db0-aa53-3ecdddffa527.glb
+  nature/flower_group_a.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/LqTljN6Wg2 | https://static.poly.pizza/48045fd1-cc1b-410d-871e-3501db7262fd.glb
+  nature/flower_group_b.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/hfPzQAedOe | https://static.poly.pizza/89f163b2-af28-4dd7-bd09-ed7b80fde2b7.glb
+  nature/flower_single_a.glb         | Stylized Nature MegaKit       | https://poly.pizza/m/GvfHo0roi3 | https://static.poly.pizza/9fbc2eff-4a06-4450-801e-cdb700722ff0.glb
+  nature/flower_single_b.glb         | Stylized Nature MegaKit       | https://poly.pizza/m/rHBoS64rRL | https://static.poly.pizza/358cce00-6e7e-4411-b889-8514eae139ce.glb
+  nature/grass.glb                   | Stylized Nature MegaKit       | https://poly.pizza/m/vUJjrRsFp4 | https://static.poly.pizza/0a84d74b-eb09-4794-ad58-dd10eed6b11e.glb
+  nature/grass_wispy_a.glb           | Stylized Nature MegaKit       | https://poly.pizza/m/6EzB7VA6vb | https://static.poly.pizza/b81bea53-a5a8-4c01-a43c-e1f6a3d5d170.glb
+  nature/grass_wispy_b.glb           | Stylized Nature MegaKit       | https://poly.pizza/m/Msr9zx66VU | https://static.poly.pizza/12298e95-47ef-4af3-bfde-1241dd5ecbb9.glb
+  nature/grass_tall.glb              | Stylized Nature MegaKit       | https://poly.pizza/m/JSIYtscPmP | https://static.poly.pizza/83f8e6d6-fa7e-4cd8-a0ef-8c51d0ff4e88.glb
+  nature/mushroom_cluster.glb        | Stylized Nature MegaKit       | https://poly.pizza/m/aOW08oSrd4 | https://static.poly.pizza/abade6e4-375f-457a-898e-66644673f54e.glb
+  nature/fungus_bracket.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/mxDOl0n6zt | https://static.poly.pizza/65e92d92-b597-4719-b759-866b8d6a8f5d.glb
+  nature/plant_small_a.glb           | Stylized Nature MegaKit       | https://poly.pizza/m/NrJN7UcglF | https://static.poly.pizza/35b5f5ed-871c-4b5b-8c92-80c06138d5b1.glb
+  nature/plant_small_b.glb           | Stylized Nature MegaKit       | https://poly.pizza/m/xH5gNlQxAZ | https://static.poly.pizza/bee11796-05ba-4026-b3c5-3dc8bac8fb07.glb
+  nature/plant_big_a.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/MbhbP7JrTI | https://static.poly.pizza/e2b7d78c-f237-4ee8-be1a-62a809097d64.glb
+  nature/plant_big_b.glb             | Stylized Nature MegaKit       | https://poly.pizza/m/uwJ1rwrZlB | https://static.poly.pizza/ddf51174-fd7b-4225-9696-1dce54f945c2.glb
+  nature/pebble_round_a.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/KYtJ6JNXh2 | https://static.poly.pizza/9ab92cc2-6cae-485b-bc34-8f99d6ba12fc.glb
+  nature/pebble_round_b.glb          | Stylized Nature MegaKit       | https://poly.pizza/m/icVsN3lmVy | https://static.poly.pizza/15475cf5-3def-4aa4-bebe-d7afc7851f41.glb
+  nature/pebble_square_a.glb         | Stylized Nature MegaKit       | https://poly.pizza/m/2YtLzwgsWp | https://static.poly.pizza/802d6e7e-73a5-4a54-8848-54ae9350077c.glb
+  nature/pebble_square_b.glb         | Stylized Nature MegaKit       | https://poly.pizza/m/6juX57sLHe | https://static.poly.pizza/5e6a2aa3-8c02-4151-b60a-cbd044953c42.glb
+  nature/rock_medium_a.glb           | Stylized Nature MegaKit       | https://poly.pizza/m/JQxF95498B | https://static.poly.pizza/73b7e249-300d-4d4b-9c31-a610b8a1ffec.glb
+  nature/rock_medium_b.glb           | Stylized Nature MegaKit       | https://poly.pizza/m/KZdEP3uUpa | https://static.poly.pizza/aaf0aaa7-c244-430a-908b-2ac57567d81c.glb
+  nature/rock_medium_c.glb           | Stylized Nature MegaKit       | https://poly.pizza/m/s1OJ3bBzqc | https://static.poly.pizza/be5fef3a-4fa1-4d08-b2d4-82e02284588d.glb

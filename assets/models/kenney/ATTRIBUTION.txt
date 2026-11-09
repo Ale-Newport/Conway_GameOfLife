@@ -1,0 +1,10 @@
+Attribution - Kenney (CC0 1.0; credit not mandatory, given as courtesy)
+=====================================================================
+"Nature Kit" by Kenney (www.kenney.nl), CC0 1.0. https://kenney.nl/assets/nature-kit
+Obtained 2026-11-09 via the public download flow on that page (kenney_nature-kit.zip,
+10,537,521 bytes), files taken from "Models/GLTF format/".
+
+Modifications by Emergence Lab: pbrMetallicRoughness.metallicFactor 1.0 -> 0.0 on every material
+(the originals render as dark metal under PBR), unused buffer data compacted.
+
+Files (49): cactus_short.glb, cactus_tall.glb, crops_bambooStageA.glb, crops_bambooStageB.glb, crops_cornStageA.glb, crops_cornStageB.glb, crops_cornStageC.glb, crops_cornStageD.glb, crops_leafsStageA.glb, crops_leafsStageB.glb, crops_wheatStageA.glb, crops_wheatStageB.glb, grass.glb, grass_large.glb, lily_large.glb, lily_small.glb, log.glb, log_large.glb, mushroom_red.glb, mushroom_redGroup.glb, mushroom_redTall.glb, mushroom_tan.glb, mushroom_tanGroup.glb, mushroom_tanTall.glb, plant_bush.glb, rock_largeA.glb, rock_largeB.glb, rock_largeC.glb, stone_largeA.glb, stone_largeB.glb, stone_largeC.glb, stone_largeD.glb, stone_largeE.glb, stone_largeF.glb, stone_tallA.glb, stone_tallB.glb, stone_tallC.glb, stone_tallD.glb, stump_old.glb, stump_oldTall.glb, stump_round.glb, tree_default.glb, tree_fat_fall.glb, tree_oak.glb, tree_palmBend.glb, tree_palmDetailedTall.glb, tree_palmTall.glb, tree_pineRoundA.glb, tree_pineTallA.glb

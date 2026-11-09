@@ -1,0 +1,24 @@
+Attribution - REQUIRED (CC BY 3.0)
+==================================
+Show these lines in the in-app Credits / About screen and keep this file with the assets:
+
+  "Hawk Lp Rigged" by Sherkiz, https://poly.pizza/m/RkN6MEbP6g, licensed under CC BY 3.0
+  (https://creativecommons.org/licenses/by/3.0/). Used unmodified.
+
+  "Rabbit" by Sherkiz, https://poly.pizza/m/Km89u3twcR, licensed under CC BY 3.0
+  (https://creativecommons.org/licenses/by/3.0/). Used unmodified.
+
+Provenance (retrieved 2026-11-09):
+  hawk.glb   <- https://static.poly.pizza/2a7aca61-a8f6-45f6-950e-003d4bfcab45.glb (866,000 bytes)
+                Poly Pizza metadata: "Rigged and Animated Hawk.", uploaded 2025-06-28, Tris 9956,
+                Animated=true, Licence "CC-BY 3.0", source type FBX.
+  rabbit.glb <- https://static.poly.pizza/8a01980e-f9cd-47c2-97b0-bad9b131ef6f.glb (227,128 bytes)
+                Poly Pizza metadata: "Rigged and animated lowpoly rabbit", uploaded 2025-06-28,
+                Tris 1560, Animated=true, Licence "CC-BY 3.0", source type FBX.
+
+Files are byte-identical to the downloads (no modifications). Runtime material overrides applied by
+the engine (metallic 0.4 -> 0.0) are not modifications of the files; if you ever bake changes into
+these files, add "modified by Emergence Lab" to the credit lines above (CC BY 3.0 section 4(b)).
+
+Provenance risk: the uploader account has no linked socials/portfolio; authorship could not be
+independently verified (UNVERIFIED). Replace with a CC0 bird/rabbit if one becomes available.
