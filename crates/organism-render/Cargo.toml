@@ -1,0 +1,27 @@
+[package]
+name = "organism-render"
+description = "Bevy visuals for living things: glTF model library with animation mapping and LOD, procedural animals and plants with procedural animation."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+bevy.workspace = true
+serde.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+simulation-core.workspace = true
+rendering.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[[example]]
+name = "zoo"
+path = "examples/zoo.rs"
+
+[lints]
+workspace = true
