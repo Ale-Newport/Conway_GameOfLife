@@ -1,0 +1,22 @@
+[package]
+name = "emergence-lab"
+description = "Emergence Lab desktop application."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "emergence-lab"
+path = "src/main.rs"
+
+[dependencies]
+bevy.workspace = true
+interface.workspace = true
+rendering.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
