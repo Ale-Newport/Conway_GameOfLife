@@ -1,0 +1,32 @@
+// Emergent Civilizations preset: abundant resources.
+(
+    id: "abundant",
+    name: "Abundant resources",
+    description: "A rich, mixed landscape with plenty of berries, fish, timber and stone. Settlers rarely go hungry, so the population grows, huts and farms spread and groups form around shared neighbourhoods. Compare with the food-scarcity preset, which differs only in its resources.",
+    seed: 11,
+    world: (
+        terrain: Generated(
+            width: 64,
+            height: 64,
+            water: 0.10,
+            mountains: 0.03,
+            hills: 0.07,
+            forest: 0.18,
+            berries: 0.14,
+            feature_size: 14.0,
+        ),
+        richness: 1.5,
+    ),
+    populations: [
+        (
+            label: "Settlers",
+            count: 40,
+            preferences: (
+                risk: (mean: 0.45, sd: 0.2),
+                cooperation: (mean: 0.55, sd: 0.25),
+                trade: (mean: 0.5, sd: 0.2),
+                time: (mean: 0.4, sd: 0.15),
+            ),
+        ),
+    ],
+)

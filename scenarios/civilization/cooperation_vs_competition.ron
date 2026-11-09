@@ -1,0 +1,42 @@
+// Emergent Civilizations preset: cooperation vs competition.
+(
+    id: "cooperation_vs_competition",
+    name: "Cooperation vs competition",
+    description: "Two preference distributions share one moderately rich valley: cooperators (high cooperation, low risk) bond quickly, share food and pool it in group stores, while competitors (low cooperation, high risk) rarely bond and turn to theft when hungry. Watch which strategy forms groups, holds territory and keeps its members alive.",
+    seed: 23,
+    world: (
+        terrain: Generated(
+            width: 64,
+            height: 64,
+            water: 0.08,
+            mountains: 0.04,
+            hills: 0.07,
+            forest: 0.16,
+            berries: 0.06,
+            feature_size: 12.0,
+        ),
+        richness: 0.7,
+    ),
+    populations: [
+        (
+            label: "Cooperators",
+            count: 30,
+            preferences: (
+                risk: (mean: 0.3, sd: 0.1),
+                cooperation: (mean: 0.85, sd: 0.08),
+                trade: (mean: 0.5, sd: 0.15),
+                time: (mean: 0.4, sd: 0.15),
+            ),
+        ),
+        (
+            label: "Competitors",
+            count: 30,
+            preferences: (
+                risk: (mean: 0.75, sd: 0.1),
+                cooperation: (mean: 0.15, sd: 0.08),
+                trade: (mean: 0.3, sd: 0.15),
+                time: (mean: 0.6, sd: 0.15),
+            ),
+        ),
+    ],
+)

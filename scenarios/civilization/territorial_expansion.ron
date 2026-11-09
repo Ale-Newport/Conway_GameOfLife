@@ -1,0 +1,58 @@
+// Emergent Civilizations preset: territorial expansion.
+(
+    id: "territorial_expansion",
+    name: "Territorial expansion",
+    description: "Three founding bands (founders already know and like each other) start in separate corners of a large map rich in timber and stone. Each band quickly becomes a group, builds huts, stores and farms, and claims territory around its buildings; as the groups grow their territories expand until borders meet and become contested.",
+    seed: 51,
+    world: (
+        terrain: Generated(
+            width: 96,
+            height: 96,
+            water: 0.08,
+            mountains: 0.04,
+            hills: 0.10,
+            forest: 0.20,
+            berries: 0.10,
+            feature_size: 18.0,
+        ),
+        richness: 1.3,
+    ),
+    populations: [
+        (
+            label: "North-west band",
+            count: 15,
+            region: (x0: 0.05, y0: 0.05, x1: 0.3, y1: 0.3),
+            kin_affinity: 0.5,
+            preferences: (
+                risk: (mean: 0.5, sd: 0.1),
+                cooperation: (mean: 0.75, sd: 0.08),
+                trade: (mean: 0.4, sd: 0.1),
+                time: (mean: 0.3, sd: 0.1),
+            ),
+        ),
+        (
+            label: "North-east band",
+            count: 15,
+            region: (x0: 0.7, y0: 0.05, x1: 0.95, y1: 0.3),
+            kin_affinity: 0.5,
+            preferences: (
+                risk: (mean: 0.5, sd: 0.1),
+                cooperation: (mean: 0.75, sd: 0.08),
+                trade: (mean: 0.4, sd: 0.1),
+                time: (mean: 0.3, sd: 0.1),
+            ),
+        ),
+        (
+            label: "South band",
+            count: 15,
+            region: (x0: 0.375, y0: 0.7, x1: 0.625, y1: 0.95),
+            kin_affinity: 0.5,
+            preferences: (
+                risk: (mean: 0.6, sd: 0.1),
+                cooperation: (mean: 0.7, sd: 0.08),
+                trade: (mean: 0.4, sd: 0.1),
+                time: (mean: 0.3, sd: 0.1),
+            ),
+        ),
+    ],
+)

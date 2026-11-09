@@ -1,0 +1,33 @@
+// Emergent Civilizations preset: spontaneous trade routes.
+(
+    id: "trade_routes",
+    name: "Spontaneous trade routes",
+    description: "Resources are separated in space: timber and stone lie in the west, berry bushes in the east, and lakes (fish) are few. Agents eager to trade specialise in what is near them and barter for the rest, and their journeys between the regions and to the places where they meet wear trails that become roads. Switch barter off to compare: everyone must then fetch both kinds of goods themselves, specialisation falls and more people die.",
+    seed: 67,
+    world: (
+        terrain: Generated(
+            width: 80,
+            height: 48,
+            water: 0.03,
+            mountains: 0.02,
+            hills: 0.08,
+            forest: 0.16,
+            berries: 0.10,
+            feature_size: 12.0,
+            zones: Split(strength: 2.0),
+        ),
+        richness: 1.2,
+    ),
+    populations: [
+        (
+            label: "Traders",
+            count: 50,
+            preferences: (
+                risk: (mean: 0.4, sd: 0.1),
+                cooperation: (mean: 0.5, sd: 0.15),
+                trade: (mean: 0.85, sd: 0.08),
+                time: (mean: 0.4, sd: 0.15),
+            ),
+        ),
+    ],
+)

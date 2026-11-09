@@ -1,0 +1,46 @@
+// Emergent Civilizations preset: two populations with different strategies.
+(
+    id: "two_strategies",
+    name: "Farmers and foragers",
+    description: "Two populations start on opposite sides of the map. Western farmers are patient (low time preference) and invest in farm plots, tools and huts; eastern foragers-traders are impatient but eager to barter. Their different strategies shape productivity, inequality, specialisation and how the two societies meet in the middle.",
+    seed: 37,
+    world: (
+        terrain: Generated(
+            width: 72,
+            height: 56,
+            water: 0.09,
+            mountains: 0.03,
+            hills: 0.08,
+            forest: 0.16,
+            berries: 0.08,
+            feature_size: 14.0,
+        ),
+        richness: 1.0,
+    ),
+    populations: [
+        (
+            label: "Farmers",
+            count: 25,
+            region: (x0: 0.0, y0: 0.0, x1: 0.4, y1: 1.0),
+            kin_affinity: 0.2,
+            preferences: (
+                risk: (mean: 0.3, sd: 0.1),
+                cooperation: (mean: 0.65, sd: 0.1),
+                trade: (mean: 0.3, sd: 0.1),
+                time: (mean: 0.15, sd: 0.08),
+            ),
+        ),
+        (
+            label: "Foragers",
+            count: 25,
+            region: (x0: 0.6, y0: 0.0, x1: 1.0, y1: 1.0),
+            kin_affinity: 0.2,
+            preferences: (
+                risk: (mean: 0.55, sd: 0.1),
+                cooperation: (mean: 0.45, sd: 0.1),
+                trade: (mean: 0.85, sd: 0.08),
+                time: (mean: 0.8, sd: 0.08),
+            ),
+        ),
+    ],
+)

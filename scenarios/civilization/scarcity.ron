@@ -1,0 +1,37 @@
+// Emergent Civilizations preset: food scarcity.
+(
+    id: "scarcity",
+    name: "Food scarcity",
+    description: "The same settlers on the same proportions of water, forest and hills as in the abundant preset, but on a poorer landscape: every stock is a third as large (richness 0.5 instead of 1.5), berry bushes are rare (2.5 % instead of 14 % of the map) and berries, fish and crops regrow 40 % slower. Hunger drives foraging over long distances, theft and fights; starvation keeps the population low unless farming takes hold.",
+    seed: 11,
+    world: (
+        terrain: Generated(
+            width: 64,
+            height: 64,
+            water: 0.10,
+            mountains: 0.03,
+            hills: 0.07,
+            forest: 0.18,
+            berries: 0.025,
+            feature_size: 14.0,
+        ),
+        richness: 0.5,
+    ),
+    populations: [
+        (
+            label: "Settlers",
+            count: 40,
+            preferences: (
+                risk: (mean: 0.45, sd: 0.2),
+                cooperation: (mean: 0.55, sd: 0.25),
+                trade: (mean: 0.5, sd: 0.2),
+                time: (mean: 0.4, sd: 0.15),
+            ),
+        ),
+    ],
+    params: {
+        "regen_berries": 0.6,
+        "regen_fish": 0.6,
+        "crop_growth": 0.6,
+    },
+)
