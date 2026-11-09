@@ -1,0 +1,36 @@
+// Predator-prey arms race (co-evolution).
+// Both populations evolve: prey under selection to detect and outrun
+// predators, predators under selection to catch prey. Neither gains a
+// lasting advantage while the costs of speed and perception rise for both.
+(
+    id: "arms_race",
+    name: "Predator-prey arms race",
+    description: "Prey and predators both inherit and mutate speed, perception and size. Watch mean_speed and predator_mean_speed climb together (a Red Queen race) and the populations oscillate.",
+    seed: 37,
+    config: (
+        world: (width: 80, height: 60),
+        food: (capacity: 8.0, initial_fraction: 0.5),
+        prey: (
+            initial: 400,
+            spread: 0.1,
+            traits: [(gene: "speed", value: 0.6), (gene: "perception", value: 5.0)],
+        ),
+        predators: (
+            initial: 20,
+            spread: 0.1,
+            evolve: true,
+            assimilation: 0.5,
+            body_energy: 45.0,
+            handling_ticks: 25,
+            interference: 0.6,
+            traits: [
+                (gene: "speed", value: 0.8),
+                (gene: "perception", value: 8.0),
+                (gene: "size", value: 1.4),
+                (gene: "clutch", value: 1.0),
+                (gene: "maturity", value: 150.0),
+            ],
+        ),
+        mutation: (rate: 0.15, size: 0.05),
+    ),
+)

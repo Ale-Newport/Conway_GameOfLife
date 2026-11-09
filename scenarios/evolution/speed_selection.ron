@@ -1,0 +1,43 @@
+// Speed selection by predation.
+// Fixed (non-evolving, genetically identical) predators hunt an asexual prey
+// population with standing variation in speed and perception. The predators'
+// top speed (0.85) lies at the upper edge of the founders' range (about
+// 0.4-0.8), so fast prey can outrun a chase while slow ones cannot; predators
+// much faster than every prey catch whichever prey they target and select on
+// speed only weakly. Speed upkeep and movement costs (~ size x speed^2) push the other
+// way. Controls: set `initial_predators` to 0 (or cull all predators) and
+// compare `mean_speed` over the same number of ticks; `tests/selection.rs`
+// also removes prey at random at the predators' kill rate, which separates
+// the selectivity of predation from its effect on density.
+(
+    id: "speed_selection",
+    name: "Speed selection (predators)",
+    description: "Non-evolving predators (top speed 0.85, at the upper edge of the prey range) hunt prey with heritable speed. Fast prey outrun chases more often, so mean_speed rises compared with a run without predators, while upkeep and movement costs keep speed from growing without bound. Perception is costly and falls in every run.",
+    seed: 11,
+    config: (
+        world: (width: 64, height: 48),
+        food: (capacity: 8.0),
+        prey: (
+            initial: 300,
+            spread: 0.15,
+            traits: [(gene: "speed", value: 0.6), (gene: "perception", value: 5.0)],
+        ),
+        predators: (
+            initial: 40,
+            spread: 0.0,
+            evolve: false,
+            constant: true,
+            handling_ticks: 25,
+            assimilation: 0.6,
+            body_energy: 40.0,
+            traits: [
+                (gene: "speed", value: 0.85),
+                (gene: "perception", value: 9.0),
+                (gene: "size", value: 1.4),
+                (gene: "clutch", value: 1.0),
+                (gene: "maturity", value: 150.0),
+            ],
+        ),
+        mutation: (rate: 0.1, size: 0.05),
+    ),
+)

@@ -1,0 +1,52 @@
+// Competing life-history strategies: r versus K.
+// Two founder groups share a world where food grows richly in four patches
+// separated by poor ground. r-strategists breed early and split their effort
+// into many small offspring; K-strategists mature late and put a large
+// reserve into few well-provisioned young that can survive the search for
+// the next patch. With these settings the K founders' lineages take over
+// (watch `lineages`, `mean_clutch` and the K marker `mean_marker_a` -> 0.9).
+// Raise `background_mortality` (e.g. 0.008: frequent density-independent
+// deaths) or make food uniform to tip the balance towards r.
+(
+    id: "r_vs_k",
+    name: "Competing strategies (r vs K)",
+    description: "r-strategists (6 cheap offspring, maturity 50) and K-strategists (1 rich offspring, maturity 150) compete for patchy food. K usually wins here (mean_marker_a tends to 0.9); raise background_mortality to about 0.008 and r takes over (marker towards 0.1).",
+    seed: 67,
+    config: (
+        world: (width: 64, height: 48),
+        food: (
+            capacity: 0.5,
+            patches: [
+                (shape: disc(x: 12.0, y: 12.0, r: 7.0), capacity: 10.0),
+                (shape: disc(x: 52.0, y: 36.0, r: 7.0), capacity: 10.0),
+                (shape: disc(x: 52.0, y: 11.0, r: 7.0), capacity: 10.0),
+                (shape: disc(x: 12.0, y: 37.0, r: 7.0), capacity: 10.0),
+            ],
+        ),
+        prey: (
+            initial: 150,
+            spread: 0.03,
+            traits: [
+                (gene: "clutch", value: 6.0),
+                (gene: "effort", value: 0.6),
+                (gene: "maturity", value: 50.0),
+                (gene: "size", value: 0.8),
+                (gene: "marker_a", value: 0.1),
+            ],
+        ),
+        extra_prey: [
+            (
+                initial: 150,
+                spread: 0.03,
+                traits: [
+                    (gene: "clutch", value: 1.0),
+                    (gene: "effort", value: 0.5),
+                    (gene: "maturity", value: 150.0),
+                    (gene: "size", value: 1.6),
+                    (gene: "marker_a", value: 0.9),
+                ],
+            ),
+        ],
+        mutation: (rate: 0.05, size: 0.03),
+    ),
+)

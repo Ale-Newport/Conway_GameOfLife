@@ -1,0 +1,24 @@
+// Environmental resistance: adaptation to a warming climate.
+// A temperature gradient runs across the world and the whole field warms by
+// 6 degrees C per 1000 ticks. Acclimation (non-heritable, at most +-4 C)
+// buffers the first part of the shift within a lifetime; beyond that only
+// genetic change in the thermal optimum and tolerance keeps the population
+// alive. Try `temperature_shift_rate` 15 to outpace evolution (extinction).
+(
+    id: "thermal_adaptation",
+    name: "Environmental resistance (warming)",
+    description: "The climate warms steadily over a gradient. Watch mean_temp_optimum track mean_temperature with a lag, mean_acclimation absorb part of the mismatch (it is not inherited), and thermal deaths rise when the shift is too fast.",
+    seed: 23,
+    config: (
+        world: (width: 72, height: 48),
+        food: (capacity: 8.0),
+        climate: (base_temperature: 18.0, gradient_x: 10.0, shift_rate: 6.0),
+        prey: (
+            initial: 300,
+            spread: 0.08,
+            traits: [(gene: "temp_optimum", value: 18.0), (gene: "temp_tolerance", value: 4.0)],
+        ),
+        mutation: (rate: 0.15, size: 0.05),
+        regions: sectors(cols: 3, rows: 1),
+    ),
+)

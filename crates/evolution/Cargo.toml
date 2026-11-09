@@ -1,0 +1,27 @@
+[package]
+name = "evolution"
+description = "Evolution laboratory: heritable genomes, mutation, recombination, natural selection, drift, genealogy and gene-frequency tracking."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+simulation-core.workspace = true
+organism-engine.workspace = true
+serde.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+ron.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "evolution"
+harness = false
+
+[lints]
+workspace = true

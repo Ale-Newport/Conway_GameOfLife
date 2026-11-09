@@ -1,0 +1,18 @@
+// Food scarcity adaptation.
+// Food is sparse on every cell. Compared with an abundant run (set
+// `food_capacity_scale` to 2 and reset), scarcity tends to favour a longer
+// search radius, efficient metabolism (low basal cost at the price of a slow
+// intake rate: the rate-yield trade-off) and narrow, cheap thermal niches.
+// The effects are modest and build up over thousands of ticks.
+(
+    id: "food_scarcity",
+    name: "Food scarcity adaptation",
+    description: "Sparse food on every cell (capacity scale 0.3). Compare mean_perception, mean_efficiency and mean_temp_tolerance with a run at food_capacity_scale 2: scarcity tends to favour longer search, efficient metabolism and cheap, narrow niches.",
+    seed: 41,
+    config: (
+        world: (width: 64, height: 48),
+        food: (capacity: 8.0, capacity_scale: 0.3),
+        prey: (initial: 120, spread: 0.12),
+        mutation: (rate: 0.12, size: 0.05),
+    ),
+)

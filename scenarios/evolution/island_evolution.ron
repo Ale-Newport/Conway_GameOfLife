@@ -1,0 +1,45 @@
+// Island evolution: allopatric divergence and an explicit speciation test.
+// Three islands in an ocean, each at a different temperature, colonised by
+// one sexually reproducing population with assortative mating (mates must be
+// genetically closer than 0.18). The islands drift and adapt apart; F_ST and
+// the regional divergence grow. Barrier 1 (`land bridge`) reconnects them:
+// toggle it to test whether the populations still interbreed. Speciation is
+// declared only by the documented criterion.
+(
+    id: "island_evolution",
+    name: "Island evolution (isolation)",
+    description: "Three isolated islands at different temperatures. Watch fst and region_divergence rise; toggle the land bridge (barrier 1) to bring the populations back into contact and see whether the speciation criterion holds.",
+    seed: 53,
+    config: (
+        world: (width: 90, height: 40),
+        food: (capacity: 9.0),
+        climate: (base_temperature: 18.0, gradient_x: 24.0),
+        barriers: [
+            (
+                name: "ocean",
+                terrain: water,
+                outside: true,
+                shapes: [
+                    disc(x: 15.0, y: 20.0, r: 12.0),
+                    disc(x: 45.0, y: 20.0, r: 12.0),
+                    disc(x: 75.0, y: 20.0, r: 12.0),
+                ],
+            ),
+            (
+                name: "land bridge",
+                terrain: land,
+                active: false,
+                shapes: [rect(x: 15.0, y: 18.0, w: 60.0, h: 4.0)],
+            ),
+        ],
+        regions: islands,
+        prey: (
+            initial: 300,
+            spread: 0.1,
+            traits: [(gene: "temp_optimum", value: 18.0), (gene: "temp_tolerance", value: 5.0)],
+        ),
+        reproduction: (mode: sexual, crossover: uniform, mate_distance_limit: 0.18),
+        mutation: (rate: 0.12, size: 0.05),
+        speciation: (enabled: true, generations: 5, min_cluster_fraction: 0.1),
+    ),
+)
