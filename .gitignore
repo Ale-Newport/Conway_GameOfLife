@@ -1,0 +1,9 @@
+/target
+**/*.rs.bk
+.DS_Store
+# user data written by the application at runtime
+/user-data/
+/exports/
+/screenshots/
+# optional third-party downloads fetched by scripts/fetch_assets.sh
+/assets/external/

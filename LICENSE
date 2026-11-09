@@ -1,0 +1,15 @@
+Emergence Lab is dual-licensed under either of
+
+  * Apache License, Version 2.0 (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0)
+  * MIT license (LICENSE-MIT or http://opensource.org/licenses/MIT)
+
+at your option. This applies to all source code in this repository.
+
+Data files under assets/ may carry their own licenses (for example pattern
+files taken from the Golly pattern collection, which are distributed under
+GPL-2.0-or-later as separate data files). Every such file or directory has a
+PROVENANCE / LICENSE note next to it, and docs/ASSET_LICENSES.md lists them all.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.

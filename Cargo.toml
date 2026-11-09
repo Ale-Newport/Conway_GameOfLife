@@ -1,0 +1,79 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+authors = ["Alejandro Newport Diaz", "Emergence Lab contributors"]
+repository = "https://github.com/anewportd/emergence-lab"
+publish = false
+
+[workspace.dependencies]
+# --- internal crates -------------------------------------------------------
+simulation-core = { path = "crates/simulation-core" }
+patterns = { path = "crates/patterns" }
+cellular-automata = { path = "crates/cellular-automata" }
+hashlife = { path = "crates/hashlife" }
+metapixel = { path = "crates/metapixel" }
+continuous = { path = "crates/continuous" }
+voxel-life = { path = "crates/voxel-life" }
+physics-world = { path = "crates/physics-world" }
+organism-engine = { path = "crates/organism-engine" }
+ecosystem = { path = "crates/ecosystem" }
+rule-engine = { path = "crates/rule-engine" }
+evolution = { path = "crates/evolution" }
+civilization = { path = "crates/civilization" }
+analytics = { path = "crates/analytics" }
+persistence = { path = "crates/persistence" }
+model-registry = { path = "crates/model-registry" }
+
+# --- simulation-side third-party crates (no Bevy) --------------------------
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ron = "0.12"
+toml = "1.2"
+postcard = { version = "1.1", features = ["use-std"] }
+thiserror = "2.0"
+anyhow = "1.0"
+rayon = "1.12"
+glam = { version = "0.33", features = ["serde"] }
+noise = "0.9"
+rustfft = "6.4"
+rhai = { version = "1.27", features = ["sync"] }
+clap = { version = "4.6", features = ["derive"] }
+criterion = "0.8"
+
+# --- presentation-side crates ----------------------------------------------
+bevy = "0.20.1"
+bevy_egui = "0.43.1"
+egui_plot = "0.37.0"
+bevy_panorbit_camera = "0.36.0"
+memory-stats = "1.2"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Simulation code is performance sensitive even while developing: optimise our
+# own crates a little and all dependencies (Bevy, egui, ...) fully in dev builds.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+codegen-units = 4
+lto = "thin"
+
+# Used by long-running exact verification suites (OTCA metapixel, big Hashlife runs).
+[profile.verify]
+inherits = "release"
+debug-assertions = true
+overflow-checks = true
