@@ -1,0 +1,13 @@
+// Softology "Amoeba".
+(
+    id: "softology-amoeba",
+    name: "Amoeba",
+    description: "Survive 9-26, born 5-7, 12-13 and 15, 5 states. From a central seed the research runs grew slowly (well below one voxel per generation) until the growth reached the boundary of a 64³ world around generations 50-83. With this seed it reaches the boundary at generation 47 and fills most of the box by generation 150.",
+    seed: 7,
+    rule: "9-26/5-7,12-13,15/5/M",
+    world: dense_bounded,
+    size: (64, 64, 64),
+    init: (kind: random_cube, cube_side: 12, density: 0.5),
+    evidence: observed,
+    reference: "J. Rampe, 3D Cellular Automata, Softology blog 2019-12-28; observations from docs/research/automata-catalog.md section 7.4",
+)

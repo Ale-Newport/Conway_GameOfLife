@@ -1,0 +1,13 @@
+// Softology "445": a 5-state Moore rule.
+(
+    id: "softology-445",
+    name: "445",
+    description: "Survive 4, born 4, 5 states (alive, then three dying states). From a small central seed the research runs showed chaotic growth that reached the boundary and then died out (generation 42 with a side-6 seed, 99 with side 12). With this seed the activity reaches the world boundary at generation 29 and dies out at generation 47. The behaviour is seed specific; a lone voxel decays through states 2, 3, 4 and vanishes.",
+    seed: 445,
+    rule: "4/4/5/M",
+    world: dense_bounded,
+    size: (64, 64, 64),
+    init: (kind: random_cube, cube_side: 6, density: 0.5),
+    evidence: observed,
+    reference: "J. Rampe, 3D Cellular Automata, Softology blog 2019-12-28; observations from docs/research/automata-catalog.md section 7.4",
+)

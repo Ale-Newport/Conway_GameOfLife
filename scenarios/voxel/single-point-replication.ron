@@ -1,0 +1,13 @@
+// 3D B1/S: every pattern replicates; a single voxel gives 8 copies after 2^k generations.
+(
+    id: "single-point-replication",
+    name: "Single Point Replication",
+    description: "Born 1, survive none, two states, Moore neighbourhood (Softology /1/2/M, the 3D analogue of the B1/S replicator). A single voxel becomes exactly 8 voxels at (±2^k, ±2^k, ±2^k) after 2^k generations (verified for k = 1 to 5 by the tests).",
+    seed: 1,
+    rule: "/1/2/M",
+    world: sparse_unbounded,
+    size: (64, 64, 64),
+    init: (kind: single_voxel),
+    evidence: tested,
+    reference: "J. Rampe, 3D Cellular Automata, Softology blog 2019-12-28; replication vector from docs/research/automata-catalog.md section 7.4, asserted by tests/vectors.rs",
+)

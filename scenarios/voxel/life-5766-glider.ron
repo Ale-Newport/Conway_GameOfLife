@@ -1,0 +1,19 @@
+// Bays' Life 5766 glider: Conway's glider copied into two adjacent z-planes.
+(
+    id: "life-5766-glider",
+    name: "Bays 5766 glider",
+    description: "Carter Bays' 3D Life 5766 (survive 5-7, born 6). The 10-voxel glider is Conway's glider doubled in z; it has period 4 and moves (1, 1, 0) per period, with 10 voxels in every phase. On this 24×24 torus it returns to its starting position after 96 generations.",
+    seed: 1,
+    rule: "5766",
+    world: dense_torus,
+    size: (24, 24, 8),
+    init: (
+        kind: pattern,
+        pattern: [
+            (1, 0, 0, 1), (2, 1, 0, 1), (0, 2, 0, 1), (1, 2, 0, 1), (2, 2, 0, 1),
+            (1, 0, 1, 1), (2, 1, 1, 1), (0, 2, 1, 1), (1, 2, 1, 1), (2, 2, 1, 1),
+        ],
+    ),
+    evidence: tested,
+    reference: "Bays, Complex Systems 1 (1987) 373-400, Theorem 7; period and displacement asserted by tests/gliders.rs",
+)

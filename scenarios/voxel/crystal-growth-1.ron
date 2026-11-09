@@ -1,0 +1,13 @@
+// Softology "Crystal Growth 1" from a single voxel on an unbounded sparse world.
+(
+    id: "crystal-growth-1",
+    name: "Crystal Growth 1",
+    description: "Survive 0-6, born 1 and 3, two states, von Neumann neighbourhood. Nothing ever dies, so a single voxel grows into an octahedral crystal at light speed: 7, 13, 43, 49, 79, 133, 259, 313, 343, 397, 523, 625 voxels in generations 1-12. The sparse world halts when the crystal needs more than 32,768 chunks.",
+    seed: 1,
+    rule: "0-6/1,3/2/N",
+    world: sparse_unbounded,
+    size: (64, 64, 64),
+    init: (kind: single_voxel),
+    evidence: tested,
+    reference: "J. Rampe, 3D Cellular Automata, Softology blog 2019-12-28; population vector from docs/research/automata-catalog.md section 7.4, asserted by tests/vectors.rs",
+)

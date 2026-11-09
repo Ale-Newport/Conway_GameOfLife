@@ -1,0 +1,13 @@
+// Conway's Life embedded exactly in Life 5766 on two identical planes.
+(
+    id: "life-in-5766-two-planes",
+    name: "Conway's Life inside 5766",
+    description: "A bounded world only two voxels deep, filled with a z-mirrored random soup so both planes are identical. A voxel with n live neighbours in its own plane then has 2n + 1 (alive) or 2n (empty) live 3D neighbours, so survive 5-7 and born 6 reproduce Conway's B3/S23 exactly in each plane.",
+    seed: 23,
+    rule: "5766",
+    world: dense_bounded,
+    size: (96, 96, 2),
+    init: (kind: random_cube, cube_side: 48, density: 0.35, mirror: z),
+    evidence: tested,
+    reference: "Bays, Complex Systems 1 (1987) 373-400, section 2.2 and Theorem 7; asserted against a 2D Life reference by tests/behaviour.rs",
+)

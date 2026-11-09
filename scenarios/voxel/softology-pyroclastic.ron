@@ -1,0 +1,13 @@
+// Softology "Pyroclastic".
+(
+    id: "softology-pyroclastic",
+    name: "Pyroclastic",
+    description: "Survive 4-7, born 6-8, 10 states. From a central seed the research runs grew slowly with long dying trails until reaching the boundary of a 64³ world (roughly generations 50-83). With this seed it reaches the boundary at generation 54.",
+    seed: 11,
+    rule: "4-7/6-8/10/M",
+    world: dense_bounded,
+    size: (64, 64, 64),
+    init: (kind: random_cube, cube_side: 12, density: 0.5),
+    evidence: observed,
+    reference: "J. Rampe, 3D Cellular Automata, Softology blog 2019-12-28; observations from docs/research/automata-catalog.md section 7.4",
+)

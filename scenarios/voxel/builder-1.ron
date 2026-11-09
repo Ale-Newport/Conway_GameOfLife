@@ -1,0 +1,13 @@
+// Softology "Builder 1".
+(
+    id: "builder-1",
+    name: "Builder 1",
+    description: "Survive 2, 6 and 9, born 4, 6 and 8-9, 10 states. Grows, then partially decays. In the research runs a side-6 seed froze into a 12-voxel still life by generation 84 while a side-12 seed still had about 11,000 non-empty voxels at generation 150. With this seed the population peaks above 23,000 voxels around generation 60 and falls to about 14,500 by generation 150.",
+    seed: 3,
+    rule: "2,6,9/4,6,8-9/10/M",
+    world: dense_bounded,
+    size: (64, 64, 64),
+    init: (kind: random_cube, cube_side: 12, density: 0.5),
+    evidence: observed,
+    reference: "J. Rampe, 3D Cellular Automata, Softology blog 2019-12-28; observations from docs/research/automata-catalog.md section 7.4",
+)

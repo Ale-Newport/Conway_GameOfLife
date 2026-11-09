@@ -1,0 +1,19 @@
+// Bays' Life 4555 glider (coordinates from the research catalogue, section 7.3).
+(
+    id: "life-4555-glider",
+    name: "Bays 4555 glider",
+    description: "Carter Bays' 3D Life 4555 (survive 4-5, born 5). This 10-voxel glider has period 4 and moves (-1, -1, 0) per period: one cell along each of two axes, perpendicular to the third. Plain random soups almost never produce it; Bays found it by stirring soups with rule 4512 first.",
+    seed: 1,
+    rule: "4555",
+    world: dense_torus,
+    size: (24, 24, 12),
+    init: (
+        kind: pattern,
+        pattern: [
+            (0, 0, 1, 1), (0, 0, 2, 1), (0, 1, 1, 1), (0, 1, 2, 1), (1, 0, 0, 1),
+            (1, 0, 3, 1), (1, 1, 0, 1), (1, 1, 3, 1), (2, 0, 1, 1), (2, 0, 2, 1),
+        ],
+    ),
+    evidence: tested,
+    reference: "Bays, Complex Systems 1 (1987) 373-400, section 2.3; coordinates from docs/research/automata-catalog.md section 7.3; asserted by tests/gliders.rs",
+)

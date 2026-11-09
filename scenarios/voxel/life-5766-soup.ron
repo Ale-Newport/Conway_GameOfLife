@@ -1,0 +1,13 @@
+// Random soup under Bays' Life 5766.
+(
+    id: "life-5766-soup",
+    name: "Bays 5766 soup",
+    description: "A 16³ random soup (30% alive) under Life 5766. Bays reports that random soups under 4555 and 5766 show bounded growth and stabilise after roughly 30-70 generations in a 70³ universe. With this seed the soup stays near the centre and settles at generation 29 into 35 voxels of still lifes. Of seeds 0-39, 29 ended with a constant population of 7 to 39 voxels and 11 died out. Occasionally a glider escapes (about 1 in 3,000 small 8³ soups in the research runs).",
+    seed: 38,
+    rule: "5766",
+    world: dense_bounded,
+    size: (64, 64, 64),
+    init: (kind: random_cube, cube_side: 16, density: 0.3),
+    evidence: documented,
+    reference: "Bays, Complex Systems 1 (1987) 373-400, section 2.3; Bays, Complex Systems 4 (1990) 599-602",
+)

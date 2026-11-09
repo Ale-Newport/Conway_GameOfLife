@@ -1,0 +1,13 @@
+// Softology "Clouds 1": a smoothing rule that needs a dense, full-volume fill.
+(
+    id: "clouds-1",
+    name: "Clouds 1",
+    description: "Survive 13-26, born 13-14 and 17-19, two states. Behaves like a cave-generation smoothing rule: it needs a dense fill of the whole volume. In the research runs a 60% fill kept about 76-80% of the volume, a 50% fill fell to about 10% by generation 60 and a 30% fill died within 5 generations. This preset keeps 76% of the volume at generation 60.",
+    seed: 1,
+    rule: "13-26/13-14,17-19/2/M",
+    world: dense_bounded,
+    size: (64, 64, 64),
+    init: (kind: random_cube, cube_side: 64, density: 0.6),
+    evidence: observed,
+    reference: "J. Rampe, 3D Cellular Automata, Softology blog 2019-12-28; observations from docs/research/automata-catalog.md section 7.4",
+)
