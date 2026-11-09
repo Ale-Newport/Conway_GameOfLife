@@ -1,0 +1,13 @@
+#N B-heptomino
+#O John Conway, 1970
+#C A very common seven-cell methuselah that passes through a Herschel and
+#C ends as blocks, gliders and a ship.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C stabilises at generation 148 with population 28.
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "bheptomino".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 4, y = 3, rule = B3/S23
+ob2o$3o$bo!

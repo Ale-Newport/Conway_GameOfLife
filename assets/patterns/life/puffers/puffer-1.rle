@@ -1,0 +1,15 @@
+#N Puffer 1
+#O Bill Gosper, 1971
+#C The first puffer ever found: a c/2 engine escorted by spaceships that
+#C leaves a trail of debris.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): puffer,
+#C period 128, displacement (0,-64) per period, speed c/2 orthogonal.
+#C Source: Life Lexicon Release 29, entry "puffer", diagram 1 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 27, y = 7, rule = B3/S23
+b3o6bo5bo6b3o$o2bo5b3o3b3o5bo2bo$3bo4b2obo3bob2o4bo$3bo19bo$3bo2bo13bo
+2bo$3bo2b2o11b2o2bo$2bo3b2o11b2o3bo!

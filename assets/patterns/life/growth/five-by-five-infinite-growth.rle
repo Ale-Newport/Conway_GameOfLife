@@ -1,0 +1,14 @@
+#N 5x5 infinite growth
+#O Paul Callahan
+#C The only pattern fitting in a 5x5 square that grows forever; it also
+#C releases a block-laying switch engine.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): linear
+#C growth: +16 cells every 144 generations from generation 660 on.
+#C Source: Life Lexicon Release 29, entry "infinitegrowth", diagram 2
+#C (bundled with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 5, y = 5, rule = B3/S23
+3obo$o$3b2o$b2obo$obobo!

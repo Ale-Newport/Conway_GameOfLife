@@ -1,0 +1,15 @@
+#N Eater 2
+#O Dave Buckingham
+#C A larger symmetric eater with a slower recovery that can eat gliders on
+#C several adjacent lanes. A demonstration glider is included.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): eater
+#C (19 cells) absorbs the included glider and is restored (eats on 8 tested
+#C lane/phase combinations).
+#C Source: Life Lexicon Release 29, entry "eater2", diagram 1 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 17, y = 15, rule = B3/S23
+obo$b2o$bo6$10b2obo$10b2ob3o$16bo$10b2ob3o$11bobo$11bobo$12bo!

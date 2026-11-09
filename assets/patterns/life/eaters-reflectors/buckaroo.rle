@@ -1,0 +1,15 @@
+#N Buckaroo
+#O Dave Buckingham (named by Bill Gosper)
+#C A queen bee shuttle stabilised by an eater so that its spark turns a
+#C passing glider; shown with the glider on its way in.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): reflects
+#C incoming glider moving (1, 1) into direction (1, -1) and is restored.
+#C Source: Life Lexicon Release 29, entry "buckaroo", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 24, y = 12, rule = B3/S23
+2bo$obo$b2o$11bo$9bobo$8bobo$7bo2bo11b2o$8bobo11b2o$3b2o4bobo$2bobo6bo
+$2bo$b2o!

@@ -1,0 +1,13 @@
+#N R-pentomino
+#O John Conway, 1969
+#C Five cells that take more than a thousand generations to settle, emitting
+#C six gliders along the way.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C stabilises at generation 1103 with population 116.
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "rpentomino".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 3, y = 3, rule = B3/S23
+b2o$2o$bo!

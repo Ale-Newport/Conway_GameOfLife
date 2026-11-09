@@ -1,0 +1,14 @@
+#N Noah's ark
+#O Charles Corderman, 1971
+#C Two cooperating switch engines that drift diagonally and leave a varied
+#C zoo of still lifes, oscillators and gliders.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): puffer,
+#C period 1344, displacement (-112,-112) per period, speed c/12 diagonal.
+#C Source: Life Lexicon Release 29, entry "noahsark", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 15, y = 15, rule = B3/S23
+10bobo$9bo$10bo2bo$12b3o6$bo$obo2$o2bo$2b2o$3bo!

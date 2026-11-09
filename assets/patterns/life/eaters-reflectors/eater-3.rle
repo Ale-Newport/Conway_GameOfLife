@@ -1,0 +1,16 @@
+#N Eater 3
+#O Dave Buckingham, 1977
+#C An eater whose loaf takes a bite out of the target and is flipped back by
+#C the rest of the structure. A demonstration glider is included.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): eater
+#C (31 cells) absorbs the included glider and is restored (eats on 4 tested
+#C lane/phase combinations).
+#C Source: Life Lexicon Release 29, entry "eater3", diagram 1 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 20, y = 21, rule = B3/S23
+18bo$17bo$17b3o7$9b2o$4b2o2bo2bo$bo2bo4bobo$obobo5bo$bo2bob2o$4bo2bo$
+5bo4bo$6b5o2$8bo$7bobo$8bo!

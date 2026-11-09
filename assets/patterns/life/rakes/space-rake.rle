@@ -1,0 +1,16 @@
+#N Space rake
+#O Unknown (probably Bill Gosper; by 1971), 1971
+#C The first known rake: an ecologist puffer whose dying debris is converted
+#C into gliders by an extra LWSS.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): rake,
+#C period 20, displacement (10,0) per period, speed c/2 orthogonal.
+#C Source: Life Lexicon Release 29, entry "spacerake", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 22, y = 19, rule = B3/S23
+11b2o5b4o$9b2ob2o3bo3bo$9b4o8bo$10b2o5bo2bo2$8bo$7b2o8b2o$6bo9bo2bo$7b
+5o4bo2bo$8b4o3b2ob2o$11bo4b2o4$18b4o$o2bo13bo3bo$4bo16bo$o3bo12bo2bo$b
+4o!

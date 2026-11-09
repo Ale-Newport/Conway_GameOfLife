@@ -1,0 +1,12 @@
+#N Diehard
+#C A seven-cell pattern that survives for 130 generations and then vanishes
+#C completely.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): dies out
+#C at generation 130.
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "diehard".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 8, y = 3, rule = B3/S23
+6bo$2o$bo3b3o!

@@ -1,0 +1,15 @@
+#N Canada goose
+#O Jason Summers, 1999
+#C A glider towing a tagalong; for a while the smallest diagonal ship apart
+#C from the glider.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C spaceship, period 4, displacement (-1,-1) per period, speed c/4 diagonal.
+#C Source: Life Lexicon Release 29, entry "canadagoose", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 13, y = 12, rule = B3/S23
+3o$o9b2o$bo6b3obo$3b2o2b2o$4bo$8bo$4b2o3bo$3bobob2o$3bobo2bob2o$2bo4b
+2o$2b2o$2b2o!

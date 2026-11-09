@@ -1,0 +1,14 @@
+#N LWSS three-glider synthesis
+#O Dave Buckingham
+#C Three gliders collide to build a lightweight spaceship; a minimal example
+#C of glider synthesis.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C collision produces exactly one LWSS.
+#C Source: Life Lexicon Release 29, entry "lwss", diagram 2 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 7, y = 10, rule = B3/S23
+bo$o$3o$5b2o$4b2o$6bo2$2b2o$3b2o$2bo!

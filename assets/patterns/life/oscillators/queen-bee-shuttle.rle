@@ -1,0 +1,14 @@
+#N Queen bee shuttle
+#O Bill Gosper, 1970
+#C A queen bee that bounces between two stabilisers (a block on one end, an
+#C eater on the other); the engine of every true period-30 gun.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C oscillator, period 30.
+#C Source: Life Lexicon Release 29, entry "queenbeeshuttle", diagram 1
+#C (bundled with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 22, y = 9, rule = B3/S23
+9bo$7bobo$6bobo$2o3bo2bo$2o4bobo$7bobo8b2o$9bo8bobo$20bo$20b2o!

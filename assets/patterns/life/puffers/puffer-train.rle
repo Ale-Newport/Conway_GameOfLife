@@ -1,0 +1,14 @@
+#N Puffer train
+#O Bill Gosper
+#C A B-heptomino kept alive by two escorting LWSS; it moves at c/2 and
+#C leaves a long, chaotic smoke trail.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): puffer,
+#C period 140, displacement (0,-70) per period, speed c/2 orthogonal.
+#C Source: Life Lexicon Release 29, entry "puffertrain", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 18, y = 5, rule = B3/S23
+b3o11b3o$o2bo10bo2bo$3bo4b3o6bo$3bo4bo2bo5bo$2bo4bo8bo!

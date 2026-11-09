@@ -1,0 +1,17 @@
+#N Backrake 1
+#O Jason Summers, 2001
+#C A symmetric c/2 rake that fires gliders backwards, away from its
+#C direction of travel.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): rake,
+#C period 8, displacement (0,-4) per period, speed c/2 orthogonal.
+#C Source: Life Lexicon Release 29, entry "backrake", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 27, y = 18, rule = B3/S23
+5b3o11b3o$4bo3bo9bo3bo$3b2o4bo7bo4b2o$2bobob2ob2o5b2ob2obobo$b2obo4bob
+2ob2obo4bob2o$o4bo3bo2bobo2bo3bo4bo$12bobo$2o7b2obobob2o7b2o$12bobo$6b
+3o9b3o$6bo3bo9bo$6bobo4b3o$12bo2bo4b2o$15bo$11bo3bo$11bo3bo$15bo$12bob
+o!

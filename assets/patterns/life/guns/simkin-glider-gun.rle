@@ -1,0 +1,16 @@
+#N Simkin glider gun
+#O Michael Simkin, 2015
+#C A Herschel-based gun in which a Herschel circulates through two B60
+#C conduits; it ties the Gosper gun for the lowest population of any gun.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): gun,
+#C period 120, emits 1 glider per period.
+#C Source: Transcribed by hand (classic object). Standard eater-stabilised
+#C form; the Lexicon diagram shows the snake-stabilised variant (identical
+#C except for the bottom stabiliser), so the match was confirmed
+#C functionally (Life Lexicon R29 entry "simkinglidergun").
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 33, y = 21, rule = B3/S23
+2o5b2o$2o5b2o2$4b2o$4b2o5$22b2ob2o$21bo5bo$21bo6bo2b2o$21b3o3bo3b2o$
+26bo4$20b2o$20bo$21b3o$23bo!

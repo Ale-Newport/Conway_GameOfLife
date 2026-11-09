@@ -1,0 +1,16 @@
+#N Schick engine
+#O Paul Schick, 1972
+#C A c/2 spaceship in which two LWSS escort a tail that throws a large
+#C spark; perturbing the spark yields many puffers.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C spaceship, period 12, displacement (-6,0) per period, speed c/2
+#C orthogonal.
+#C Source: Life Lexicon Release 29, entry "schickengine", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 18, y = 9, rule = B3/S23
+4o$o3bo9bo$o11b2o$bo2bo2b2o5b3o$6b3o6b3o$bo2bo2b2o5b3o$o11b2o$o3bo9bo$
+4o!

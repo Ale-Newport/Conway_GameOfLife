@@ -1,0 +1,13 @@
+#N Eater 5 (tub-with-tail)
+#C The tub-with-tail eater, which can absorb gliders arriving from two
+#C different directions. A demonstration glider is included.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): eater
+#C (12 cells) absorbs the included glider and is restored (eats on 4 tested
+#C lane/phase combinations).
+#C Source: Life Lexicon Release 29, entry "eater5" (standard form, first
+#C diagram); demonstration glider added by the verifier.
+#C License: Extracted from a Life Lexicon Release 29 diagram (Stephen Silver
+#C et al., CC BY-SA 3.0); the demonstration glider was positioned by the
+#C Emergence Lab verifier. Attribution retained.
+x = 17, y = 18, rule = B3/S23
+obo$b2o$bo10$15b2o$11bo3b2o$10bobo$9bobo$9bo$8b2o!

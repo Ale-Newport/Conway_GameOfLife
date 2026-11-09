@@ -1,0 +1,15 @@
+#N Glider-producing switch engine (time bomb seed)
+#O Charles Corderman (engine, 1971); seed by Doug Petrie, 1971
+#C Doug Petrie's 'time bomb' seed, which turns into Corderman's
+#C glider-producing switch engine, the second of the two naturally occurring
+#C stabilised switch engines.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): puffer,
+#C period 384, displacement (-32,-32) per period, speed c/12 diagonal.
+#C Source: Life Lexicon Release 29, entry "timebomb", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 15, y = 6, rule = B3/S23
+bo11b2o$obo4bo6bo$7bo4bo$2bo2bo3bo2bo$2b2o6bo$3bo!

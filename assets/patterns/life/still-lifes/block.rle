@@ -1,0 +1,13 @@
+#N Block
+#O John Conway, 1969
+#C A 2x2 square, the smallest and most common still life. It is the standard
+#C catalyst and the most frequent product of glider collisions.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): still
+#C life: next generation identical.
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "block".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 2, y = 2, rule = B3/S23
+2o$2o!

@@ -1,0 +1,18 @@
+#N Block-laying switch engine
+#O Charles Corderman, 1971
+#C A switch engine stabilised by its own exhaust; it leaves a zig-zag trail
+#C of blocks and is the most common infinite-growth object in soups.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): puffer,
+#C period 288, displacement (-24,-24) per period, speed c/12 diagonal.
+#C Source: Life Lexicon Release 29, entry "stabilizedswitchengine", diagram
+#C 1 (bundled with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 60, y = 60, rule = B3/S23
+2bo$bobo2$bo2bo$3b2o$4bo$18b2o$18b2o3$b2o$3bo$2b2o$b3o15bo$b2o16b2o5b
+2o$3obo14b2o5b2o$bo3bo10b2o$3bo2bo10bo$3b3o12bo$4b2o8b2o$14b2o2$34b2o$
+34b2o3$6b2o$6b2o16b2o$24b2o2$42b2o$20b2o20b2o$20b2o2$14b2o$14b2o$39b2o
+$39b2o3$35b2o$35b2o5$58b2o$58b2o3$30b2o$30b2o16b2o$48b2o3$44b2o$44b2o
+2$38b2o$38b2o!

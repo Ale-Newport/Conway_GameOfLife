@@ -1,0 +1,13 @@
+#N Acorn
+#O Charles Corderman
+#C A seven-cell methuselah that grows to a large debris field and 13 gliders
+#C before settling.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C stabilises at generation 5206 with population 633.
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "acorn".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 7, y = 3, rule = B3/S23
+bo$3bo$2o2b3o!

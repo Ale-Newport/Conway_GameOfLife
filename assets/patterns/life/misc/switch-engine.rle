@@ -1,0 +1,13 @@
+#N Switch engine (unstable)
+#O Charles Corderman, 1971
+#C An eight-cell engine that crawls diagonally at c/12, but on its own its
+#C exhaust soon catches up and destroys it.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C stabilises at generation 3911 with population 842.
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "switchengine".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 6, y = 4, rule = B3/S23
+bobo$o$bo2bo$3b3o!

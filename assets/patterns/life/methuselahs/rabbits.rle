@@ -1,0 +1,14 @@
+#N Rabbits
+#O Andrew Trevorrow, 1986
+#C A nine-cell methuselah that keeps evolving for more than seventeen
+#C thousand generations.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C stabilises at generation 17331 with population 1744.
+#C Source: Life Lexicon Release 29, entry "rabbits", diagram 1 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 7, y = 3, rule = B3/S23
+o3b3o$3o2bo$bo!

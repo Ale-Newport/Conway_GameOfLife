@@ -1,0 +1,14 @@
+#N Eater 1 (fishhook)
+#O Bill Gosper, 1971
+#C The classic fishhook eater: it absorbs an incoming glider and then
+#C restores its own shape. A demonstration glider is included.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): eater (7
+#C cells) absorbs the included glider and is restored (eats on 2 tested
+#C lane/phase combinations).
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "eater1".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 13, y = 13, rule = B3/S23
+obo$b2o$bo7$9b2o$9bo$10b3o$12bo!

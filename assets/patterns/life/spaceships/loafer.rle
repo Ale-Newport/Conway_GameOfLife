@@ -1,0 +1,15 @@
+#N Loafer
+#O Josh Ball, 2013
+#C A slow c/7 orthogonal spaceship; the first new glider-constructible ship
+#C in about a decade when it was found.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C spaceship, period 7, displacement (-1,0) per period, speed c/7
+#C orthogonal.
+#C Source: Life Lexicon Release 29, entry "loafer", diagram 1 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 9, y = 9, rule = B3/S23
+b2o2bob2o$o2bo2b2o$bobo$2bo$8bo$6b3o$5bo$6bo$7b2o!

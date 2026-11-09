@@ -1,0 +1,15 @@
+#N Pinwheel
+#O Simon Norton, 1970
+#C A small rotor that turns inside a ring flanked by four blocks, like a
+#C turning pinwheel.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C oscillator, period 4.
+#C Source: Life Lexicon Release 29, entry "pinwheel", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 12, y = 12, rule = B3/S23
+6b2o$6b2o2$4b4o$2obo4bo$2obo2bobo$3bo3b2ob2o$3bobo2bob2o$4b4o2$4b2o$4b
+2o!

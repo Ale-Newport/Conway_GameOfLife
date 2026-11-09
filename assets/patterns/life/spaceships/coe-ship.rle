@@ -1,0 +1,15 @@
+#N Coe ship
+#O Tim Coe, 1995
+#C A c/2 puffer engine that is itself a clean spaceship; it was later seen
+#C in random soups.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C spaceship, period 16, displacement (8,0) per period, speed c/2
+#C orthogonal.
+#C Source: Life Lexicon Release 29, entry "coeship", diagram 1 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 10, y = 9, rule = B3/S23
+4b6o$2b2o5bo$2obo5bo$4bo3bo$6bo$6b2o$5b4o$5b2ob2o$7b2o!

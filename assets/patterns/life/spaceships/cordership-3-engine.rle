@@ -1,0 +1,22 @@
+#N 3-engine Cordership
+#O Paul Tooke, 2004
+#C A glide-symmetric diagonal spaceship built from three switch engines that
+#C clean up each other's exhaust.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C spaceship, period 96, displacement (-8,-8) per period, speed c/12
+#C diagonal.
+#C Source: Life Lexicon Release 29, entry "cordership", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 63, y = 58, rule = B3/S23
+32b2obo$31b3obo6bobo$30bo4bobo4bo$31b2o6bobo3bo$32bo3bo2bo2b2o$35bob2o
+3bo$34bobo16b2o$34bobo16b2o7$61b2o$52b2o7b2o$39bo9bob4o$34bo3b5o5b2obo
+3b2o$33bobo7b2o4bo2b2ob2o$33bo7bob2o5b6o$34bo8b2o6bo$35bo3b4o$40b3o$
+24bobo9b2o$24bobobo6bobo$23bo2b2obo4b2o$24b2o3bobob2obo$24b2o3b2ob5o$
+28bob2o3b2o$27bobo$2b2obo$b3obo6bobo$o4bobo4bo$b2o6bobo3bo$2bo3bo2bo2b
+2o11bo$5bob2o3bo11b3o$4bobo17bo2bo$4bobo16bo4bo$24bo2$24bo2bo$25bobo2$
+21bo$20b3o$19b2ob2o$9bo8b2obo5bo$4bo3b5o4b2o6b2o$3bobo7b2o2b2o7b2o$3bo
+7bob2o$4bo8b2o$5bo3b4o$10b3o4$11b2o$11b2o!

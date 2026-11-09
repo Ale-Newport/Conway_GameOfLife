@@ -1,0 +1,14 @@
+#N Caterer
+#O Dean Hickerson, 1989
+#C A small period-3 oscillator that repeatedly serves up an isolated cell,
+#C useful as a sparker.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C oscillator, period 3.
+#C Source: Life Lexicon Release 29, entry "caterer", diagram 1 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 8, y = 6, rule = B3/S23
+2bo$o3b4o$o3bo$o$3bo$b2o!

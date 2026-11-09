@@ -1,0 +1,15 @@
+#N Kok's galaxy
+#O Jan Kok, 1971
+#C Four thick bars arranged like a pinwheel around an empty centre that
+#C churn through an eight-phase cycle; it serves as the Golly application
+#C icon.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C oscillator, period 8.
+#C Source: Life Lexicon Release 29, entry "koksgalaxy", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 9, y = 9, rule = B3/S23
+6ob2o$6ob2o$7b2o$2o5b2o$2o5b2o$2o5b2o$2o$2ob6o$2ob6o!

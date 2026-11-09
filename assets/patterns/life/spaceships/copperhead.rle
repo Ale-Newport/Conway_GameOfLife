@@ -1,0 +1,15 @@
+#N Copperhead
+#O 'zdr' (conwaylife.com forum user), 2016
+#C A small c/10 orthogonal spaceship found with a depth-first search in
+#C 2016.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C spaceship, period 10, displacement (0,-1) per period, speed c/10
+#C orthogonal.
+#C Source: Life Lexicon Release 29, entry "copperhead", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 6, y = 12, rule = B3/S23
+b4o2$bo2bo$ob2obo$o4bo2$o4bo$2o2b2o$6o$bo2bo$2b2o$2b2o!

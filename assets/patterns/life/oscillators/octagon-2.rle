@@ -1,0 +1,13 @@
+#N Octagon 2
+#O Sol Goodman and Arthur Taber (independently), 1971
+#C An octagonal ring of sixteen cells; the first period-5 oscillator found.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C oscillator, period 5.
+#C Source: Life Lexicon Release 29, entry "octagonii", diagram 1 (bundled
+#C with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 8, y = 8, rule = B3/S23
+3b2o$2bo2bo$bo4bo$o6bo$o6bo$bo4bo$2bo2bo$3b2o!

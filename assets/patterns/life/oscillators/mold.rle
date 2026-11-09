@@ -1,0 +1,13 @@
+#N Mold
+#O Achim Flammenkamp (rediscovered by Dean Hickerson, 1989), 1988
+#C A twelve-cell period-4 oscillator that fits in a 6x6 box.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C oscillator, period 4.
+#C Source: Life Lexicon Release 29, entry "mold", diagram 1 (bundled with
+#C Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 6, y = 6, rule = B3/S23
+3b2o$2bo2bo$o2bobo$4bo$ob2o$bo!

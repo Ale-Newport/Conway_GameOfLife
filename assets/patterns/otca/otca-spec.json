@@ -1,0 +1,838 @@
+{
+ "_comment": "OTCA metapixel (Brice Due 2006) machine-readable spec. Coordinates are tile-nominal: tile occupies [0,2047]^2; RLE file coordinate = nominal + 5. See docs/research/otca-metapixel.md. Values measured with Golly 5.1 bgolly (git 9a7079a8) on 2026-11-09.",
+ "period": 35328,
+ "period_factorization": "2^9*3*23 = 768*46 = 192*184",
+ "tile_pitch": 2048,
+ "tile_bbox_nominal": [
+  -5,
+  -5,
+  2052,
+  2052
+ ],
+ "file_to_nominal_offset": [
+  -5,
+  -5
+ ],
+ "files": {
+  "OFF": "OTCAmetapixel-OFF.rle",
+  "ON": "OTCAmetapixel-ON.rle",
+  "OFF_B3S23": "OTCAmetapixel-OFF-B3S23.rle",
+  "ON_B3S23": "OTCAmetapixel-ON-B3S23.rle"
+ },
+ "population_unprogrammed": {
+  "OFF": 23920,
+  "ON": 66203
+ },
+ "rule_bits": {
+  "how": "add ONE live cell at the listed coordinate to complete the broken eater (eater present = digit in rule). Same cell for ON and OFF tiles; all tiles of a pattern must be programmed identically.",
+  "B": {
+   "0": [
+    148,
+    1516
+   ],
+   "1": [
+    148,
+    1506
+   ],
+   "2": [
+    148,
+    1496
+   ],
+   "3": [
+    148,
+    1470
+   ],
+   "4": [
+    148,
+    1460
+   ],
+   "5": [
+    148,
+    1450
+   ],
+   "6": [
+    148,
+    1424
+   ],
+   "7": [
+    148,
+    1414
+   ],
+   "8": [
+    148,
+    1404
+   ]
+  },
+  "S": {
+   "0": [
+    162,
+    1518
+   ],
+   "1": [
+    162,
+    1508
+   ],
+   "2": [
+    162,
+    1498
+   ],
+   "3": [
+    162,
+    1472
+   ],
+   "4": [
+    162,
+    1462
+   ],
+   "5": [
+    162,
+    1452
+   ],
+   "6": [
+    162,
+    1426
+   ],
+   "7": [
+    162,
+    1416
+   ],
+   "8": [
+    162,
+    1406
+   ]
+  },
+  "verified": "all 18 bits individually verified with bgolly (centre of 3x3 grid, read at t=2P), plus B1,B3,B5,S1,S2,S3,S5,S6 cross-checked against Golly demo tiles"
+ },
+ "neighbourhood_fuses": {
+  "how": "default = all present (Moore). REMOVE the listed cells from EVERY tile to drop one direction from every macro-cell's neighbourhood. Verified (bgolly, 3x3 grid, rule B1/S): removing edge block X makes each tile deaf to its X neighbour; removing corner LWSS X makes each tile deaf to its OPPOSITE corner neighbour (the corner LWSS gates the tile's own output toward X). von Neumann = remove the 4 corner LWSS (as in metapixel-parity64).",
+  "NW": [
+   [
+    8,
+    1
+   ],
+   [
+    8,
+    3
+   ],
+   [
+    9,
+    0
+   ],
+   [
+    10,
+    0
+   ],
+   [
+    11,
+    0
+   ],
+   [
+    11,
+    3
+   ],
+   [
+    12,
+    0
+   ],
+   [
+    12,
+    1
+   ],
+   [
+    12,
+    2
+   ]
+  ],
+  "NE": [
+   [
+    2044,
+    8
+   ],
+   [
+    2044,
+    11
+   ],
+   [
+    2045,
+    12
+   ],
+   [
+    2046,
+    8
+   ],
+   [
+    2046,
+    12
+   ],
+   [
+    2047,
+    9
+   ],
+   [
+    2047,
+    10
+   ],
+   [
+    2047,
+    11
+   ],
+   [
+    2047,
+    12
+   ]
+  ],
+  "SE": [
+   [
+    2035,
+    2045
+   ],
+   [
+    2035,
+    2046
+   ],
+   [
+    2035,
+    2047
+   ],
+   [
+    2036,
+    2044
+   ],
+   [
+    2036,
+    2047
+   ],
+   [
+    2037,
+    2047
+   ],
+   [
+    2038,
+    2047
+   ],
+   [
+    2039,
+    2044
+   ],
+   [
+    2039,
+    2046
+   ]
+  ],
+  "SW": [
+   [
+    0,
+    2035
+   ],
+   [
+    0,
+    2036
+   ],
+   [
+    0,
+    2037
+   ],
+   [
+    0,
+    2038
+   ],
+   [
+    1,
+    2035
+   ],
+   [
+    1,
+    2039
+   ],
+   [
+    2,
+    2035
+   ],
+   [
+    3,
+    2036
+   ],
+   [
+    3,
+    2039
+   ]
+  ],
+  "N": [
+   [
+    1001,
+    0
+   ],
+   [
+    1001,
+    1
+   ],
+   [
+    1002,
+    0
+   ],
+   [
+    1002,
+    1
+   ]
+  ],
+  "E": [
+   [
+    2046,
+    1001
+   ],
+   [
+    2046,
+    1002
+   ],
+   [
+    2047,
+    1001
+   ],
+   [
+    2047,
+    1002
+   ]
+  ],
+  "S": [
+   [
+    1045,
+    2046
+   ],
+   [
+    1045,
+    2047
+   ],
+   [
+    1046,
+    2046
+   ],
+   [
+    1046,
+    2047
+   ]
+  ],
+  "W": [
+   [
+    0,
+    1045
+   ],
+   [
+    0,
+    1046
+   ],
+   [
+    1,
+    1045
+   ],
+   [
+    1,
+    1046
+   ]
+  ],
+  "deaf_direction_when_removed": {
+   "NW": "SE",
+   "NE": "SW",
+   "SE": "NW",
+   "SW": "NE",
+   "N": "N",
+   "E": "E",
+   "S": "S",
+   "W": "W"
+  }
+ },
+ "overlap_objects": {
+  "corner_tubs_outside_nominal_square": {
+   "NW": [
+    [
+     -5,
+     -4
+    ],
+    [
+     -4,
+     -5
+    ],
+    [
+     -4,
+     -3
+    ],
+    [
+     -3,
+     -4
+    ]
+   ],
+   "NE": [
+    [
+     2050,
+     -4
+    ],
+    [
+     2051,
+     -5
+    ],
+    [
+     2051,
+     -3
+    ],
+    [
+     2052,
+     -4
+    ]
+   ],
+   "SE": [
+    [
+     2050,
+     2051
+    ],
+    [
+     2051,
+     2050
+    ],
+    [
+     2051,
+     2052
+    ],
+    [
+     2052,
+     2051
+    ]
+   ],
+   "SW": [
+    [
+     -5,
+     2051
+    ],
+    [
+     -4,
+     2050
+    ],
+    [
+     -4,
+     2052
+    ],
+    [
+     -3,
+     2051
+    ]
+   ]
+  },
+  "corner_blocks_straddling_corners": {
+   "NW": [
+    [
+     -1,
+     -1
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     0,
+     -1
+    ],
+    [
+     0,
+     0
+    ]
+   ],
+   "NE": [
+    [
+     2047,
+     -1
+    ],
+    [
+     2047,
+     0
+    ],
+    [
+     2048,
+     -1
+    ],
+    [
+     2048,
+     0
+    ]
+   ],
+   "SE": [
+    [
+     2047,
+     2047
+    ],
+    [
+     2047,
+     2048
+    ],
+    [
+     2048,
+     2047
+    ],
+    [
+     2048,
+     2048
+    ]
+   ],
+   "SW": [
+    [
+     -1,
+     2047
+    ],
+    [
+     -1,
+     2048
+    ],
+    [
+     0,
+     2047
+    ],
+    [
+     0,
+     2048
+    ]
+   ]
+  }
+ },
+ "readout": {
+  "rect_nominal_inclusive": [
+   250,
+   250,
+   1750,
+   1750
+  ],
+  "OFF_count": 0,
+  "ON_count_range_steady": [
+   21677,
+   29795
+  ],
+  "ON_count_period": 46,
+  "ON_count_when_t_mod_46_eq_0": 29795,
+  "at_t_eq_k_times_P_k_ge_1": "core is either empty (OFF) or bit-identical to the core of OTCAmetapixel-ON.rle at gen 0 (29795 cells)",
+  "displayed_metagen_at_t": "m(t) = max(0, floor((t - 7408) / 35328)) outside transition windows",
+  "transition_window_t_mod_P": [
+   4320,
+   7407
+  ],
+  "transition_window_applies_from_t": 35328,
+  "notes": "first cycle [0,35328) never changes display; metagen n (n>=0) is cleanly readable at t=(n+1)*35328"
+ },
+ "golden_or_tiling_B3S23": {
+  "blinker3x3": {
+   "model": [
+    "...",
+    "OOO",
+    "..."
+   ],
+   "rows": [
+    {
+     "t": 0,
+     "population": 342076,
+     "sha256": "cf4530b73d4fff3232ad87ba999a2b687ee31066476df403ab3f71774cc8987b"
+    },
+    {
+     "t": 35328,
+     "population": 330244,
+     "sha256": "4e4bfc8180dd75f9b9565a3298343657247801f3b3589ed9447ed0775f645242",
+     "core_counts": [
+      0,
+      0,
+      0,
+      29795,
+      29795,
+      29795,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 70656,
+     "population": 330268,
+     "sha256": "309afbb13d1a03d2dd2fe3e22ef4be00a387106c7fb6da80c1c0595e771eff3f",
+     "core_counts": [
+      0,
+      29795,
+      0,
+      0,
+      29795,
+      0,
+      0,
+      29795,
+      0
+     ]
+    },
+    {
+     "t": 105984,
+     "population": 330244,
+     "sha256": "77a05b9ac8ebbcd9fee39eab2ef1fdfdab9f2a7e717b8912a8988ac285abe56d",
+     "core_counts": [
+      0,
+      0,
+      0,
+      29795,
+      29795,
+      29795,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 141312,
+     "population": 330220,
+     "sha256": "ba4826bf393200c2de688853d3a580a6b87cd89395e026bb5a444a0b7789e0f1",
+     "core_counts": [
+      0,
+      29795,
+      0,
+      0,
+      29795,
+      0,
+      0,
+      29795,
+      0
+     ]
+    },
+    {
+     "t": 176640,
+     "population": 330244,
+     "sha256": "4e4bfc8180dd75f9b9565a3298343657247801f3b3589ed9447ed0775f645242",
+     "core_counts": [
+      0,
+      0,
+      0,
+      29795,
+      29795,
+      29795,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 211968,
+     "population": 330268,
+     "sha256": "309afbb13d1a03d2dd2fe3e22ef4be00a387106c7fb6da80c1c0595e771eff3f",
+     "core_counts": [
+      0,
+      29795,
+      0,
+      0,
+      29795,
+      0,
+      0,
+      29795,
+      0
+     ]
+    },
+    {
+     "t": 247296,
+     "population": 330244,
+     "sha256": "77a05b9ac8ebbcd9fee39eab2ef1fdfdab9f2a7e717b8912a8988ac285abe56d",
+     "core_counts": [
+      0,
+      0,
+      0,
+      29795,
+      29795,
+      29795,
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 282624,
+     "population": 330220,
+     "sha256": "ba4826bf393200c2de688853d3a580a6b87cd89395e026bb5a444a0b7789e0f1",
+     "core_counts": [
+      0,
+      29795,
+      0,
+      0,
+      29795,
+      0,
+      0,
+      29795,
+      0
+     ]
+    }
+   ]
+  },
+  "single1x1": {
+   "model": [
+    "O"
+   ],
+   "rows": [
+    {
+     "t": 0,
+     "population": 66206,
+     "sha256": "d278172c42df6acd4b92e9ba484196e292fc078e5eb4922eb0edfebb939c928f"
+    },
+    {
+     "t": 35328,
+     "population": 65115,
+     "sha256": "41720dcbfb683543cbb41192e7cc3668315de3e358f018792a326accc09a5aef",
+     "core_counts": [
+      29795
+     ]
+    },
+    {
+     "t": 70656,
+     "population": 22815,
+     "sha256": "7d5de0a54891a27aa2709665c8690735d66622ea8176951a3d3212384179200b",
+     "core_counts": [
+      0
+     ]
+    },
+    {
+     "t": 105984,
+     "population": 22815,
+     "sha256": "7d5de0a54891a27aa2709665c8690735d66622ea8176951a3d3212384179200b",
+     "core_counts": [
+      0
+     ]
+    },
+    {
+     "t": 141312,
+     "population": 22815,
+     "sha256": "7d5de0a54891a27aa2709665c8690735d66622ea8176951a3d3212384179200b",
+     "core_counts": [
+      0
+     ]
+    },
+    {
+     "t": 176640,
+     "population": 22815,
+     "sha256": "7d5de0a54891a27aa2709665c8690735d66622ea8176951a3d3212384179200b",
+     "core_counts": [
+      0
+     ]
+    },
+    {
+     "t": 211968,
+     "population": 22815,
+     "sha256": "7d5de0a54891a27aa2709665c8690735d66622ea8176951a3d3212384179200b",
+     "core_counts": [
+      0
+     ]
+    },
+    {
+     "t": 247296,
+     "population": 22815,
+     "sha256": "7d5de0a54891a27aa2709665c8690735d66622ea8176951a3d3212384179200b",
+     "core_counts": [
+      0
+     ]
+    },
+    {
+     "t": 282624,
+     "population": 22815,
+     "sha256": "7d5de0a54891a27aa2709665c8690735d66622ea8176951a3d3212384179200b",
+     "core_counts": [
+      0
+     ]
+    }
+   ]
+  },
+  "block2x2": {
+   "model": [
+    "OO",
+    "OO"
+   ],
+   "rows": [
+    {
+     "t": 0,
+     "population": 264796,
+     "sha256": "692ef87b74e8307d8f1087c4aa4cd206d5bc00dde5d05a561ed3e05f24e28eab"
+    },
+    {
+     "t": 35328,
+     "population": 259832,
+     "sha256": "21d3c6b0922d1ede4baa65a2bcfab7bf0f83f240947221c14775d56d35aa5318",
+     "core_counts": [
+      29795,
+      29795,
+      29795,
+      29795
+     ]
+    },
+    {
+     "t": 70656,
+     "population": 259832,
+     "sha256": "21d3c6b0922d1ede4baa65a2bcfab7bf0f83f240947221c14775d56d35aa5318",
+     "core_counts": [
+      29795,
+      29795,
+      29795,
+      29795
+     ]
+    },
+    {
+     "t": 105984,
+     "population": 259832,
+     "sha256": "21d3c6b0922d1ede4baa65a2bcfab7bf0f83f240947221c14775d56d35aa5318",
+     "core_counts": [
+      29795,
+      29795,
+      29795,
+      29795
+     ]
+    },
+    {
+     "t": 141312,
+     "population": 259832,
+     "sha256": "21d3c6b0922d1ede4baa65a2bcfab7bf0f83f240947221c14775d56d35aa5318",
+     "core_counts": [
+      29795,
+      29795,
+      29795,
+      29795
+     ]
+    },
+    {
+     "t": 176640,
+     "population": 259832,
+     "sha256": "21d3c6b0922d1ede4baa65a2bcfab7bf0f83f240947221c14775d56d35aa5318",
+     "core_counts": [
+      29795,
+      29795,
+      29795,
+      29795
+     ]
+    },
+    {
+     "t": 211968,
+     "population": 259832,
+     "sha256": "21d3c6b0922d1ede4baa65a2bcfab7bf0f83f240947221c14775d56d35aa5318",
+     "core_counts": [
+      29795,
+      29795,
+      29795,
+      29795
+     ]
+    },
+    {
+     "t": 247296,
+     "population": 259832,
+     "sha256": "21d3c6b0922d1ede4baa65a2bcfab7bf0f83f240947221c14775d56d35aa5318",
+     "core_counts": [
+      29795,
+      29795,
+      29795,
+      29795
+     ]
+    },
+    {
+     "t": 282624,
+     "population": 259832,
+     "sha256": "21d3c6b0922d1ede4baa65a2bcfab7bf0f83f240947221c14775d56d35aa5318",
+     "core_counts": [
+      29795,
+      29795,
+      29795,
+      29795
+     ]
+    }
+   ]
+  }
+ },
+ "golden_hash_definition": "SHA-256 of concatenated lines 'x y\\n' for all live cells in global nominal coordinates (tile (i,j) nominal origin at (2048*i, 2048*j), model row j = tile row j), sorted by y then x; grid built by OR-ing the *-B3S23.rle tiles (file coords - 5) shifted by (2048*i, 2048*j); 'O' = ON tile, '.' = OFF tile; core_counts are per tile in row-major order."
+}

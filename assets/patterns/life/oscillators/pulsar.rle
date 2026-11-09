@@ -1,0 +1,14 @@
+#N Pulsar
+#O John Conway, 1970
+#C A large fourfold-symmetric oscillator that is nevertheless very common in
+#C soups because a small predecessor grows into it.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C oscillator, period 3.
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "pulsar".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 13, y = 13, rule = B3/S23
+2b3o3b3o2$o4bobo4bo$o4bobo4bo$o4bobo4bo$2b3o3b3o2$2b3o3b3o$o4bobo4bo$o
+4bobo4bo$o4bobo4bo2$2b3o3b3o!

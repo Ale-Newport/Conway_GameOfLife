@@ -1,0 +1,14 @@
+#N Snark
+#O Mike Playle, 2013
+#C A small stable reflector that turns a glider through 90 degrees and is
+#C ready again after 43 ticks; shown with an incoming glider.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): reflects
+#C incoming glider moving (-1, -1) into direction (-1, 1) and is restored.
+#C Source: Life Lexicon Release 29, entry "Snark" (Playle's original, top of
+#C the diagram); incoming glider taken from the same diagram's glider loop.
+#C License: Extracted from a Life Lexicon Release 29 diagram (Stephen Silver
+#C et al., CC BY-SA 3.0); the demonstration glider was positioned by the
+#C Emergence Lab verifier. Attribution retained.
+x = 19, y = 24, rule = B3/S23
+9b2o$8bobo$2b2o4bo$o2bo2b2ob4o$2obobobobo2bo$3bobobobo$3bobob2o$4bo2$
+17b2o$8b2o7bo$8b2o5bobo$15b2o7$5b2o$6bo$3b3o8b3o$3bo10bo$15bo!

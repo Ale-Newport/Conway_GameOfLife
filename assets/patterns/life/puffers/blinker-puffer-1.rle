@@ -1,0 +1,14 @@
+#N Blinker puffer 1
+#O Robert Wainwright, 1984
+#C The first blinker puffer: a compact c/2 engine that lays a row of
+#C blinkers.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): puffer,
+#C period 8, displacement (-4,0) per period, speed c/2 orthogonal.
+#C Source: Life Lexicon Release 29, entry "blinkerpuffer", diagram 1
+#C (bundled with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 9, y = 18, rule = B3/S23
+3bo$bo3bo$o$o4bo$5o4$b2o$2ob3o$b4o$2b2o2$5b2o$3bo4bo$2bo$2bo5bo$2b6o!

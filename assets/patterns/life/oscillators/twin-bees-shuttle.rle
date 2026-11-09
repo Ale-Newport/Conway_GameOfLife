@@ -1,0 +1,16 @@
+#N Twin bees shuttle
+#O Bill Gosper, 1971
+#C Two small active regions (the twin bees) bounce back and forth between
+#C block stabilisers; this period-46 shuttle is the engine of the classic
+#C p46 guns.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid):
+#C oscillator, period 46.
+#C Source: Life Lexicon Release 29, entry "twinbeesshuttle", diagram 1
+#C (bundled with Golly 5.1 at Help/Lexicon/).
+#C License: Cell layout transcribed from the Life Lexicon Release 29, (C)
+#C Stephen Silver 1997-2018 with later updates by Dave Greene and David
+#C Bell, licensed CC BY-SA 3.0. The configuration itself is a mathematical
+#C object; attribution is retained to respect the source.
+x = 27, y = 17, rule = B3/S23
+b2o$b2o2$15bo$2o13b2o8b2o$2o14b2o7b2o$11b2o2b2o4$11b2o2b2o$2o14b2o$2o
+13b2o$15bo2$b2o$b2o!

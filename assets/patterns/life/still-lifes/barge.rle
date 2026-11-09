@@ -1,0 +1,12 @@
+#N Barge
+#O JHC group (John Conway and collaborators), 1970
+#C A diagonally stretched tub of six cells.
+#C Verified by the Emergence Lab verifier (B3/S23, unbounded grid): still
+#C life: next generation identical.
+#C Source: Transcribed by hand (classic object); cross-checked against Life
+#C Lexicon R29 entry "barge".
+#C License: Transcribed by hand for Emergence Lab; a configuration of cells
+#C is a mathematical fact and no third-party expression was copied.
+#C Cross-checked against the Life Lexicon R29 diagram.
+x = 4, y = 4, rule = B3/S23
+bo$obo$bobo$2bo!
