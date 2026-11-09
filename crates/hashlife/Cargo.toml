@@ -1,0 +1,24 @@
+[package]
+name = "hashlife"
+description = "Hashlife (hash-consed quadtree with memoised evolution) for two-state outer-totalistic Life-like rules, with macrocell I/O."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+simulation-core.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "hashlife"
+harness = false
+
+[lints]
+workspace = true
