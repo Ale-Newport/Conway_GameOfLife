@@ -1,0 +1,20 @@
+[package]
+name = "rendering"
+description = "Bevy rendering building blocks: styled grid renderer, 2D/3D cameras, voxel meshing, terrain and water, particles, shared world-input types."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+bevy.workspace = true
+bevy_panorbit_camera.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true
