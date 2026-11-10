@@ -51,7 +51,7 @@ neighbourhood, size and step (`sim::params::rules_text`).
 | `neighbourhood` | text ≤ 40 | `moore` | `RequiresReset` | `moore`, `von_neumann`, `none`, or listened directions `N,E,S,W,NE…` |
 | `width`, `height` | int 1–256 | 3 | `RequiresReset` | grid size in tiles (pattern kept at the top-left) |
 | `seed` | int ≥ 0 | 1 | `RequiresReset` | seed of the generator used by `Randomize` |
-| `step` | choice | `35328` | `Immediate` | generations per tick: `1, 2, 4, …, 32768` or `35328` (one metagen); ticks always stop at multiples of P to read. Integers (`--param step=1024`) and `metagen` are accepted and normalised to the option text |
+| `step` | choice | `35328` | `Immediate` | generations per tick: `1, 2, 4, …, 32768` or `35328` (one metagen); a tick that crosses a multiple of P pauses there to read the tiles, then completes its step (at `1024` the tick that reads at 35 328 ends at 35 840). Integers (`--param step=1024`) and `metagen` are accepted and normalised to the option text |
 | `node_limit` | int 1024–2·10⁹ | 8 388 608 | `Immediate` | Hashlife soft node limit |
 
 Changing the rule, neighbourhood or size changes the *physical* pattern, so

@@ -110,8 +110,9 @@ pub fn param_specs() -> Vec<ParamSpec> {
             .apply(ApplyPolicy::RequiresReset),
         ParamSpec::choice("step", "Generations per tick", &options, &PERIOD.to_string())
             .describe(
-                "Physical B3/S23 generations advanced per tick by Hashlife. Ticks stop exactly at every multiple of \
-                 35 328 to read the macro states, whatever the step.",
+                "Physical B3/S23 generations advanced per tick by Hashlife. Whatever the step, evolution pauses at \
+                 every multiple of 35 328 to read the macro states, then completes the tick (at 1024 per tick, the \
+                 tick that reads at 35 328 ends at 35 840).",
             )
             .group("Speed")
             .apply(ApplyPolicy::Immediate),
@@ -201,7 +202,8 @@ pub fn rules_text(programming: Programming, width: u32, height: u32, step: StepS
          in each tile's core [250, 1750]²: 0 = OFF, 29 795 = ON, anything else = ambiguous (reported, never \
          rounded).\n\
          * The display shows m(t) = max(0, ⌊(t − 7408)/P⌋); cores may change while t mod P ∈ [4320, 7407] (t ≥ P).\n\
-         * One tick advances {gens} generations, stopping at every multiple of P to read the tiles.\n\n\
+         * One tick advances {gens} generations; a tick that crosses a multiple of P pauses there to read the \
+         tiles, then completes its step.\n\n\
          **Accelerated macro representation — not a physical simulation.** The same rule is also applied directly \
          to the macro grid (same neighbourhood, outside OFF) to predict each metageneration; every exact readout \
          is compared with it and disagreements are reported as mismatches.",

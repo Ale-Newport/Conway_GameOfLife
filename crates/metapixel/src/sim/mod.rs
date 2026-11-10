@@ -71,9 +71,10 @@ impl Default for WorldConfig {
 /// * One tick advances [`StepSize::generations`] physical generations;
 ///   [`Simulation::tick`] reports the physical generation and
 ///   [`Simulation::advance`]`(n)` advances exactly `n` generations.
-/// * Whatever the step, evolution stops at every multiple of `P = 35 328` to
-///   read every tile ([`ReadoutRecord`]) and compare it with the
-///   accelerated prediction.
+/// * Whatever the step, evolution pauses at every multiple of `P = 35 328`
+///   to read every tile ([`ReadoutRecord`]) and compare it with the
+///   accelerated prediction, then completes the tick: with 1024 generations
+///   per tick, the tick that reads at 35 328 ends at 35 840.
 /// * Commands edit the macro pattern and rebuild the construction at
 ///   generation 0; rule, neighbourhood, size and seed are
 ///   [`ApplyPolicy::RequiresReset`] parameters.
@@ -237,8 +238,9 @@ impl MetapixelSim {
         Ok(())
     }
 
-    /// Advances `generations` physical generations, stopping at every
-    /// multiple of P to read the tiles. Returns the generations advanced.
+    /// Advances `generations` physical generations, pausing at every
+    /// multiple of P on the way to read the tiles. Returns the generations
+    /// advanced.
     fn run(&mut self, generations: u64) -> u64 {
         if self.halted.is_some() {
             return 0;

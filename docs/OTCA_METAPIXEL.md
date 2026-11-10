@@ -122,9 +122,11 @@ says which one it displays.
   repeat with period 46 (21 677 … 29 795 cells).
 * **Displayed metagen** `m(t) = max(0, ⌊(t − 7408)/P⌋)` outside transitions;
   `PhaseInfo` reports it with `t mod P`, the stage and the half of the cycle.
-* **Readout**: metagen `n` at `t = (n + 1)·P`. Whatever the step size, ticks
-  stop exactly there (`MetapixelSim::run`), read all tiles and record the
-  result.
+* **Readout**: metagen `n` at `t = (n + 1)·P`. Whatever the step size,
+  evolution pauses exactly there (`MetapixelSim::run`), reads all tiles,
+  records the result and then completes the tick, so a tick ends on a
+  multiple of P only when its step lands there (with 1024 generations per
+  tick, the tick that reads at 35 328 ends at 35 840).
 * **Finite grids**: outside the grid is permanently OFF (never sends, never
   born); no debris escapes; the bounding box is constant.
 
@@ -209,7 +211,7 @@ each time includes contention from its neighbours.
 | `exact::golly_parity_demo_follows_the_von_neumann_parity_rule` (ignored) | 64×64 B135/S135 von Neumann demo (detected from the tiles), 5 metagens | 0.34 s |
 | `exact::golly_p216_demo_follows_its_rule_with_missing_tiles_never_born` (ignored) | sparse 4 512-tile B35/S236 demo (128 116 349 cells), 4 metagens; missing tiles never ON | 0.64 s |
 | `exact::transition_window_timing_matches_the_research_note` (ignored) | per-generation core counts for `t mod P ∈ [4250, 7500]`: dying cores leave their period-46 sequence at exactly **4320** and are empty from **7362**; born cores get their first cell at **4366** and are steady from **7408**; 29 795 at `t ≡ 0 (mod 46)` | 1.70 s |
-| `sim::*` | descriptor and metrics, apply policies and pending values (integer `step` overrides from the command line accepted; the physical rule stays B3/S23 whatever the macro rule), ticks stopping at P, commands rebuilding at generation 0 (errors change nothing), grid-view contract (budget, power-of-two LOD, snapped origins, densities equal to Hashlife's block counts, exact texels), macro view labels, inspection, snapshot/restore replay including the RNG, scenarios (files equal embedded copies, RON round trip, reset restores the generator) | 0.23 s |
+| `sim::*` | descriptor and metrics, apply policies and pending values (integer `step` overrides from the command line accepted; the physical rule stays B3/S23 whatever the macro rule), readouts at multiples of P, commands rebuilding at generation 0 (errors change nothing), grid-view contract (budget, power-of-two LOD, snapped origins, densities equal to Hashlife's block counts, exact texels), macro view labels, inspection, snapshot/restore replay including the RNG, scenarios (files equal embedded copies, RON round trip, reset restores the generator) | 0.23 s |
 
 Every exact readout so far had cores of exactly 0 or 29 795 cells; no tile
 was ever ambiguous and no prediction ever mismatched.
