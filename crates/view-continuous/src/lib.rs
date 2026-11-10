@@ -18,9 +18,8 @@
 //!   scenarios in the top-bar picker (grouped by model) and the model buttons
 //!   of the Tools panel, loaded into the same runner (`Control::Replace`).
 //!   The runner publishes a display-ready descriptor of the running model
-//!   ([`display_descriptor`]: glyphs egui can draw, "time unit" as the tick
-//!   unit, and no slider stepping for values off their step grid, which egui
-//!   would otherwise snap — and send to the model — merely by drawing).
+//!   ([`display_descriptor`]: glyphs egui can draw and "time unit" as the
+//!   tick unit).
 //! * **World** — a grid camera (pan, zoom towards the pointer, framing) that
 //!   requests only the visible region from the model, at a level of detail
 //!   that keeps one sample per pixel; single planes are drawn by the shared

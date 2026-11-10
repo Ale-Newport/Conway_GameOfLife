@@ -111,8 +111,12 @@ Rules:
   The descriptor may depend on the running system: after every control that
   can change the state (parameters, commands, edits, closures, reset,
   undo/redo, history jumps, restores, `Control::Replace`; not after plain
-  ticks) the runner rebuilds it on the simulation thread and publishes it if
-  it changed. `SessionControl::descriptor()` returns the current
+  ticks or queries) the runner rebuilds it on the simulation thread and
+  publishes it if it changed, and it rebuilds it once more after the next
+  tick: a parameter with `ApplyPolicy::NextTick` (set with `SetParam` or by
+  a closure, or carried by a restored snapshot) only takes effect inside
+  that tick, so the rules text names a new rule from the first tick that
+  runs it. `SessionControl::descriptor()` returns the current
   `Arc<ModelDescriptor>` (the shell reads it once per frame) and
   `RunnerStatus::descriptor_seq` counts the changes, so a mode can rebuild
   what it derives from the descriptor when the number moves. To show the
@@ -124,6 +128,13 @@ Rules:
   current tick (replacing a sample of the same tick), so the bottom-bar
   population follows edits made while paused, loaded saves and closures that
   advance the model by themselves.
+* Read the model with `Runner::query(|sim: &S| …)` (`Control::Query`): the
+  closure runs on the simulation thread after the controls sent before and
+  its result arrives on a `Receiver` (poll it with `try_recv`, never block
+  a frame). A query changes nothing: no descriptor rebuild, metric sample or
+  view publication. `Runner::request`, `Runner::exec` and `Control::Exec`
+  take `&mut S` and count as state changes; use them only for closures that
+  change the model. `SessionControl::request_snapshot()` (Save) is a query.
 * Dropping the last `Runner` handle never waits: the worker is told to stop
   and exits once it has handled the controls sent before (a long Hashlife
   jump keeps running on its thread, not on the UI thread). Tests that must
@@ -166,6 +177,13 @@ Rules:
   `EguiWantsInput`, in world systems.
 * While no `WorldCamera` is active the shell paints the central area with the
   theme background, so a mode without a camera still looks clean.
+* Camera key controls (`GridCameraController`, `OrbitCameraRig`) ignore keys
+  pressed while Ctrl, Cmd or Alt is held (`rendering::shortcut_modifier_held`):
+  such chords are shortcuts (Cmd+S, Ctrl+Z…), and mode key handlers should
+  use the same test. `GridCameraController::key_zoom` (zoom with `=` / `-`
+  and numpad `+` / `-`) is off by default because those keys are the
+  shell's Faster / Slower shortcuts (3.3); enable it only in apps without
+  the shell.
 
 ### 2.4 Panel contents: one-shot systems with `InMut<egui::Ui>`
 
@@ -215,7 +233,7 @@ frame it fails (identical toasts merge into one with a repeat counter).
 
 | Widget | Purpose |
 |---|---|
-| `param_editor(ui, &ModelDescriptor, &ParamSet, &dyn SessionControl)` | Controls generated from `ParamSpec` (bool, int/float sliders incl. logarithmic, text applied on Enter, choice, colour), grouped by `group`, with *live / next tick / on reset* badges, reset-to-default buttons and a notice for the session's last change (with "Reset now" for `RequiresReset`). Linear float sliders snap to the spec's `step` (counted from `min`); logarithmic sliders are not stepped (a fixed step would make the low end unreachable); values are clamped to `[min, max]` before sending because the model rejects out-of-range values. Colours are edited as unmultiplied **sRGB** (the convention of `ParamValue::parse_loose("#rrggbb")`) |
+| `param_editor(ui, &ModelDescriptor, &ParamSet, &dyn SessionControl)` | Controls generated from `ParamSpec` (bool, int/float sliders incl. logarithmic, text applied on Enter, choice, colour), grouped by `group`, with *live / next tick / on reset* badges, reset-to-default buttons and a notice for the session's last change (with "Reset now" for `RequiresReset`). Linear float sliders snap edits to the spec's `step` (counted from `min`; `SliderClamping::Edits`, so a value off that grid is shown as it is and never sent back merely by drawing it); logarithmic sliders are not stepped (a fixed step would make the low end unreachable); values are clamped to `[min, max]` before sending because the model rejects out-of-range values. Colours are edited as unmultiplied **sRGB** (the convention of `ParamValue::parse_loose("#rrggbb")`) |
 | `metrics_panel(ui, &TimeSeriesStore, &[MetricSpec], x_label, &Palette, &mut MetricsPanelState)` | Metric picker, `egui_plot` time series over ticks (M4 decimation keeps extremes), window (all / last N ticks), latest/min/max/mean table, optional histogram (Freedman–Diaconis bins, recomputed at most every 0.25 s while data arrives). Pass `widgets::rules::tick_label(&descriptor)` as `x_label`: the tick unit only when one tick is one unit |
 | `histogram_plot(ui, id, &analytics::Histogram, colour, height, x_label)` | Bar chart of a histogram with under/overflow note |
 | `rules_panel(ui, &ModelDescriptor, &Palette)` / `markdown(ui, text)` | Model identity, time step, determinism, rules in Markdown (headings, lists, bold, italic, code, fenced code, quotes, rules, pipe tables), metrics guide |

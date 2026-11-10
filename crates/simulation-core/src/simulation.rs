@@ -184,19 +184,21 @@ pub(crate) mod test_model {
     use crate::params::ParamSpec;
     use crate::rng::SimRng;
 
-    /// Random walk counter: `value += rng.below(step_max + 1)` per tick.
+    /// Random walk counter: `value += rng.below(step_max + 1)` per tick. A
+    /// new `step_max` takes effect on the next tick (`ApplyPolicy::NextTick`).
     #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
     pub struct Walker {
         pub seed: u64,
         pub tick: u64,
         pub value: u64,
         pub step_max: u64,
+        pub pending_step_max: Option<u64>,
         pub rng: SimRng,
     }
 
     impl Walker {
         pub fn new(seed: u64) -> Self {
-            Self { seed, tick: 0, value: 0, step_max: 3, rng: SimRng::seed_from_u64(seed) }
+            Self { seed, tick: 0, value: 0, step_max: 3, pending_step_max: None, rng: SimRng::seed_from_u64(seed) }
         }
     }
 
@@ -219,6 +221,9 @@ pub(crate) mod test_model {
             self.tick
         }
         fn step(&mut self) {
+            if let Some(n) = self.pending_step_max.take() {
+                self.step_max = n;
+            }
             self.value += self.rng.below(self.step_max + 1);
             self.tick += 1;
         }
@@ -235,12 +240,12 @@ pub(crate) mod test_model {
             }
         }
         fn params(&self) -> ParamSet {
-            ParamSet::new().with("step_max", ParamValue::Int(self.step_max as i64))
+            ParamSet::new().with("step_max", ParamValue::Int(self.pending_step_max.unwrap_or(self.step_max) as i64))
         }
         fn set_param(&mut self, key: &str, value: ParamValue) -> Result<ApplyPolicy, SimError> {
             let spec = self.descriptor().param(key).cloned().ok_or_else(|| SimError::UnknownParameter(key.into()))?;
             let v = spec.validate(&value)?;
-            self.step_max = v.as_i64().unwrap_or(3) as u64;
+            self.pending_step_max = Some(v.as_i64().unwrap_or(3) as u64);
             Ok(spec.apply)
         }
         fn metrics(&self) -> Metrics {

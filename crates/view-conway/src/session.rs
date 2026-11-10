@@ -6,7 +6,8 @@
 //!
 //! **Served descriptor.** The runner publishes [`served_descriptor`] of the
 //! running model, rebuilt on the simulation thread after every control that
-//! may change it, so the shell's Rules tab follows the topology. It omits the
+//! may change it and after the tick that follows, so the shell's Rules tab
+//! follows the topology and the generations per tick in effect. It omits the
 //! rule preset, the rule text and the engine parameters: this mode runs
 //! B3/S23 only (the Cellular Automata Lab runs other rules) and switches
 //! engines from its own Engine card, which refuses switches that would copy
@@ -107,34 +108,12 @@ pub const SERVED_SUMMARY: &str = "Conway's Game of Life (B3/S23) on bounded, tor
                                   or infinite worlds, with dense, bit-packed, sparse and Hashlife engines. Other \
                                   Life-like rules run in the Cellular Automata Lab.";
 
-/// The model's rules text quotes the generations per tick in effect ("One
-/// tick advances 64 generation(s)."). A new value takes effect on the next
-/// tick, after the runner rebuilt the descriptor for the control that set
-/// it, so the quoted number would lag behind; the served text names the
-/// setting instead.
-pub fn generic_ticks_sentence(rules: &str) -> String {
-    const START: &str = "One tick advances ";
-    const END: &str = " generation(s).";
-    let Some(a) = rules.find(START) else { return rules.to_string() };
-    let rest = &rules[a + START.len()..];
-    match rest.find(END) {
-        Some(b) if rest[..b].chars().all(|c| c.is_ascii_digit()) && b > 0 => format!(
-            "{}One tick advances the number of generations set in *Generations per tick* (Tools › Time).{}",
-            &rules[..a],
-            &rest[b + END.len()..]
-        ),
-        _ => rules.to_string(),
-    }
-}
-
 /// What `descriptor()` serves for a model descriptor: hidden parameters
-/// removed, a Classic Conway summary and a rules text that does not depend
-/// on the generations per tick.
+/// removed and a Classic Conway summary.
 pub fn served_descriptor(descriptor: &ModelDescriptor) -> ModelDescriptor {
     let mut d = descriptor.clone();
     d.params.retain(|p| !HIDDEN_PARAMS.contains(&p.key.as_str()));
     d.summary = SERVED_SUMMARY.to_string();
-    d.rules = generic_ticks_sentence(&d.rules);
     d
 }
 
@@ -158,9 +137,17 @@ impl ConwayRunner {
         self.send(Control::Command(command));
     }
 
-    /// Runs `f` on the simulation thread; poll the receiver with `try_recv`.
+    /// Runs `f`, which may change the simulation, on the simulation thread
+    /// (a state change, see [`Runner::request`]); poll the receiver with
+    /// `try_recv`.
     pub fn request<R: Send + 'static>(&self, f: impl FnOnce(&mut LifeSim) -> R + Send + 'static) -> Receiver<R> {
         self.0.request(f)
+    }
+
+    /// Reads the simulation on its thread ([`Runner::query`]); poll the
+    /// receiver with `try_recv`.
+    pub fn query<R: Send + 'static>(&self, f: impl FnOnce(&LifeSim) -> R + Send + 'static) -> Receiver<R> {
+        self.0.query(f)
     }
 
     /// Sets a parameter.
@@ -667,7 +654,7 @@ pub(crate) fn poll_live_world(
                 }
                 sync.since = 0.0;
                 let epoch = live.epoch;
-                *lock(&sync.pending) = Some(runner.request(move |sim| LiveInfo::read(sim, epoch)));
+                *lock(&sync.pending) = Some(runner.query(move |sim| LiveInfo::read(sim, epoch)));
             }
         }
     }
@@ -677,6 +664,7 @@ pub(crate) fn poll_live_world(
 mod tests {
     use super::*;
     use bevy::ecs::system::RunSystemOnce;
+    use simulation_core::RunnerStatus;
     use std::sync::Weak;
 
     #[test]
@@ -704,20 +692,33 @@ mod tests {
         assert_eq!(d.summary, SERVED_SUMMARY);
     }
 
-    /// The served descriptor does not change with the generations per tick,
-    /// so it cannot lag behind a new value taking effect on the next tick.
+    /// The served rules name the generations per tick in effect: a new value
+    /// takes effect on the next tick, after which the runner serves the
+    /// descriptor again (also when that tick runs in a later batch).
     #[test]
-    fn served_rules_do_not_depend_on_the_generations_per_tick() {
-        let mut sim = LifeSim::conway(1);
-        let before = served_descriptor(&sim.descriptor());
-        sim.set_param("generations_per_tick", ParamValue::Int(64)).unwrap();
-        sim.step(); // the value applies on the next tick
-        let model = sim.descriptor();
-        assert!(model.rules.contains("One tick advances 64 generation(s)."), "the model's sentence changed");
-        let after = served_descriptor(&model);
-        assert_eq!(before, after);
-        assert!(after.rules.contains("set in *Generations per tick*") && after.rules.contains("Births and deaths"));
-        assert_eq!(generic_ticks_sentence("no such sentence"), "no such sentence");
+    fn served_rules_name_the_generations_per_tick_in_effect() {
+        let runner = ConwayRunner(spawn_session(LifeSim::conway(1), DEFAULT_SPEED, &RandomizeDensity::default()));
+        assert!(runner.0.descriptor().rules.contains("One tick advances 1 generation(s)."));
+        let wait_for = |done: fn(&RunnerStatus) -> bool| {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            loop {
+                let status = runner.0.status();
+                if done(&status) {
+                    return status;
+                }
+                assert!(std::time::Instant::now() < deadline, "the runner did not get there");
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+        };
+        runner.set_param("generations_per_tick", ParamValue::Int(64));
+        let status = wait_for(|s| s.params.i64_or("generations_per_tick", 0) == 64);
+        assert_eq!(status.descriptor_seq, 0, "the value applies on the next tick");
+        runner.send(Control::Step(1));
+        let status = wait_for(|s| s.tick == 64);
+        assert_eq!(status.descriptor_seq, 1);
+        let d = runner.0.descriptor();
+        assert!(d.rules.contains("One tick advances 64 generation(s)."), "{}", d.rules);
+        assert_eq!(d.summary, SERVED_SUMMARY);
     }
 
     #[test]
@@ -826,7 +827,7 @@ mod tests {
         assert_eq!(live.origin.as_ref().map(|o| o.name.as_str()), Some("Glider"));
         assert_eq!(world.resource::<ModeScenarios>().get(MODE).and_then(|l| l.selected.clone()), None);
         // The replaced simulation is the one the runner now runs.
-        let rx = world.resource::<ConwayRunner>().request(|sim| (sim.population(), sim.world().topology));
+        let rx = world.resource::<ConwayRunner>().query(|sim| (sim.population(), sim.world().topology));
         assert_eq!(rx.recv().unwrap(), (5, Topology::Infinite));
         world.run_system_once(exit_session).unwrap();
         assert!(first.upgrade().is_none());

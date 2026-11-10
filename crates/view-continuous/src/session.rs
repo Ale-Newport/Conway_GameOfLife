@@ -14,9 +14,7 @@ use bevy::prelude::*;
 use continuous::scenario::{self, LibraryCreature, Scenario, ScenarioHeader};
 use continuous::{ContinuousSim, ModelKind, Rule};
 use interface::{ActiveSession, ModeScenarios, ScenarioEntry, ScenarioList, ScenarioSelected, SessionStatus, Toasts};
-use simulation_core::{
-    Control, ModelDescriptor, ParamKind, ParamSet, ParamValue, Runner, RunnerConfig, Simulation, Speed,
-};
+use simulation_core::{Control, ModelDescriptor, ParamKind, ParamSet, Runner, RunnerConfig, Simulation, Speed};
 
 use crate::MODE;
 use crate::world::{CameraFit, LatestView, ViewRequestState, ViewSettings};
@@ -232,7 +230,7 @@ pub fn default_speed(kind: ModelKind) -> Speed {
 pub fn spawn_runner(sim: ContinuousSim, speed: Speed) -> Arc<Runner<ContinuousSim>> {
     Arc::new(
         Runner::spawn_with_descriptor(sim, RunnerConfig { speed, ..default() }, |sim| {
-            display_descriptor(&sim.descriptor(), &sim.params())
+            display_descriptor(&sim.descriptor())
         })
         .with_clear(|sim: &mut ContinuousSim| sim.clear())
         .with_randomize(|sim: &mut ContinuousSim, seed| sim.randomize(seed)),
@@ -314,13 +312,12 @@ pub fn displayable(text: &str) -> String {
 ///
 /// * texts use only characters egui's built-in fonts can draw
 ///   ([`displayable`]);
-/// * the tick unit reads "time unit" (the shell pluralises it);
-/// * linear float sliders whose current value lies off their step grid are
-///   not stepped. egui re-applies a slider's step on every frame
-///   (`SliderClamping::Always`), so drawing such a parameter would silently
-///   change it (SmoothLife's `α_n = 0.028` on the grid `0.0001 + k·0.001`
-///   would become 0.0281) and send it to the model.
-pub fn display_descriptor(descriptor: &ModelDescriptor, params: &ParamSet) -> ModelDescriptor {
+/// * the tick unit reads "time unit" (the shell pluralises it).
+///
+/// Parameter steps are kept: the shell's sliders apply them to edits only,
+/// so a value off the step grid (SmoothLife's `α_n = 0.028` on the grid
+/// `0.0001 + k·0.001`) is shown as it is and not sent back.
+pub fn display_descriptor(descriptor: &ModelDescriptor) -> ModelDescriptor {
     let mut d = descriptor.clone();
     d.name = displayable(&d.name);
     d.summary = displayable(&d.summary);
@@ -332,21 +329,10 @@ pub fn display_descriptor(descriptor: &ModelDescriptor, params: &ParamSet) -> Mo
         spec.label = displayable(&spec.label);
         spec.description = displayable(&spec.description);
         spec.group = displayable(&spec.group);
-        let value = params.get(&spec.key).and_then(ParamValue::as_f64).or_else(|| spec.default.as_f64());
-        match &mut spec.kind {
-            ParamKind::Float { min, step, logarithmic: false, .. } if *step > 0.0 => {
-                if let Some(v) = value
-                    && *min + ((v - *min) / *step).round() * *step != v
-                {
-                    *step = 0.0;
-                }
+        if let ParamKind::Choice { options } = &mut spec.kind {
+            for option in options {
+                option.label = displayable(&option.label);
             }
-            ParamKind::Choice { options } => {
-                for option in options {
-                    option.label = displayable(&option.label);
-                }
-            }
-            _ => {}
         }
     }
     for metric in &mut d.metrics {
@@ -483,7 +469,7 @@ pub(crate) fn sync_live_world(
         None => {
             if state.live.last_params.as_ref() != Some(&current.params) {
                 state.live.last_params = Some(current.params.clone());
-                *lock(&state.live.pending) = Some(runner.0.request(|sim| LiveInfo {
+                *lock(&state.live.pending) = Some(runner.0.query(|sim| LiveInfo {
                     rule: sim.rule().clone(),
                     header: sim.scenario().header.clone(),
                     width: sim.width(),
@@ -526,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    fn display_descriptors_draw_and_do_not_snap() {
+    fn display_descriptors_draw_and_keep_steps() {
         let catalog = Catalog::builtin();
         let ctx = bevy_egui::egui::Context::default();
         let mut output = ctx.run_ui(Default::default(), |ui| {
@@ -537,20 +523,12 @@ mod tests {
         let mut missing: Vec<char> = Vec::new();
         for scenario in &catalog.scenarios {
             let sim = ContinuousSim::from_scenario(scenario.clone()).unwrap();
-            let params = sim.params();
-            let d = display_descriptor(&sim.descriptor(), &params);
+            let d = display_descriptor(&sim.descriptor());
             let mut texts = vec![d.name.clone(), d.summary.clone(), d.rules.clone(), d.tick_unit.clone()];
             for spec in &d.params {
                 texts.extend([spec.label.clone(), spec.description.clone(), spec.group.clone()]);
                 if let ParamKind::Choice { options } = &spec.kind {
                     texts.extend(options.iter().map(|o| o.label.clone()));
-                }
-                // No slider would move its value when drawn.
-                if let (ParamKind::Float { min, step, logarithmic: false, .. }, Some(v)) =
-                    (&spec.kind, params.get(&spec.key).and_then(ParamValue::as_f64))
-                    && *step > 0.0
-                {
-                    assert_eq!(min + ((v - min) / step).round() * step, v, "{} {}", scenario.header.id, spec.key);
                 }
             }
             for m in &d.metrics {
@@ -565,15 +543,17 @@ mod tests {
             }
         }
         assert!(missing.is_empty(), "characters that cannot be drawn: {missing:?}");
-        // The SmoothLife sigmoid widths are off the 0.001 grid counted from 0.0001.
+        // Values off the step grid keep their step too: the SmoothLife sigmoid
+        // widths lie off the 0.001 grid counted from 0.0001.
         let sl = ContinuousSim::from_scenario(catalog.get("smoothlife.glider").unwrap().clone()).unwrap();
-        let d = display_descriptor(&sl.descriptor(), &sl.params());
+        let d = display_descriptor(&sl.descriptor());
         let step = |key: &str| match &d.param(key).unwrap().kind {
             ParamKind::Float { step, .. } => *step,
             _ => f64::NAN,
         };
-        assert_eq!(step("alpha_n"), 0.0);
-        assert_eq!(step("b1"), 0.001, "values on the grid keep their step");
+        assert_eq!(sl.params().f64_or("alpha_n", 0.0), 0.028);
+        assert_eq!(step("alpha_n"), 0.001);
+        assert_eq!(step("b1"), 0.001);
         assert_eq!(d.param("outer_radius").unwrap().label, "Outer radius r_a");
         assert_eq!(displayable("~10⁻⁶ and K ∗ A"), "~10^-6 and K * A");
         assert_eq!(displayable("10⁻¹²·x²"), "10^-12·x²");
@@ -652,7 +632,7 @@ mod tests {
         let runner = first.upgrade().unwrap();
         let glider =
             ContinuousSim::from_scenario(Catalog::builtin().get("smoothlife.glider").unwrap().clone()).unwrap();
-        let expected = display_descriptor(&glider.descriptor(), &glider.params());
+        let expected = display_descriptor(&glider.descriptor());
         let start = std::time::Instant::now();
         while runner.status().descriptor_seq == 0 || runner.status().speed != default_speed(ModelKind::SmoothLife) {
             assert!(start.elapsed().as_secs() < 10, "the new model's descriptor and speed were not published");

@@ -9,10 +9,12 @@
 //! rendering performance.
 //!
 //! After the controls that can change the state other than by ticking
-//! (everything but play, pause, step, speed, view and history settings) the
-//! worker records a metric sample of the current tick and publishes the
-//! descriptor again if it changed, so edits made while paused and long
-//! closures show up at once.
+//! (everything but play, pause, step, speed, queries, view and history
+//! settings) the worker records a metric sample of the current tick and
+//! publishes the descriptor again if it changed, so edits made while paused
+//! and long closures show up at once. It rebuilds the descriptor once more
+//! after the next tick, which is when a parameter with
+//! [`ApplyPolicy::NextTick`] takes effect.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -81,6 +83,9 @@ impl Default for RunnerConfig {
 /// Closure executed on the simulation thread.
 pub type SimFn<S> = Box<dyn FnOnce(&mut S) + Send>;
 
+/// Closure reading the simulation on its thread (see [`Control::Query`]).
+pub type QueryFn<S> = Box<dyn FnOnce(&S) + Send>;
+
 /// Reusable mode-specific action (e.g. "clear the world").
 pub type SimHook<S> = Arc<dyn Fn(&mut S) + Send + Sync>;
 
@@ -112,6 +117,9 @@ pub enum Control<S: Simulation> {
     SetParam(String, ParamValue),
     /// Run an arbitrary closure on the simulation thread.
     Exec(SimFn<S>),
+    /// Run a closure that only reads the simulation; unlike `Exec` it is
+    /// not a state change (nothing is rebuilt, recorded or published).
+    Query(QueryFn<S>),
     /// Run a closure and record the previous state for undo.
     ExecEdit(SimFn<S>),
     /// Undo the last edit.
@@ -246,7 +254,8 @@ impl<S: Simulation> Runner<S> {
     /// Like [`Runner::spawn`], but the published descriptor is
     /// `describe(sim)` instead of [`Simulation::descriptor`], e.g. with texts
     /// adapted to the user interface. `describe` runs here once, then on the
-    /// simulation thread after every control that may change the state.
+    /// simulation thread after every control that may change the state and
+    /// after the tick that follows it.
     pub fn spawn_with_descriptor(
         sim: S,
         config: RunnerConfig,
@@ -293,8 +302,8 @@ impl<S: Simulation> Runner<S> {
     }
 
     /// Current descriptor of the model, published again by the worker when
-    /// a control changes it ([`RunnerStatus::descriptor_seq`] counts the
-    /// changes).
+    /// a control, or the tick applying a [`ApplyPolicy::NextTick`] change,
+    /// changes it ([`RunnerStatus::descriptor_seq`] counts the changes).
     pub fn descriptor(&self) -> Arc<ModelDescriptor> {
         Arc::clone(&lock(&self.shared.descriptor))
     }
@@ -334,13 +343,26 @@ impl<S: Simulation> Runner<S> {
         self.send(Control::Exec(Box::new(f)));
     }
 
-    /// Runs a closure on the simulation thread and returns a receiver for its
-    /// result. Poll it with `try_recv` to avoid blocking a frame.
+    /// Runs a closure that may change the simulation on its thread and
+    /// returns a receiver for its result. Poll it with `try_recv` to avoid
+    /// blocking a frame. Like [`Runner::exec`] it counts as a state change;
+    /// use [`Runner::query`] to read.
     pub fn request<R: Send + 'static>(&self, f: impl FnOnce(&mut S) -> R + Send + 'static) -> Receiver<R> {
         let (tx, rx) = mpsc::channel();
         self.exec(move |sim| {
             let _ = tx.send(f(sim));
         });
+        rx
+    }
+
+    /// Reads the simulation on its thread, after the controls sent before,
+    /// and returns a receiver for the result. Poll it with `try_recv` to
+    /// avoid blocking a frame. Nothing is rebuilt, recorded or published.
+    pub fn query<R: Send + 'static>(&self, f: impl FnOnce(&S) -> R + Send + 'static) -> Receiver<R> {
+        let (tx, rx) = mpsc::channel();
+        self.send(Control::Query(Box::new(move |sim| {
+            let _ = tx.send(f(sim));
+        })));
         rx
     }
 
@@ -470,7 +492,7 @@ impl<S: Simulation> SessionControl for Runner<S> {
         Runner::take_errors(self)
     }
     fn request_snapshot(&self) -> Receiver<Result<Snapshot, SimError>> {
-        self.request(|sim| sim.snapshot())
+        self.query(|sim| sim.snapshot())
     }
     fn restore(&self, snapshot: Snapshot) {
         self.send(Control::Restore(snapshot));
@@ -516,6 +538,10 @@ struct Worker<S: Simulation> {
     /// A control handled since the last publication may have changed the
     /// state (and the descriptor).
     state_changed: bool,
+    /// The state changed since the last tick: the next tick may apply a
+    /// pending [`ApplyPolicy::NextTick`] change, so the descriptor is
+    /// rebuilt after it.
+    describe_after_tick: bool,
     playing: bool,
     speed: Speed,
     view_request: S::ViewRequest,
@@ -555,6 +581,7 @@ impl<S: Simulation> Worker<S> {
             descriptor,
             descriptor_seq: 0,
             state_changed: false,
+            describe_after_tick: false,
             playing: false,
             speed: config.speed,
             view_request: S::ViewRequest::default(),
@@ -696,6 +723,7 @@ impl<S: Simulation> Worker<S> {
                 f(&mut self.sim);
                 self.changed();
             }
+            Control::Query(f) => f(&self.sim),
             Control::ExecEdit(f) => {
                 self.record_undo();
                 f(&mut self.sim);
@@ -744,10 +772,12 @@ impl<S: Simulation> Worker<S> {
     }
 
     /// Notes that the state may have changed: the view, the descriptor and a
-    /// metric sample are published again.
+    /// metric sample are published again, and the descriptor once more after
+    /// the next tick.
     fn changed(&mut self) {
         self.dirty = true;
         self.state_changed = true;
+        self.describe_after_tick = true;
     }
 
     fn set_playing(&mut self, playing: bool) {
@@ -827,6 +857,9 @@ impl<S: Simulation> Worker<S> {
         let t0 = Instant::now();
         self.sim.step();
         let ms = t0.elapsed().as_secs_f64() * 1000.0;
+        if std::mem::take(&mut self.describe_after_tick) {
+            self.refresh_descriptor();
+        }
         self.last_step_ms = ms;
         self.avg_step_ms = if self.avg_step_ms == 0.0 { ms } else { self.avg_step_ms * 0.9 + ms * 0.1 };
         self.rate_ticks += 1;
@@ -951,7 +984,7 @@ mod tests {
         let runner = Runner::spawn(Walker::new(3), RunnerConfig::default());
         runner.step(25);
         wait_for(&runner, |s| s.tick == 25);
-        let rx = runner.request(|sim| sim.value);
+        let rx = runner.query(|sim| sim.value);
         let value = rx.recv_timeout(Duration::from_secs(5)).unwrap();
         runner.send(Control::RequestView);
         let start = Instant::now();
@@ -987,7 +1020,7 @@ mod tests {
         for _ in 0..st.tick {
             Simulation::step(&mut w);
         }
-        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        let value = runner.query(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(value, w.value);
         assert!(st.tick < 200 || reference > 0);
     }
@@ -1000,11 +1033,11 @@ mod tests {
         assert!(!st.can_redo);
         runner.send(Control::Undo);
         wait_for(&runner, |s| s.can_redo);
-        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        let value = runner.query(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(value, 0);
         runner.send(Control::Redo);
         wait_for(&runner, |s| !s.can_redo);
-        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        let value = runner.query(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(value, 100);
         runner.command(WalkerCommand::Fail);
         let start = Instant::now();
@@ -1037,10 +1070,10 @@ mod tests {
         assert!(session.can_clear() && session.can_randomize());
         session.randomize(77);
         wait_for(&runner, |s| s.can_undo);
-        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        let value = runner.query(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(value, 77);
         session.clear();
-        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        let value = runner.query(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(value, 0);
         let snapshot = session.request_snapshot().recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
         assert_eq!(snapshot.model_id, "test.walker");
@@ -1051,14 +1084,20 @@ mod tests {
         let runner = Runner::spawn(Walker::new(1), RunnerConfig::default());
         let first = runner.descriptor();
         assert!(first.rules.contains("0..=3"), "{}", first.rules);
+        // A NextTick parameter takes effect inside the next tick, which then
+        // publishes the descriptor, also when it runs in a later batch.
         runner.send(Control::SetParam("step_max".into(), ParamValue::Int(10)));
-        wait_for(&runner, |s| s.descriptor_seq == 1);
+        let st = wait_for(&runner, |s| s.params.i64_or("step_max", 0) == 10);
+        assert_eq!(st.descriptor_seq, 0, "the new value is not in effect yet");
+        runner.step(1);
+        let st = wait_for(&runner, |s| s.tick == 1);
+        assert_eq!(st.descriptor_seq, 1);
         assert!(runner.descriptor().rules.contains("0..=10"));
         assert!(first.rules.contains("0..=3"), "a published descriptor never changes");
         // Ticks and unchanged descriptors publish nothing new.
         runner.step(5);
         runner.edit(WalkerCommand::Add(1));
-        let st = wait_for(&runner, |s| s.tick == 5 && s.can_undo);
+        let st = wait_for(&runner, |s| s.tick == 6 && s.can_undo);
         assert_eq!(st.descriptor_seq, 1);
         runner.send(Control::Reset);
         wait_for(&runner, |s| s.descriptor_seq == 2);
@@ -1075,8 +1114,34 @@ mod tests {
         let runner = Runner::spawn_with_descriptor(Walker::new(1), RunnerConfig::default(), describe);
         assert_eq!(SessionControl::descriptor(&runner).name, "Walker up to 3");
         runner.send(Control::SetParam("step_max".into(), ParamValue::Int(7)));
+        runner.step(1);
         wait_for(&runner, |s| s.descriptor_seq == 1);
         assert_eq!(runner.descriptor().name, "Walker up to 7");
+    }
+
+    #[test]
+    fn queries_change_nothing() {
+        let describes = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&describes);
+        let describe = move |sim: &Walker| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            sim.descriptor()
+        };
+        let runner = Runner::spawn_with_descriptor(Walker::new(1), RunnerConfig::default(), describe);
+        runner.step(2);
+        wait_for(&runner, |s| s.tick == 2);
+        runner.drain_metrics();
+        let (described, view) = (describes.load(Ordering::SeqCst), runner.latest_view().unwrap());
+        let value = runner.query(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        let session: &dyn SessionControl = &runner;
+        let snapshot = session.request_snapshot().recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
+        assert_eq!((value, snapshot.tick), (*view.view, 2));
+        // The status shows the new speed once the batch holding the queries is done.
+        runner.send(Control::SetSpeed(Speed::Unlimited));
+        wait_for(&runner, |s| s.speed == Speed::Unlimited);
+        assert_eq!(describes.load(Ordering::SeqCst), described, "a query rebuilt the descriptor");
+        assert!(runner.drain_metrics().is_empty(), "a query recorded a metric sample");
+        assert_eq!(runner.latest_view().unwrap().seq, view.seq, "a query published a view");
     }
 
     #[test]
@@ -1084,7 +1149,7 @@ mod tests {
         let runner = Runner::spawn(Walker::new(1), RunnerConfig::default());
         runner.step(3);
         wait_for(&runner, |s| s.tick == 3);
-        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        let value = runner.query(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
         // An edit while paused replaces the sample of the current tick.
         runner.edit(WalkerCommand::Add(100));
         wait_for(&runner, |s| s.can_undo);
@@ -1099,7 +1164,7 @@ mod tests {
         });
         wait_for(&runner, |s| s.tick == 13);
         let samples = runner.drain_metrics();
-        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        let value = runner.query(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(samples.len(), 1);
         assert_eq!((samples[0].tick, samples[0].get("value")), (13, Some(value as f64)));
     }
