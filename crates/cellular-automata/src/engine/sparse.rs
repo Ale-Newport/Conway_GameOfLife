@@ -267,7 +267,7 @@ impl LifeEngine for SparseEngine {
         out
     }
 
-    fn cells_in_rect(&self, rect: CellRect, limit: usize) -> Vec<(i64, i64)> {
+    fn cells_in_rect(&self, rect: CellRect) -> Vec<(i64, i64)> {
         let keys = self.keys_in(&rect);
         let mut out = Vec::new();
         for band in keys.chunk_by(|a, b| a.1 == b.1) {
@@ -278,14 +278,29 @@ impl LifeEngine for SparseEngine {
                     let bx = key.0 * 64;
                     let mask = bit_range((rect.x0.max(bx) - bx) as u32, (rect.x1.min(bx + 63) - bx) as u32);
                     push_cells(self.tile(key).rows[r] & mask, bx, by + r as i64, &mut out);
-                    if out.len() >= limit {
-                        out.truncate(limit);
-                        return out;
-                    }
                 }
             }
         }
         out
+    }
+
+    fn count_in_rect(&self, rect: CellRect, limit: u64) -> u64 {
+        let mut count = 0;
+        for key in self.keys_in(&rect) {
+            if count >= limit {
+                break;
+            }
+            let (bx, by) = (key.0 * 64, key.1 * 64);
+            let tile = self.tile(key);
+            count += if rect.contains(bx, by) && rect.contains(bx + 63, by + 63) {
+                u64::from(tile.population)
+            } else {
+                let mask = bit_range((rect.x0.max(bx) - bx) as u32, (rect.x1.min(bx + 63) - bx) as u32);
+                let (r0, r1) = ((rect.y0.max(by) - by) as usize, (rect.y1.min(by + 63) - by) as usize);
+                tile.rows[r0..=r1].iter().map(|&row| u64::from((row & mask).count_ones())).sum()
+            };
+        }
+        count.min(limit)
     }
 
     fn step(&mut self) -> Result<Option<GenStats>, CaError> {
@@ -431,7 +446,7 @@ mod tests {
         let mut e = SparseEngine::new(LifeRule::conway()).unwrap();
         let cells = [(-65, -3), (-64, -3), (0, 0), (63, 64), (1 << 40, -(1 << 40))];
         e.set_cells(&cells, true);
-        assert_eq!(e.cells_in_rect(CellRect::new(-70, -5, 0, 0), usize::MAX), vec![(-65, -3), (-64, -3), (0, 0)]);
+        assert_eq!(e.cells_in_rect(CellRect::new(-70, -5, 0, 0)), vec![(-65, -3), (-64, -3), (0, 0)]);
         e.clear_rect(CellRect::new(-64, -64, 63, 63));
         assert_eq!(e.population(), 3);
         assert!(!e.get_cell(0, 0) && e.get_cell(-65, -3) && e.get_cell(63, 64));

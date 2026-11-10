@@ -27,7 +27,7 @@ use simulation_core::{
 
 use crate::engine::{
     AUTO_HASHLIFE_MIN_POPULATION, AUTO_REGULARITY_MAX_POPULATION, DenseEngine, EngineChoice, EngineKind, GenStats,
-    LifeEngine, SelectionInput, create_engine, select_engine, tile_regularity, transfer,
+    LifeEngine, MAX_SWITCH_CELLS, SelectionInput, create_engine, select_engine, tile_regularity, transfer,
 };
 use crate::error::CaError;
 use crate::geometry::{CellRect, MAX_EDIT_CELLS, MAX_FILL_CELLS, World, check_fill};
@@ -281,16 +281,15 @@ impl LifeSim {
     ///
     /// # Errors
     /// [`CaError::LimitExceeded`] when `rect` holds more than
-    /// [`MAX_EDIT_CELLS`] live cells (at most one more is listed to find out).
+    /// [`MAX_EDIT_CELLS`] live cells (counted before anything is listed).
     fn region_cells(&self, rect: CellRect) -> Result<Vec<(i64, i64)>, CaError> {
-        let cells = self.engine.cells_in_rect(rect, MAX_EDIT_CELLS as usize + 1);
-        if cells.len() as u64 > MAX_EDIT_CELLS {
+        if self.engine.count_in_rect(rect, MAX_EDIT_CELLS + 1) > MAX_EDIT_CELLS {
             return Err(CaError::LimitExceeded(format!(
                 "the region holds more than {MAX_EDIT_CELLS} live cells, the most a copy, move, rotation or mirror \
                  handles"
             )));
         }
-        Ok(cells)
+        Ok(self.engine.cells_in_rect(rect))
     }
 
     /// Picks the engine for a choice.
@@ -320,13 +319,17 @@ impl LifeSim {
     /// Re-runs the automatic engine choice (no-op for a fixed choice). The
     /// tile regularity is measured only up to
     /// [`AUTO_REGULARITY_MAX_POPULATION`] live cells: a larger pattern keeps
-    /// Hashlife if it runs, and is treated as irregular otherwise.
+    /// Hashlife if it runs, and is treated as irregular otherwise. A pattern
+    /// of more than [`MAX_SWITCH_CELLS`] live cells keeps the running engine
+    /// (a switch would copy every cell), which can run any tick.
     fn reselect(&mut self) -> Result<(), CaError> {
         if self.engine_choice != EngineChoice::Auto {
             return Ok(());
         }
         let population = self.engine.population();
-        if population > AUTO_REGULARITY_MAX_POPULATION && self.engine.kind() == EngineKind::Hashlife {
+        if population > MAX_SWITCH_CELLS
+            || (population > AUTO_REGULARITY_MAX_POPULATION && self.engine.kind() == EngineKind::Hashlife)
+        {
             return Ok(());
         }
         let measured = AUTO_HASHLIFE_MIN_POPULATION..=AUTO_REGULARITY_MAX_POPULATION;
@@ -509,23 +512,26 @@ impl LifeSim {
         Ok(total)
     }
 
-    /// Bookkeeping after an edit of `rect` (`None` = anywhere).
+    /// Bookkeeping after an edit of `rect` (`None` = anywhere). The tracker
+    /// merges the live cells of the edited region, listed only when it holds
+    /// at most [`MAX_EDIT_CELLS`] of them (counted first): above that limit
+    /// tracking stops (the `track_*` parameters turn off) instead of listing
+    /// them.
     fn after_edit(&mut self, rect: Option<CellRect>) {
         if self.generation == 0 {
             self.reset_point = None;
         }
         if self.tracker.enabled() {
-            match rect.and_then(|r| self.world.clip(&r)) {
-                Some(r) => {
-                    let cells = self.engine.cells_in_rect(r, usize::MAX);
-                    self.tracker.edit(r, cells);
+            let region = match rect {
+                Some(r) => self.world.clip(&r),
+                None => Some(CellRect::new(i64::MIN, i64::MIN, i64::MAX, i64::MAX)),
+            };
+            if let Some(r) = region {
+                if self.engine.count_in_rect(r, MAX_EDIT_CELLS + 1) > MAX_EDIT_CELLS {
+                    self.tracker.configure(false, false, Vec::new);
+                } else {
+                    self.tracker.edit(r, self.engine.cells_in_rect(r));
                 }
-                None if rect.is_none() => {
-                    let all = self.engine.export_cells();
-                    let bounds = CellRect::new(i64::MIN, i64::MIN, i64::MAX, i64::MAX);
-                    self.tracker.edit(bounds, all);
-                }
-                None => {}
             }
         }
         self.halted = None;

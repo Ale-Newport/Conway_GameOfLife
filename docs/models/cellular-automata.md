@@ -39,8 +39,8 @@ benchmark. No new third-party crate.
 |---|---|
 | `engine::{LifeEngine, EngineKind, EngineChoice, GenStats}` | engine trait, the four implementations' kinds, automatic/fixed choice, births/deaths of a generation |
 | `DenseEngine`, `BitEngine`, `SparseEngine`, `HashlifeEngine` | the engines |
-| `create_engine`, `switch_engine`, `select_engine`, `SelectionInput`, `tile_regularity`, `engine::AUTO_REGULARITY_MAX_POPULATION` | construction, exact state transfer (refused, never lossy, when the target cannot hold every cell), automatic choice |
-| `LifeEngine::reserve`, `DenseEngine::window_fits`, `engine::BORDER_CELL_BUDGET`, the `limit` of `LifeEngine::cells_in_rect` | capacity checks before writes; bounded view cost on Hashlife; bounded region listings |
+| `create_engine`, `switch_engine`, `select_engine`, `SelectionInput`, `tile_regularity`, `engine::AUTO_REGULARITY_MAX_POPULATION`, `engine::MAX_SWITCH_CELLS` | construction, exact state transfer (refused, never lossy, when the target cannot hold every cell or the pattern has more than 2^26 live cells), automatic choice |
+| `LifeEngine::reserve`, `DenseEngine::window_fits`, `engine::BORDER_CELL_BUDGET`, `LifeEngine::count_in_rect` | capacity checks before writes; bounded view cost on Hashlife; exact live-cell counts of rectangles (up to a limit) without listing a cell |
 | `engine::reference::reference_step` | naive reference stepper (used by the property tests) |
 | `LifeSim`, `LifeConfig`, `LifeMode`, `LifeCommand`, `PasteMode`, `MirrorAxis`, `RulePreset`, `InitItem`, `PatternSource`, `PatternLibrary`, `place_pattern` | the Life model, its configuration, commands and pattern resolution; `LifeSim::copy_region` is the copy query and `LifeSim::cut_region` the cut (copy + clear), both refused above `MAX_EDIT_CELLS` live cells |
 | `GenerationsSim`/`GenerationsConfig`, `WireworldSim`/`WireworldConfig`, `PaintCommand`, `StateInit` | multi-state models and their shared painting commands (`halt_reason` reports a reset that could not be carried out) |
@@ -63,7 +63,8 @@ All four implement `LifeEngine`: set/get cell, set many cells, clear, clear a
 rectangle, load/export cells (export is sorted row-major), step one
 generation (returning births and deaths), `advance(n)`, population
 (maintained incrementally, constant time), bounding box, cells in a
-rectangle, level-of-detail counting for views (`count_live`), rule change,
+rectangle and their exact number (`count_in_rect`, see below),
+level-of-detail counting for views (`count_live`), rule change,
 `reserve` (capacity check before writing), `memory_bytes`, `name`. Every
 engine runs every `B/S` rule (any birth and survival masks; `B0` only on
 finite worlds, see below).
@@ -113,11 +114,32 @@ neighbours changed in the previous generation (or was edited): otherwise its
 state equals its current state. Still lifes therefore cost nothing. The plane
 is the whole `i64` range; cells that would be born beyond it are discarded.
 
+**Rectangle counts.** `count_in_rect(rect, limit)` returns the number of
+live cells of a rectangle, exact up to `limit` (the smaller of the two;
+`u64::MAX` gives the exact count), without listing any: the dense engine
+scans the clipped bytes, the bit engine popcounts masked words, the sparse
+engine adds the cached population of every tile inside the rectangle and
+popcounts the tiles its border cuts, and the Hashlife adapter adds cached
+quadtree populations (read through `Universe::density_grid`), descending
+only into non-empty squares that cross the border and listing the overlap of
+squares of at most 64 cells. The universe reports node populations through
+`u32` density pixels, so a square inside the rectangle that holds more than
+`u32::MAX` cells is split further — only while the count is still below
+`limit`; callers pass their maximum plus one, which keeps the cost
+proportional to the squares crossing the border for any population. Both
+users of `cells_in_rect` in `LifeSim` count first: the region tools (§4.3)
+and the tracker after an edit (§4.4).
+
 **Engine switching** (`switch_engine`, the `engine` parameter) exports the
 live cells and loads them into the new engine: the state is transferred
 exactly, and the future is identical (tested). A switch the target cannot
 hold (the dense window on the infinite plane) is refused and the running
-engine is kept; no cell is ever dropped.
+engine is kept; no cell is ever dropped. The exported list takes 16 bytes per
+live cell, so a switch of more than `MAX_SWITCH_CELLS` = 2^26 live cells (at
+most 1 GiB of list) is refused before anything is listed, with a message
+giving the population and the limit (shown by `set_param` for the `engine`
+parameter); a Hashlife pattern of billions of cells therefore stays on
+Hashlife instead of exhausting memory.
 
 **Hashlife `advance(n)`**: `n = 2^k` with `k ≤ 61` is one atomic
 `step_pow2(k)`; other counts (including `2^62`, `2^63`) use the universe's
@@ -148,7 +170,11 @@ lists every live cell, so `LifeSim` measures patterns of at most
 Hashlife if it runs (leaving it would list every cell too; a breeder after a
 big jump has billions), whatever the tick, and is treated as irregular by the
 other engines. The choice therefore costs at most a few tens of megabytes
-for any population. Rationale
+for any population. A pattern of more than `MAX_SWITCH_CELLS` = 2^26 live
+cells keeps the running engine whatever the choice would be (switching would
+copy every cell; every engine runs every tick, Hashlife by decomposing it
+into powers of two): a large sparse soup stays on the sparse engine when the
+tick becomes a large power of two. Rationale
 (see `docs/research/life-engines-hashlife.md` §5.3): the bit engine has a
 constant cost of W·H/64 words per generation and wins on finite and dense
 worlds; tiles cost in proportion to the active area and win on unbounded,
@@ -177,18 +203,19 @@ preset again restores its exact rule.
 | `rule` | text | NextTick | `B3/S23`, `b3s23`, `S23/B3`, `23/3` (S/B), names; B0 only on finite worlds |
 | `topology` | choice | RequiresReset | bounded, torus, klein_bottle, cross_surface, infinite |
 | `width`, `height` | int 1..=65536 | RequiresReset | world size (the home region on the infinite plane) |
-| `engine` | choice | Immediate | auto, dense, bit, sparse, hashlife (exact transfer) |
+| `engine` | choice | Immediate | auto, dense, bit, sparse, hashlife (exact transfer; refused above 2^26 live cells) |
 | `generations_per_tick` | int 1..=2^30 | NextTick | must be a power of two while Hashlife runs |
 | `track_ages`, `track_activity` | bool | Immediate | age (G) and activity (B) channels |
 
 Invalid combinations are rejected by `set_param` with a message (B0 on the
 infinite plane, the bit engine on the infinite plane, Hashlife with a
-non-power-of-two step, a world too large for a fixed engine, a world on
-which the scenario cannot be rebuilt — e.g. a non-square world for an
-8-fold symmetric soup, or a home region too large for a fixed dense engine
-on the infinite plane), so a NextTick or RequiresReset change can never
-fail later. `reset` rebuilds atomically: should it still fail, the state is
-kept and the reason is reported by `halt_reason` / `is_finished`.
+non-power-of-two step, a world too large for a fixed engine, an engine
+switch of more than 2^26 live cells, a world on which the scenario cannot be
+rebuilt — e.g. a non-square world for an 8-fold symmetric soup, or a home
+region too large for a fixed dense engine on the infinite plane), so a
+NextTick or RequiresReset change can never fail later. `reset` rebuilds
+atomically: should it still fail, the state is kept and the reason is
+reported by `halt_reason` / `is_finished`.
 
 ### 4.3 Commands (`LifeCommand`)
 
@@ -211,10 +238,11 @@ bottles and cross-surfaces), so moved or pasted cells that wrap around an
 edge replace what was there instead of merging with it. Drawing shapes larger
 than 2^26 cells (`MAX_EDIT_CELLS`) are refused, and so are moves, rotations,
 mirrors, copies and cuts of a region holding more than 2^26 live cells (they
-list its cells one by one; at most 2^26 + 1 are listed to find out, and
-nothing changes); random fills are streamed into the engine and
-cover any region up to 2^32 cells (the largest world). Shapes, pastes and
-rotations that would leave the 64-bit plane are refused (never clamped).
+list its cells one by one; the region is counted first with
+`count_in_rect`, so nothing is listed and nothing changes); random fills are
+streamed into the engine and cover any region up to 2^32 cells (the largest
+world). Shapes, pastes and rotations that would leave the 64-bit plane are
+refused (never clamped).
 
 Symmetric fills visit the region row-major and draw one random number per
 symmetry orbit (at the orbit's first cell), so a seed always gives the same
@@ -242,7 +270,11 @@ generation counts as 1, saturating at 255). Activity = 255 when a cell was
 born or died during the last tick (in any of its generations), minus 16 per
 tick afterwards (the trail decays once at the first generation of every
 tick), matching the view contract "255 when the cell changed this tick". Edits
-are merged for the edited region without ageing anything. Cost O(live cells +
+are merged for the edited region without ageing anything: the region's live
+cells are counted first and listed only when there are at most 2^26
+(`MAX_EDIT_CELLS`); an edit that leaves more inside its region (a fill of a
+large world, for example) is applied and stops tracking — `track_ages` and
+`track_activity` turn off — instead of listing them. Cost O(live cells +
 trail) per generation on every engine; enabling tracking starts every live
 cell at age 1. Views read the tracker only inside the request (rows found by
 binary search, then the requested columns).
@@ -414,7 +446,10 @@ K3,3 once inputs and output are on the outside).
   (proportional to the covered area), not counted exactly.
 * Ant trails keep at most the 2^20 most recent flips.
 * Tracking costs O(live cells) per generation and stores 17 bytes per live
-  cell; Hashlife with tracking steps one generation at a time.
+  cell; Hashlife with tracking steps one generation at a time. An edit whose
+  region holds more than 2^26 live cells stops tracking (§4.4).
+* Engine switches copy at most 2^26 live cells; above that the running
+  engine is kept (refused for a fixed choice, kept by the automatic one).
 * Hashlife texel counts saturate at `u32::MAX` per texel (only for blocks of
   more than 4·10^9 live cells).
 * The sparse plane ends at the `i64` limits (births beyond are dropped);
@@ -440,8 +475,9 @@ CARGO_TARGET_DIR=target/agents/cellular-automata cargo clippy -p cellular-automa
   ±2^50, 15–45 generations); 300-generation runs on a Klein bottle; 2000
   generations of an unbounded soup on three engines; Hashlife jumps against
   sparse stepping; engine switching; level-of-detail counts of every engine
-  against direct counting; region listings of every engine, whole and cut
-  off at a limit.
+  against direct counting; region listings and `count_in_rect` (exact and
+  capped at several limits) of every engine on random rectangles, a whole
+  tile and the whole plane.
 * **`tests/catalog.rs`**: every one of the 80 catalog patterns against its
   declared data — initial population and size; still lifes; oscillator periods
   (minimal) and population ranges; spaceship periods and displacements; gun
@@ -472,12 +508,27 @@ CARGO_TARGET_DIR=target/agents/cellular-automata cargo clippy -p cellular-automa
   changes) instead of dropping them; random fills of a 16,384 × 8,200 world;
   activity = 255 for every change of the tick, −16 per tick; births/deaths of
   the last tick after `advance(n)`; Hashlife jumps keep the generation exact
-  when a later jump fails at the ±2^61 limit; cut; region tools, copies and
-  cuts of more than 2^26 live cells refused unchanged; the automatic choice
+  when a later jump fails at the ±2^61 limit; cut; the automatic choice
   keeps Hashlife for a soup too large to measure and for a Gosper gun after
   2^40 generations (about 1.8 × 10^11 cells) without listing them, and keeps
   Sparse for a full block one row above 2^20 cells (one of exactly 2^20 is
   measured and moves to Hashlife).
+* **`tests/listing_limits.rs`**: a counting global allocator (the crate's
+  only `unsafe` code: it forwards to the system allocator and fails single
+  allocations above 4 GiB, so a regression aborts instead of exhausting the
+  machine) measures what refusals allocate, the tests running one at a time.
+  Moves, rotations, mirrors and cuts of a full 8,192 × 8,193 torus (2^26 +
+  8,192 live cells), and a move of a Gosper gun's 1.8 × 10^11 cells on
+  Hashlife, are refused unchanged allocating less than 16 MiB; switching that
+  gun to the sparse or dense engine through `set_param` is refused with the
+  limit in the message and the state kept, and `switch_engine` refuses it
+  too, likewise without listing; at 64
+  generations per tick the automatic choice keeps a sparse pattern of more
+  than 2^26 cells instead of moving it to Hashlife; filling the whole torus
+  with tracking on is applied and stops tracking without listing the cells,
+  while a smaller region keeps it. Peak memory of the refusal test
+  (`/usr/bin/time -l`, maximum resident set size): 3.24 GB when the refusal
+  listed 2^26 + 1 cells first, 13 MB with the count.
 * **`tests/generations.rs`**: Brian's Brain 1 → 2 → 0 and no surviving cells,
   the domino spaceship, the exploding 2×2 block (12, 20, 28), Star Wars decay,
   streamed fills of worlds above 2^26 cells, world changes that would make the
@@ -507,7 +558,10 @@ CARGO_TARGET_DIR=target/agents/cellular-automata cargo clippy -p cellular-automa
 * Unit tests (`src/`): SWAR kernel against scalar counts for many rules,
   shifts and bit reversal, the dense window and its refusal of far-apart
   cells, Hashlife border-texel budget (exact up to the budget, proportional
-  estimate beyond, exact for uniform blocks) and `advance(2^62)`, the
+  estimate beyond, exact for uniform blocks) and `advance(2^62)`, Hashlife
+  rectangle counts against listings (cells at the `i64` extremes, the whole
+  plane) and on a full 2^17 × 2^17 square whose blocks saturate the `u32`
+  density pixels (exact without a limit, immediate with one), the
   topology images of rectangles (`World::images`) against cell-by-cell
   mapping on all finite topologies, streamed fills equal to listed fills,
   shapes refused at the edge of the 64-bit plane, tracker per-tick decay and

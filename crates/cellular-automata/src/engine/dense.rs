@@ -286,10 +286,10 @@ impl LifeEngine for DenseEngine {
     }
 
     fn export_cells(&self) -> Vec<(i64, i64)> {
-        self.cells_in_rect(self.window(), usize::MAX)
+        self.cells_in_rect(self.window())
     }
 
-    fn cells_in_rect(&self, rect: CellRect, limit: usize) -> Vec<(i64, i64)> {
+    fn cells_in_rect(&self, rect: CellRect) -> Vec<(i64, i64)> {
         let mut out = Vec::new();
         let Some(clip) = rect.intersect(&self.window()) else {
             return out;
@@ -299,14 +299,27 @@ impl LifeEngine for DenseEngine {
             let (a, b) = ((clip.x0 - self.origin.0) as usize, (clip.x1 - self.origin.0) as usize);
             for (i, &c) in row[a..=b].iter().enumerate() {
                 if c != 0 {
-                    if out.len() == limit {
-                        return out;
-                    }
                     out.push((clip.x0 + i as i64, y));
                 }
             }
         }
         out
+    }
+
+    fn count_in_rect(&self, rect: CellRect, limit: u64) -> u64 {
+        let Some(clip) = rect.intersect(&self.window()) else {
+            return 0;
+        };
+        let (a, b) = ((clip.x0 - self.origin.0) as usize, (clip.x1 - self.origin.0) as usize);
+        let mut count = 0;
+        for y in clip.y0..=clip.y1 {
+            if count >= limit {
+                break;
+            }
+            let row = self.grid.row((y - self.origin.1) as usize);
+            count += row[a..=b].iter().filter(|&&c| c != 0).count() as u64;
+        }
+        count.min(limit)
     }
 
     fn step(&mut self) -> Result<Option<GenStats>, CaError> {

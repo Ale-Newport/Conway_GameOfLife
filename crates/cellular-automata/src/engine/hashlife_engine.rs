@@ -72,6 +72,55 @@ impl HashlifeEngine {
         Ok(())
     }
 
+    /// Adds the live cells of `rect` inside the aligned square of side
+    /// `2^level` at `(x, y)`, which holds `population` live cells (a cached
+    /// quadtree population, saturated at `u32::MAX` by
+    /// `Universe::density_grid`), to `count`, stopping once it reaches
+    /// `limit`. A square inside `rect` adds its population; a square crossing
+    /// the border lists its overlap when it holds at most
+    /// [`LIST_UP_TO`] cells (every 8×8 leaf does) and otherwise descends into
+    /// its four children, whose populations one 2×2 density grid gives. So
+    /// only non-empty squares crossing the border are visited, plus, below
+    /// `limit`, the squares inside `rect` holding more than `u32::MAX` cells.
+    fn count_square(
+        &self,
+        rect: &CellRect,
+        (x, y): (i128, i128),
+        level: u32,
+        population: u32,
+        limit: u64,
+        count: &mut u64,
+    ) {
+        let last = (1i128 << level) - 1;
+        let (x0, y0) = (x.max(rect.x0.into()), y.max(rect.y0.into()));
+        let (x1, y1) = ((x + last).min(rect.x1.into()), (y + last).min(rect.y1.into()));
+        if population == 0 || *count >= limit || x0 > x1 || y0 > y1 {
+            return;
+        }
+        let inside = (x0, y0, x1, y1) == (x, y, x + last, y + last);
+        // A saturated population stands for at least u32::MAX cells.
+        if inside && (population < u32::MAX || count.saturating_add(u64::from(u32::MAX)) >= limit) {
+            *count += u64::from(population);
+            return;
+        }
+        // The overlap lies inside the i64 plane.
+        if population <= LIST_UP_TO {
+            let cells = self.universe.cells_in_rect(x0 as i64, y0 as i64, x1 as i64, y1 as i64, LIST_UP_TO as usize);
+            *count += cells.len() as u64;
+            return;
+        }
+        // An 8×8 leaf holds at most LIST_UP_TO cells, so `level > 3` here and
+        // a 2×2 grid of half-size squares is always a valid density grid.
+        let Ok(children) = self.universe.density_grid(x as i64, y as i64, 2, 2, level - 1) else {
+            return;
+        };
+        let half = 1i128 << (level - 1);
+        for (i, &child) in children.iter().enumerate() {
+            let corner = (x + half * (i % 2) as i128, y + half * (i / 2) as i128);
+            self.count_square(rect, corner, level - 1, child, limit, count);
+        }
+    }
+
     fn bin(cells: &[(i64, i64)], grid: &TexelGrid, out: &mut [u32]) {
         for &(x, y) in cells {
             out[grid.index(x, y)] += 1;
@@ -185,6 +234,11 @@ impl HashlifeEngine {
 /// beyond it, so a view never enumerates more than this many cells.
 pub const BORDER_CELL_BUDGET: usize = 1 << 21;
 
+/// Squares crossing the border of a counted rectangle that hold at most
+/// this many live cells (every 8×8 quadtree leaf does) are counted by listing
+/// their overlap with the rectangle (see [`HashlifeEngine::count_square`]).
+const LIST_UP_TO: u32 = 64;
+
 impl LifeEngine for HashlifeEngine {
     fn kind(&self) -> EngineKind {
         EngineKind::Hashlife
@@ -236,8 +290,19 @@ impl LifeEngine for HashlifeEngine {
         cells
     }
 
-    fn cells_in_rect(&self, rect: CellRect, limit: usize) -> Vec<(i64, i64)> {
-        self.universe.cells_in_rect(rect.x0, rect.y0, rect.x1, rect.y1, limit)
+    fn cells_in_rect(&self, rect: CellRect) -> Vec<(i64, i64)> {
+        self.universe.cells_in_rect(rect.x0, rect.y0, rect.x1, rect.y1, usize::MAX)
+    }
+
+    fn count_in_rect(&self, rect: CellRect, limit: u64) -> u64 {
+        // The whole plane is the aligned square of side 2^64 at (i64::MIN, i64::MIN).
+        let corner = i64::MIN;
+        let Ok(plane) = self.universe.density_grid(corner, corner, 1, 1, 64) else {
+            return 0;
+        };
+        let mut count = 0;
+        self.count_square(&rect, (corner.into(), corner.into()), 64, plane[0], limit, &mut count);
+        count.min(limit)
     }
 
     fn step(&mut self) -> Result<Option<GenStats>, CaError> {
@@ -309,7 +374,7 @@ mod tests {
         let mut fast = vec![0u32; grid.len()];
         e.count_live(&grid, &mut fast);
         let mut slow = vec![0u32; grid.len()];
-        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap(), usize::MAX), &grid, &mut slow);
+        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap()), &grid, &mut slow);
         assert_eq!(fast, slow);
     }
 
@@ -323,7 +388,7 @@ mod tests {
         let req = GridViewRequest { x0: -45, y0: -37, x1: 61, y1: 29, max_width: 9, max_height: 9 };
         let grid = TexelGrid::plan(&req, None);
         let mut exact = vec![0u32; grid.len()];
-        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap(), usize::MAX), &grid, &mut exact);
+        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap()), &grid, &mut exact);
         for budget in [0, 50, 1 << 20] {
             let mut got = vec![0u32; grid.len()];
             e.count_live_with_budget(&grid, &mut got, budget);
@@ -346,5 +411,44 @@ mod tests {
         e.advance(1 << 62).unwrap();
         assert_eq!(e.export_cells(), block.to_vec(), "2^62 generations of a still life");
         assert_eq!(e.universe().generation(), 1 << 62);
+    }
+
+    #[test]
+    fn rectangle_counts_are_exact_up_to_the_limit() {
+        let mut e = HashlifeEngine::new(LifeRule::conway()).unwrap();
+        let mut cells: Vec<(i64, i64)> = (0..3000).map(|i| (i * 37 % 211 - 90, i * 53 % 173 - 70)).collect();
+        cells.extend([(i64::MIN, i64::MIN), (i64::MAX, i64::MAX), (i64::MIN, 5), (1 << 40, -(1 << 40))]);
+        e.set_cells(&cells, true);
+        let plane = CellRect::new(i64::MIN, i64::MIN, i64::MAX, i64::MAX);
+        let rects = [
+            plane,
+            CellRect::new(-90, -70, 120, 102),
+            CellRect::new(-37, -11, 58, 13),
+            CellRect::new(3, 3, 3, 90),
+            CellRect::new(i64::MIN, -100, 0, i64::MAX),
+            CellRect::new(-(1 << 41), -(1 << 41), 1 << 41, 0),
+        ];
+        for rect in rects {
+            let listed = e.cells_in_rect(rect).len() as u64;
+            assert_eq!(e.count_in_rect(rect, u64::MAX), listed, "{rect:?}");
+            for limit in [0, 1, listed / 2] {
+                assert_eq!(e.count_in_rect(rect, limit), limit.min(listed), "{rect:?}, limit {limit}");
+            }
+        }
+        assert_eq!(e.count_in_rect(plane, u64::MAX), e.population());
+        // A full 2^17 × 2^17 square (2^34 cells, built from a macrocell file):
+        // the density grid saturates its blocks of 2^32 cells and more.
+        let mut text = String::from("[M2]\n");
+        text.push_str(&"********$".repeat(8));
+        for level in 4..=17 {
+            text.push_str(&format!("\n{level} {i} {i} {i} {i}", i = level - 3));
+        }
+        e.set_universe(hashlife::macrocell::read(&text).unwrap()).unwrap();
+        let square = e.bounding_box().unwrap();
+        assert_eq!((square.width(), square.height()), (1 << 17, 1 << 17));
+        assert_eq!(e.count_in_rect(plane, u64::MAX), 1 << 34, "saturated blocks are split until exact");
+        let part = CellRect::new(square.x0 + 3, square.y0 - 9, square.x1, square.y0 + (1 << 16));
+        assert_eq!(e.count_in_rect(part, u64::MAX), ((1 << 17) - 3) * ((1 << 16) + 1));
+        assert_eq!(e.count_in_rect(part, 1000), 1000, "a saturated block reaches the limit at once");
     }
 }

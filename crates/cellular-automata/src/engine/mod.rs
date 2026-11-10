@@ -169,8 +169,9 @@ impl std::ops::Add for GenStats {
 /// single-cell operations map coordinates through the world's topology
 /// ([`World::map`]): they wrap on tori, Klein bottles and cross-surfaces and
 /// are ignored outside a bounded plane. Rectangle operations
-/// ([`LifeEngine::cells_in_rect`], [`LifeEngine::clear_rect`],
-/// [`LifeEngine::count_live`]) are clipped to the world and never wrap.
+/// ([`LifeEngine::cells_in_rect`], [`LifeEngine::count_in_rect`],
+/// [`LifeEngine::clear_rect`], [`LifeEngine::count_live`]) are clipped to
+/// the world and never wrap.
 pub trait LifeEngine: Send + Sync {
     /// Which implementation this is.
     fn kind(&self) -> EngineKind;
@@ -221,10 +222,17 @@ pub trait LifeEngine: Send + Sync {
     }
     /// Every live cell, sorted row-major (by `y`, then `x`).
     fn export_cells(&self) -> Vec<(i64, i64)>;
-    /// Live cells inside `rect`, sorted row-major: at most `limit` of them
-    /// (which ones are kept when the rectangle holds more depends on the
-    /// engine), so callers can refuse huge regions without listing them.
-    fn cells_in_rect(&self, rect: CellRect, limit: usize) -> Vec<(i64, i64)>;
+    /// Live cells inside `rect`, sorted row-major. Callers that must bound
+    /// the list check [`LifeEngine::count_in_rect`] first.
+    fn cells_in_rect(&self, rect: CellRect) -> Vec<(i64, i64)>;
+    /// Number of live cells inside `rect`, counted without listing them and
+    /// exactly up to `limit`: the smaller of the count and `limit` (so
+    /// `limit = u64::MAX` gives the exact count). The dense engine scans
+    /// bytes, the bit engine popcounts words, the sparse engine adds whole
+    /// tiles' populations and popcounts the tiles cut by the border, and
+    /// Hashlife adds cached quadtree populations, descending only into
+    /// squares crossing the border.
+    fn count_in_rect(&self, rect: CellRect, limit: u64) -> u64;
     /// Advances one generation. Returns its births and deaths, or `None`
     /// when the engine does not count them (Hashlife).
     ///
@@ -272,13 +280,20 @@ pub fn create_engine(kind: EngineKind, world: World, rule: LifeRule) -> Result<B
     })
 }
 
+/// Most live cells an engine switch copies. A switch lists every live cell
+/// (16 bytes each, so at most 1 GiB here) and loads the list into the new
+/// engine; [`switch_engine`] refuses larger patterns, and `LifeSim`'s
+/// automatic choice keeps the running engine for them.
+pub const MAX_SWITCH_CELLS: u64 = 1 << 26;
+
 /// Moves the exact state of `engine` into a new engine of `kind` (same
 /// world and rule). Returns `engine` unchanged when it already is of `kind`.
 ///
 /// # Errors
-/// See [`EngineKind::check`]; [`CaError::LimitExceeded`] when the new
-/// engine cannot hold every live cell (the dense engine's window on the
-/// infinite plane). No cell is ever dropped.
+/// See [`EngineKind::check`]; [`CaError::LimitExceeded`] when `engine`
+/// holds more than [`MAX_SWITCH_CELLS`] live cells (checked before anything
+/// is listed) or when the new engine cannot hold every live cell (the dense
+/// engine's window on the infinite plane). No cell is ever dropped.
 pub fn switch_engine(engine: Box<dyn LifeEngine>, kind: EngineKind) -> Result<Box<dyn LifeEngine>, CaError> {
     if engine.kind() == kind {
         return Ok(engine);
@@ -291,6 +306,14 @@ pub fn switch_engine(engine: Box<dyn LifeEngine>, kind: EngineKind) -> Result<Bo
 /// # Errors
 /// As [`switch_engine`].
 pub(crate) fn transfer(engine: &dyn LifeEngine, kind: EngineKind) -> Result<Box<dyn LifeEngine>, CaError> {
+    let population = engine.population();
+    if population > MAX_SWITCH_CELLS {
+        return Err(CaError::LimitExceeded(format!(
+            "switching to the {} engine copies every live cell one by one; this pattern has {population} live \
+             cells, more than the {MAX_SWITCH_CELLS} a switch copies",
+            kind.label()
+        )));
+    }
     let mut next = create_engine(kind, engine.world(), engine.rule())?;
     if let Some(bbox) = engine.bounding_box() {
         next.reserve(bbox)?;

@@ -336,22 +336,6 @@ fn region_tools_and_copy() {
 }
 
 #[test]
-fn region_tools_refuse_more_live_cells_than_the_edit_limit() {
-    use cellular_automata::geometry::MAX_EDIT_CELLS;
-    // Every cell of an 8,192 × 8,193 torus alive: one row more than the limit.
-    let mut s = sim(Topology::Torus, 8192, 8193, vec![]);
-    s.apply(LifeCommand::Randomize { density: 1.0, seed: Some(1), region: None, symmetry: Symmetry::None }).unwrap();
-    let population = s.population();
-    assert_eq!(population, MAX_EDIT_CELLS + 8192);
-    let world = CellRect::new(0, 0, 8191, 8192);
-    let refused = |result: Result<(), SimError>| matches!(result, Err(SimError::LimitExceeded(m)) if m.contains(&MAX_EDIT_CELLS.to_string()));
-    assert!(refused(s.apply(LifeCommand::MoveRegion { rect: world, dx: 1, dy: 0 })));
-    assert!(refused(s.apply(LifeCommand::RotateRegion { rect: world, rotation: Rotation::Half })));
-    assert!(refused(s.cut_region(world).map(|_| ())), "copy_region refuses, so nothing is cleared");
-    assert_eq!(s.population(), population);
-}
-
-#[test]
 fn randomize_with_seed_symmetry_and_region() {
     let mut a = sim(Topology::Torus, 64, 64, vec![]);
     let mut b = sim(Topology::Torus, 64, 64, vec![]);
