@@ -2,8 +2,10 @@
 //!
 //! Every colour the shell paints comes from a [`Palette`], so the three
 //! themes (dark lab, light, high contrast) stay consistent. The accent is
-//! per mode ([`crate::mode::ModeCard::accent`]); the high-contrast theme
-//! brightens it to keep at least 4.5:1 contrast against the panels.
+//! per mode ([`crate::mode::ModeCard::accent`]); the light theme darkens it
+//! to at least 3:1 contrast against the panels and the high-contrast theme
+//! brightens it to at least 7:1. Selected text is the accent shaded to 4.5:1
+//! on the selection fill (7:1 in high contrast).
 
 use bevy::prelude::*;
 use bevy_egui::egui::{self, Color32, CornerRadius, FontId, Margin, Shadow, Stroke, TextStyle};
@@ -193,22 +195,22 @@ pub fn with_alpha(color: Color32, alpha: f32) -> Color32 {
 }
 
 fn darken_for_light(c: Color32) -> Color32 {
-    let white = Color32::from_rgb(250, 251, 253);
-    let mut out = c;
-    let mut step = 0;
-    while contrast_ratio(out, white) < 3.0 && step < 20 {
-        out = mix(out, Color32::BLACK, 0.08);
-        step += 1;
-    }
-    out
+    shade_for_contrast(c, Color32::from_rgb(250, 251, 253), Color32::BLACK, 0.08, 3.0)
 }
 
 fn brighten_for_contrast(c: Color32) -> Color32 {
-    let mut out = c;
-    let mut step = 0;
-    while contrast_ratio(out, Color32::BLACK) < 7.0 && step < 20 {
-        out = mix(out, Color32::WHITE, 0.1);
-        step += 1;
+    shade_for_contrast(c, Color32::BLACK, Color32::WHITE, 0.1, 7.0)
+}
+
+/// `color` mixed toward `target` in steps of `t` (at most 20) until its
+/// contrast with `background` reaches `min_ratio`.
+fn shade_for_contrast(color: Color32, background: Color32, target: Color32, t: f32, min_ratio: f32) -> Color32 {
+    let mut out = color;
+    for _ in 0..20 {
+        if contrast_ratio(out, background) >= min_ratio {
+            break;
+        }
+        out = mix(out, target, t);
     }
     out
 }
@@ -303,18 +305,26 @@ fn visuals(p: &Palette) -> egui::Visuals {
     widgets.open.bg_stroke = border(p.stroke);
     widgets.open.fg_stroke = Stroke::new(1.0, p.text);
     widgets.open.corner_radius = radius;
+    // Opaque: bevy_egui blends in linear light (sRGB target), where a
+    // translucent accent over the light panel washes out to grey.
+    let selection_fill = mix(p.panel, p.accent, 0.35);
+    // Selected text and icons (and the focused text-edit outline): the accent,
+    // darkened in the light theme and lightened in the dark ones until it
+    // reads on the selection fill (WCAG 4.5:1, 7:1 in high contrast).
+    let selection_ink = shade_for_contrast(
+        p.accent,
+        selection_fill,
+        if p.dark { Color32::WHITE } else { Color32::BLACK },
+        0.1,
+        if hc { 7.0 } else { 4.5 },
+    );
     let shadow_alpha = if p.dark { 110 } else { 40 };
     egui::Visuals {
         dark_mode: p.dark,
         override_text_color: Some(p.text),
         weak_text_color: Some(p.text_muted),
         widgets,
-        selection: egui::style::Selection {
-            // Opaque: bevy_egui blends in linear light (sRGB target), where a
-            // translucent accent over the light panel washes out to grey.
-            bg_fill: mix(p.panel, p.accent, 0.35),
-            stroke: Stroke::new(1.0, p.accent),
-        },
+        selection: egui::style::Selection { bg_fill: selection_fill, stroke: Stroke::new(1.0, selection_ink) },
         hyperlink_color: p.accent,
         faint_bg_color: mix(p.panel, p.surface, 0.5),
         extreme_bg_color: if p.dark { mix(p.background, Color32::BLACK, 0.3) } else { Color32::WHITE },
@@ -425,6 +435,36 @@ mod tests {
                 assert!(chroma >= 0.25 * accent_chroma, "{kind:?} {mode:?}: the selection shows grey");
                 let gap = (hue - accent_hue).abs();
                 assert!(gap.min(360.0 - gap) <= 15.0, "{kind:?} {mode:?}: the selection is not the accent's hue");
+            }
+        }
+    }
+
+    #[test]
+    fn selected_text_is_readable_in_every_theme_and_accent() {
+        use egui::widget_style::{Classes, HasClasses, SELECTED_CLASS, WidgetState};
+        let selected = Classes::default().with_class(SELECTED_CLASS);
+        let ctx = egui::Context::default();
+        for kind in ThemeKind::ALL {
+            let min_text = if kind == ThemeKind::HighContrast { 7.0 } else { 4.5 };
+            for mode in crate::mode::AppMode::ALL {
+                let p = Palette::new(kind, mode.default_accent());
+                apply_palette(&ctx, &p);
+                let style = ctx.global_style();
+                // Selected buttons and labels.
+                for state in [WidgetState::Inactive, WidgetState::Hovered, WidgetState::Active] {
+                    let button = style.button_style(&selected, state);
+                    let fill = composite(p.panel, button.frame.fill);
+                    let ratio = contrast_ratio(composite(fill, button.text_style.color), fill);
+                    assert!(ratio >= min_text, "{kind:?} {mode:?} {state:?}: selected label at {ratio:.2}:1");
+                }
+                // Selected text in labels and text edits.
+                let selection = style.visuals.selection;
+                let fill = composite(p.panel, selection.bg_fill);
+                let ratio = contrast_ratio(composite(fill, selection.stroke.color), fill);
+                assert!(ratio >= min_text, "{kind:?} {mode:?}: selected text at {ratio:.2}:1");
+                // The same colour outlines the focused text edit (WCAG 3:1 for UI components).
+                let ratio = contrast_ratio(selection.stroke.color, p.panel);
+                assert!(ratio >= 3.0, "{kind:?} {mode:?}: focus outline at {ratio:.2}:1");
             }
         }
     }
