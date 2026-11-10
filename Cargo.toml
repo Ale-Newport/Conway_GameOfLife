@@ -32,6 +32,15 @@ model-registry = { path = "crates/model-registry" }
 rendering = { path = "crates/rendering" }
 organism-render = { path = "crates/organism-render" }
 interface = { path = "crates/interface" }
+view-continuous = { path = "crates/view-continuous" }
+view-voxel = { path = "crates/view-voxel" }
+view-evolution = { path = "crates/view-evolution" }
+view-civilization = { path = "crates/view-civilization" }
+view-custom-life = { path = "crates/view-custom-life" }
+view-conway = { path = "crates/view-conway" }
+view-ca-lab = { path = "crates/view-ca-lab" }
+view-metapixel = { path = "crates/view-metapixel" }
+view-ecosystem = { path = "crates/view-ecosystem" }
 
 # --- simulation-side third-party crates (no Bevy) --------------------------
 serde = { version = "1.0", features = ["derive"] }

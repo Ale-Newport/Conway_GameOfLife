@@ -2966,6 +2966,11 @@ dependencies = [
  "interface",
  "rendering",
  "thiserror 2.0.21",
+ "view-civilization",
+ "view-continuous",
+ "view-custom-life",
+ "view-evolution",
+ "view-voxel",
 ]
 
 [[package]]
@@ -6777,6 +6782,7 @@ dependencies = [
  "patterns",
  "rendering",
  "serde",
+ "serde_json",
  "simulation-core",
 ]
 

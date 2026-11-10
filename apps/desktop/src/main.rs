@@ -21,7 +21,15 @@ use rendering::WorldInputPlugin;
 /// contract in `docs/UI_SHELL.md`. Modes that are not registered appear on
 /// the dashboard as "in development".
 // ---- BEGIN MODE REGISTRATION ------------------------------------------
-fn register_modes(_app: &mut App) {}
+fn register_modes(app: &mut App) {
+    app.add_plugins((
+        view_custom_life::CustomLifeViewPlugin,
+        view_evolution::EvolutionViewPlugin,
+        view_continuous::ContinuousViewPlugin,
+        view_voxel::VoxelViewPlugin,
+        view_civilization::CivilizationViewPlugin,
+    ));
+}
 // ---- END MODE REGISTRATION --------------------------------------------
 
 fn main() -> ExitCode {

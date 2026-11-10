@@ -17,6 +17,11 @@ bevy.workspace = true
 interface.workspace = true
 rendering.workspace = true
 thiserror.workspace = true
+view-continuous.workspace = true
+view-voxel.workspace = true
+view-evolution.workspace = true
+view-civilization.workspace = true
+view-custom-life.workspace = true
 
 [lints]
 workspace = true
