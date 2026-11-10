@@ -1,0 +1,52 @@
+// Bottlenose dolphin (Tursiops truncatus): cooperative hunter in pods (packs); a mammal
+// that gets its water from food. Mass 150–300 kg, longevity ≈ 40 yr, maturity ≈ 9 yr, one calf
+// after ≈ 12 months (AnAge, order of magnitude); ≈ 32 km/h. Model: manifest `dolphin`.
+(
+    id: "dolphin",
+    name: "Bottlenose dolphin",
+    scientific_name: "Tursiops truncatus",
+    class: mammal,
+    roles: [carnivore, predator, social],
+    diet: [
+        (food: prey("small_fish"), preference: 1.0),
+        (food: prey("reef_fish"), preference: 0.8),
+    ],
+    locomotion: [swim],
+    habitat: (
+        biomes: [ocean, reef],
+        aquatic: true,
+        water: salt,
+        min_depth_m: 2.0,
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 200.0, length_m: 2.7, thermoregulation: endotherm, body_temperature_c: 36.8),
+    metabolism: (field_multiplier: 2.5, fasting_days: Some(6.0), dehydration_days: 1000.0, intake_per_hour: 0.5),
+    movement: (sprint_speed_m_s: Some(9.0), cruise_fraction: 0.35, endurance_s: 1800.0, agility: 3.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 100.0, fov_deg: 300.0, hearing_m: 1000.0),
+    life: (lifespan_years: 40.0, maturity_days: 3300.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 365.0),
+        litter: (1, 1),
+        breeding_seasons: [],
+        interval_days: 1100.0,
+        parental_care_days: 600.0,
+        birth_mass_fraction: Some(0.08),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: pack, group_size: (4, 12), cohesion: 0.6, alignment: Some(0.6), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: cathemeral,
+        weights: (forage: 1.2, hunt: 1.3, scavenge: 0.0, flee: 2.0, drink: 0.0, rest: 0.4, sleep: 1.0, mate: 1.0, wander: 0.3, defend: 0.0, migrate: 0.0),
+        boldness: 0.7,
+        vigilance: 0.6,
+        hunting: coursing,
+    ),
+    combat: (attack: 0.8, defence: 0.8, aggression: 0.3),
+    climate: (preferred_c: (10.0, 30.0), tolerance_c: (0.0, 34.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("dolphin"), procedural: Some("dolphin"), body_plan: fish, color: (0.5, 0.55, 0.62), scale: 1.0),
+)

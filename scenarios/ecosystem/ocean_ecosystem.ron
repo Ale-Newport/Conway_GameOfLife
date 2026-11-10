@@ -1,0 +1,40 @@
+// Ocean ecosystem: a warm coast whose western 70 % is a reef 25 m deep. Algae (standing for
+// phytoplankton and algal turf) feed damselfish, a density field of small forage fish
+// (sticklebacks standing for coastal forage fish, about one per m²) and manta rays; blacktip
+// reef sharks hunt reef fish and take forage fish; a pod of bottlenose dolphins led by its
+// leader feeds on the forage fish (a dolphin needs ≈ 5 kg of fish a day) and chases reef fish.
+// Sand lizards live on the beach, which has no fresh water: reptiles get their water from prey.
+(
+    id: "ocean_ecosystem",
+    name: "Ocean ecosystem",
+    description: "A 3.7 km² warm coast (96 × 96 cells of 20 m; 70 % sea, 25 m deep). Marine species live only in salt water of their minimum depth: reef fish school with alarm substance, sharks stalk them, the dolphin pod follows its leader and feeds on forage fish (a density field of millions), manta rays filter the plankton. Watch population.reef_fish, shark, dolphin and manta, and biomass_* per trophic level.",
+    seed: 41,
+    config: (
+        world: (
+            width: 96,
+            height: 96,
+            cell_size_m: 20.0,
+            river_count: 0,
+            lake_tendency: 0.0,
+            base_temperature_c: 26.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 1200.0,
+            seasonality: 3.0,
+        ),
+        terrain: coast(elevation_m: 8.0, sea_depth_m: 25.0, sea_fraction: 0.7),
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 20.0, species: ["palm"]),
+        soil: (litter_kg_m2: 0.05, deadwood_kg_m2: 0.01, mycelium_kg_m2: 0.005, mycorrhiza_kg_m2: 0.001),
+        animals: [
+            (species: "reef_fish", count: 600),
+            (species: "small_fish", count: 3000000),
+            (species: "manta", count: 4),
+            (species: "shark", count: 4),
+            (species: "dolphin", count: 6, groups: Some(1)),
+            (species: "lizard", count: 20),
+            (species: "beetle", count: 4000000),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)

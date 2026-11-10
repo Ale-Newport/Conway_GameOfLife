@@ -1,0 +1,56 @@
+// Wild boar (Sus scrofa): omnivorous rooting forager living in matriarchal sounders.
+// Mass 84–130 kg, longevity 21–27 yr record (≈ 15 yr wild), maturity 0.9–1 yr, litter 4.5–7
+// after 115 d: docs/research/ecology-alife.md §10.3; sprint 56 km/h (Hirt et al. 2017).
+// Eats mast and roots (shrubs), fungi, earthworms, beetle larvae and carrion. Model: manifest
+// `pig` (boar proxy).
+(
+    id: "boar",
+    name: "Wild boar",
+    scientific_name: "Sus scrofa",
+    class: mammal,
+    roles: [omnivore, prey, scavenger, social],
+    diet: [
+        (food: fungi, preference: 0.8),
+        (food: prey("worm"), preference: 0.8),
+        (food: plant(shrubs), preference: 0.6),
+        (food: prey("beetle"), preference: 0.5),
+        (food: carrion, preference: 0.5),
+        (food: plant(grass), preference: 0.4),
+        (food: eggs, preference: 0.4),
+    ],
+    locomotion: [walk, run, swim],
+    habitat: (
+        biomes: [temperate_forest, wetland, grassland, tropical_rainforest, savanna],
+        max_slope: 1.2,
+        max_wade_depth_m: 0.6,
+        refuges: [dense_vegetation],
+    ),
+    body: (mass_kg: 100.0, length_m: 1.5, thermoregulation: endotherm, body_temperature_c: 38.5),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(15.0), dehydration_days: 3.0, intake_per_hour: 0.3),
+    movement: (sprint_speed_m_s: Some(13.0), cruise_fraction: 0.25, endurance_s: 120.0, agility: 2.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 100.0, fov_deg: 300.0, hearing_m: 300.0),
+    life: (lifespan_years: 15.0, maturity_days: 360.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 115.0),
+        litter: (4, 7),
+        breeding_seasons: [autumn, winter],
+        interval_days: 330.0,
+        parental_care_days: 90.0,
+        birth_mass_fraction: Some(0.01),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: herd, group_size: (4, 20), cohesion: 0.5, alignment: Some(0.3), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: crepuscular,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.6, flee: 2.0, drink: 1.2, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.5,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.8, defence: 0.9, aggression: 0.5),
+    climate: (preferred_c: (0.0, 25.0), tolerance_c: (-30.0, 40.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("pig"), procedural: Some("boar"), body_plan: quadruped, color: (0.3, 0.24, 0.2), scale: 1.0),
+)

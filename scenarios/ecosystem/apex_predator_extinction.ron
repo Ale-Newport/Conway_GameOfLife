@@ -1,0 +1,43 @@
+// Apex predator extinction: a wolf pack controls the ungulates of a temperate grassland and
+// woodland. On day 15 every wolf is removed (hunted out). Without predation the deer, wapiti
+// and sheep survive longer and breed; their grazing and browsing pressure on grass, shrubs and
+// young trees rises — a trophic cascade that emerges from the model.
+(
+    id: "apex_predator_extinction",
+    name: "Apex predator extinction",
+    description: "A 1.6 km² dry grassland and woodland (64 × 64 cells of 20 m) grazed by red deer, wapiti and feral sheep and hunted by a pack of twelve wolves. On day 15 all wolves are removed. Watch kills, population.deer, stag and sheep, biomass_primary_consumers and biomass_producers, and compare with the same scenario without its event.",
+    seed: 101,
+    config: (
+        world: (
+            width: 64,
+            height: 64,
+            cell_size_m: 20.0,
+            sea_level: 0.0,
+            relief: 0.0,
+            roughness: 0.4,
+            river_count: 3,
+            lake_tendency: 0.6,
+            base_temperature_c: 11.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 550.0,
+            seasonality: 9.0,
+            lightning_rate: 0.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 20.0, species: ["oak", "birch", "pine"]),
+        soil: (litter_kg_m2: 0.1, deadwood_kg_m2: 0.03, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "deer", count: 60),
+            (species: "stag", count: 30),
+            (species: "sheep", count: 120),
+            (species: "wolf", count: 12, groups: Some(1)),
+            (species: "raven", count: 6),
+        ],
+        events: [
+            (day: 15.0, action: remove(species: "wolf", fraction: 1.0)),
+        ],
+        params: {"mutation_rate": 0.1, "predation_efficiency": 2.0},
+    ),
+)

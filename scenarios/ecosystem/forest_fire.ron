@@ -1,0 +1,55 @@
+// Forest fire and recovery: a dry pine and birch woodland after a two-week drought. Fires
+// are lit on day 22 at three points of the dry, windward side; how far they spread depends on
+// the fuel, its moisture and the wind (physics-world fire automaton). Animals flee the fire,
+// trees die or resprout, burned biomass returns as ash and the vegetation regrows from the
+// seed bank and from seeds of surviving trees.
+(
+    id: "forest_fire",
+    name: "Forest fire and recovery",
+    description: "A dry 2.6 km² woodland (80 × 80 cells of 20 m). A 14-day drought from day 8 dries the fuel; on day 22 three fires are lit on the western side with a 7 m/s westerly wind (no lightning). Watch burned_area, burning_cells, burned_biomass, biomass_producers and nutrients.soil_mineral (ash) during the fire and the recovery that follows.",
+    seed: 71,
+    config: (
+        world: (
+            width: 80,
+            height: 80,
+            cell_size_m: 20.0,
+            sea_level: 0.0,
+            relief: 0.02,
+            roughness: 0.4,
+            river_count: 2,
+            lake_tendency: 0.5,
+            base_temperature_c: 16.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 550.0,
+            seasonality: 8.0,
+            wind_speed: 7.0,
+            wind_from_deg: 270.0,
+            fire_spread: 1.0,
+            // Only the scheduled ignitions start fires.
+            lightning_rate: 0.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.8, seed_bank: 1.0),
+        trees: (density_per_ha: 60.0, species: ["pine", "birch", "oak"]),
+        soil: (litter_kg_m2: 0.4, deadwood_kg_m2: 0.2, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "deer", count: 30),
+            (species: "rabbit", count: 60),
+            (species: "boar", count: 10),
+            (species: "fox", count: 4),
+            (species: "songbird", count: 20),
+            (species: "lizard", count: 20),
+            (species: "beetle", count: 30000000),
+            (species: "worm", count: 30000000),
+            (species: "butterfly", count: 500000),
+        ],
+        events: [
+            (day: 8.0, action: world(drought(days: 14.0))),
+            (day: 22.0, action: ignite(x: 12, y: 20)),
+            (day: 22.0, action: ignite(x: 12, y: 40)),
+            (day: 22.0, action: ignite(x: 12, y: 60)),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)

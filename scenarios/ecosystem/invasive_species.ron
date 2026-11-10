@@ -1,0 +1,41 @@
+// Invasive species introduction: an island-like grassland whose native fauna evolved without
+// rodents — sand lizards, warblers and frogs living on beetles, spiders and butterflies. On
+// day 3 a ship brings brown rats. The rats breed fast, eat the same insects, seeds and carrion
+// and prey on lizards and frogs.
+(
+    id: "invasive_species",
+    name: "Invasive species introduction",
+    description: "A 1.6 km² grassland with scrub and a pond (64 × 64 cells of 20 m) and a native community of lizards, frogs and songbirds feeding on insects. On day 3, 24 brown rats arrive in the south-west corner. Watch population.rat, population.lizard, population.frog and population.beetle, and compare with the same scenario without its event.",
+    seed: 97,
+    config: (
+        world: (
+            width: 64,
+            height: 64,
+            cell_size_m: 20.0,
+            river_count: 0,
+            lake_tendency: 1.0,
+            base_temperature_c: 18.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 800.0,
+            seasonality: 6.0,
+            lightning_rate: 0.0,
+        ),
+        terrain: basin(elevation_m: 20.0, depth_m: 3.0, radius_cells: 6.0),
+        rules: ecological,
+        vegetation: (initial_fraction: 0.7, seed_bank: 1.0),
+        trees: (density_per_ha: 10.0, species: ["oak", "birch"]),
+        soil: (litter_kg_m2: 0.15, deadwood_kg_m2: 0.03, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "lizard", count: 120),
+            (species: "frog", count: 40),
+            (species: "songbird", count: 30),
+            (species: "beetle", count: 20000000),
+            (species: "spider", count: 4000000),
+            (species: "butterfly", count: 600000),
+        ],
+        events: [
+            (day: 3.0, action: introduce(species: "rat", count: 24, region: Some((2.0, 54.0, 10.0, 62.0)))),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)

@@ -1,0 +1,50 @@
+// Przewalski's wild horse (Equus ferus przewalskii): grazer living in harem bands.
+// Mass ≈ 300 kg, longevity ≈ 20 yr, maturity ≈ 2.5 yr, one foal after ≈ 335 d (AnAge, order
+// of magnitude); sprint ≈ 70 km/h (Hirt et al. 2017 dataset, Equus). Model: manifest `horse`.
+(
+    id: "horse",
+    name: "Wild horse",
+    scientific_name: "Equus ferus przewalskii",
+    class: mammal,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(grass), preference: 1.0),
+        (food: plant(shrubs), preference: 0.3),
+        (food: plant(flowers), preference: 0.2),
+    ],
+    locomotion: [walk, run, swim],
+    habitat: (
+        biomes: [grassland, savanna, tundra, mountain],
+        max_slope: 1.2,
+        max_wade_depth_m: 0.8,
+        refuges: [],
+    ),
+    body: (mass_kg: 300.0, length_m: 2.2, thermoregulation: endotherm, body_temperature_c: 37.8),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(15.0), dehydration_days: 2.5, intake_per_hour: 0.15),
+    movement: (sprint_speed_m_s: Some(19.0), cruise_fraction: 0.25, endurance_s: 600.0, agility: 2.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 350.0, fov_deg: 300.0, hearing_m: 300.0),
+    life: (lifespan_years: 20.0, maturity_days: 900.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 335.0),
+        litter: (1, 1),
+        breeding_seasons: [spring, summer],
+        interval_days: 365.0,
+        parental_care_days: 300.0,
+        birth_mass_fraction: Some(0.1),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: herd, group_size: (5, 15), cohesion: 0.6, alignment: Some(0.5), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.1, defend: 0.0, migrate: 0.0),
+        boldness: 0.3,
+        vigilance: 0.6,
+        hunting: none,
+    ),
+    combat: (attack: 0.5, defence: 0.8, aggression: 0.4),
+    climate: (preferred_c: (-5.0, 25.0), tolerance_c: (-40.0, 40.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("horse"), procedural: Some("wild_horse"), body_plan: quadruped, color: (0.62, 0.48, 0.32), scale: 1.0),
+)

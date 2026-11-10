@@ -1,0 +1,41 @@
+// Evolution of an isolated population: sand lizards stranded on a cool, windy island. They
+// live at the cold edge of their thermal niche: individuals whose thermal-niche gene is
+// shifted towards cold are less often torpid and suffer less exposure, so they eat, grow and
+// breed more. With a high mutation rate and no immigration, the gene pool can drift and adapt;
+// the genealogy records every lineage.
+(
+    id: "island_evolution",
+    name: "Evolution of an isolated population",
+    description: "A cool island (64 × 64 cells of 20 m, mostly ocean) with a closed population of 120 sand lizards feeding on beetles and spiders, at the cold edge of their thermal niche, and a mutation rate of 0.3 per gene and birth. Nothing is scripted: inspect the genes of the lizards (thermal_shift_c, size, speed...) over the years and follow lineages in the genealogy.",
+    seed: 113,
+    config: (
+        world: (
+            width: 64,
+            height: 64,
+            cell_size_m: 20.0,
+            // A cool, wet island of low relief.
+            island: true,
+            sea_level: 0.45,
+            relief: 0.02,
+            roughness: 0.5,
+            continentality: 0.6,
+            river_count: 0,
+            lake_tendency: 0.3,
+            base_temperature_c: 12.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 1100.0,
+            seasonality: 8.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 10.0, species: ["pine", "birch"]),
+        soil: (litter_kg_m2: 0.12, deadwood_kg_m2: 0.03, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "lizard", count: 120),
+            (species: "beetle", count: 6000000),
+            (species: "spider", count: 1500000),
+        ],
+        params: {"mutation_rate": 0.3},
+    ),
+)

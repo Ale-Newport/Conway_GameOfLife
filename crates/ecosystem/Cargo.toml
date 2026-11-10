@@ -1,0 +1,31 @@
+[package]
+name = "ecosystem"
+description = "Ecosystem simulator: species catalogue, fauna behaviour, flora, fungi, nutrient cycle and scenarios."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+simulation-core.workspace = true
+physics-world.workspace = true
+organism-engine.workspace = true
+analytics.workspace = true
+serde.workspace = true
+ron.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+# Used by one test that checks every visual model id against assets/models/manifest.toml.
+toml.workspace = true
+
+[[bench]]
+name = "ecosystem"
+harness = false
+
+[lints]
+workspace = true

@@ -1,0 +1,56 @@
+// Common frog (Rana temporaria): amphibious insectivore that spawns in ponds; hibernates.
+// Mass 0.02–0.03 kg, longevity 27 yr record (≈ 8 yr wild), maturity 3 yr, 2,585 eggs: docs/
+// research/ecology-alife.md §10.3. `litter` counts metamorphs surviving the tadpole stage
+// (tadpoles are not modelled). Model: manifest `frog`.
+// Reproduction: a metamorph weighs ≈ 0.25 g (1 % of the mother); `laying_days` (30) is the
+// feeding period over which the female builds her eggs (oogenesis), so that the clutch can
+// be paid from reserves and food (checked by `species::tests`).
+(
+    id: "frog",
+    name: "Common frog",
+    scientific_name: "Rana temporaria",
+    class: amphibian,
+    roles: [carnivore, prey, solitary],
+    diet: [
+        (food: prey("beetle"), preference: 1.0),
+        (food: prey("spider"), preference: 0.7),
+        (food: prey("butterfly"), preference: 0.5),
+        (food: prey("worm"), preference: 0.5),
+    ],
+    locomotion: [walk, jump, swim],
+    habitat: (
+        biomes: [wetland, temperate_forest, grassland, lake, river],
+        breeds_in_water: true,
+        max_slope: 1.0,
+        max_wade_depth_m: 0.1,
+        refuges: [water, dense_vegetation],
+    ),
+    body: (mass_kg: 0.025, length_m: 0.08, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: None, dehydration_days: 1.5, intake_per_hour: 0.3),
+    movement: (sprint_speed_m_s: Some(1.0), cruise_fraction: 0.3, endurance_s: 60.0, agility: 4.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 10.0, fov_deg: 300.0, hearing_m: 20.0),
+    life: (lifespan_years: 8.0, maturity_days: 1095.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 30.0, incubation_days: 21.0),
+        litter: (5, 12),
+        breeding_seasons: [spring],
+        interval_days: 330.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.01),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: solitary, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: nocturnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.5, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.2,
+        vigilance: 0.6,
+        hunting: none,
+    ),
+    combat: (attack: 0.01, defence: 0.05, aggression: 0.0),
+    climate: (preferred_c: (8.0, 24.0), tolerance_c: (-2.0, 33.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: Some((below_c: 5.0, wake_above_c: 7.0, metabolic_fraction: 0.2, min_reserve_fraction: 0.3))),
+    representation: individual,
+    visual: (model: Some("frog"), procedural: Some("frog"), body_plan: amphibian, color: (0.45, 0.5, 0.25), scale: 1.0),
+)

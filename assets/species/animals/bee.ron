@@ -1,0 +1,50 @@
+// Honey bee (Apis mellifera): eusocial pollinator; hives are super-agents with forager squads
+// that fly to flowers, recruit nest mates to the best patch (dance) and pollinate (≈ 75 flower
+// visits and ≈ 20 mg of dry nectar per trip). Worker ≈ 0.1 g, ≈ 25 km/h, summer workers live
+// ≈ 6 weeks, development 21 d, queen ≈ 1,500 eggs/day, hive kept at ≈ 33 °C (order of magnitude).
+// Swarms found new colonies in spring and summer. Procedural `bee` rig.
+(
+    id: "bee",
+    name: "Honey bee",
+    scientific_name: "Apis mellifera",
+    class: insect,
+    roles: [herbivore, pollinator, social],
+    diet: [
+        (food: nectar, preference: 1.0),
+    ],
+    locomotion: [walk, fly],
+    habitat: (
+        biomes: [grassland, temperate_forest, savanna, tropical_rainforest, wetland],
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 0.0001, length_m: 0.013, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 3.0, fasting_days: None, dehydration_days: 10.0, intake_per_hour: 0.3),
+    movement: (sprint_speed_m_s: Some(7.5), cruise_fraction: 0.6, endurance_s: 3600.0, agility: 4.0, flight_altitude_m: 3.0),
+    perception: (vision_m: 50.0, fov_deg: 300.0, hearing_m: 1.0),
+    life: (lifespan_years: 4.0, maturity_days: 21.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 1.0, incubation_days: 21.0),
+        litter: (1, 1),
+        breeding_seasons: [spring, summer],
+        interval_days: 365.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.5),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: colony, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.5,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.05, defence: 0.02, aggression: 0.4),
+    climate: (preferred_c: (12.0, 35.0), tolerance_c: (-30.0, 45.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: colony((workers_per_forager: 500.0, founding_workers: 10000.0, max_workers: 40000.0, forager_fraction: 0.3, max_foragers: 24, foraging_range_m: 1500.0, travel_fraction: 0.15, load_kg: 0.00002, worker_lifespan_days: 40.0, development_days: 21.0, max_eggs_per_day: 1500.0, nest_temperature_c: Some(33.0), recruitment: true, flower_visits_per_trip: 75.0, swarm_workers: 30000.0)),
+    visual: (model: None, procedural: Some("bee"), body_plan: insect, color: (0.85, 0.65, 0.1), scale: 1.0),
+)

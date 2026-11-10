@@ -1,0 +1,36 @@
+// Scots pine (Pinus sylvestris): evergreen conifer, drought-tolerant, thick bark but resinous
+// (flammable) foliage. Height 25–35 m, seeds from ~10–15 yr, lifespan 300–700 yr, winged
+// seeds dispersed by wind (research note §10.5; designer values).
+(
+    id: "pine",
+    name: "Scots pine",
+    scientific_name: "Pinus sylvestris",
+    style: conifer,
+    deciduous: false,
+    max_height_m: 30.0,
+    mature_biomass_kg: 1500.0,
+    crown_ratio: 0.18,
+    leaf_area_index: 4.0,
+    leaf_area_per_kg: 5.0,
+    height_growth_m_per_year: 0.45,
+    maturity_years: 15.0,
+    lifespan_years: 300.0,
+    shade_tolerance: 0.25,
+    drought_tolerance: 0.7,
+    temperature_c: (-2.0, 15.0, 34.0),
+    biomes: [temperate_forest, grassland, tundra, mountain, wetland],
+    seeds_per_year: 30.0,
+    seeding_seasons: [spring],
+    dispersal: two_dt(scale_m2: 600.0, shape: 1.2),
+    wood_nutrient_g_per_kg: 1.0,
+    leaf_nutrient_g_per_kg: 12.0,
+    bark_resistance: 0.7,
+    flammability: 0.8,
+    resprouts: false,
+    models: (
+        young: ["tree_pine_a", "tree_pine_b"],
+        mature: ["tree_pine_c", "tree_pine_d", "kenney_tree_pineTallA"],
+        old: ["tree_pine_e", "kenney_tree_pineRoundA"],
+        dead: ["tree_dead_a", "tree_dead_b"],
+    ),
+)

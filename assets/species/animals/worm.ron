@@ -1,0 +1,51 @@
+// Common earthworm (Lumbricus terrestris): soil detritivore and ecosystem engineer. Mass ≈ 4 g,
+// ≈ 6 yr, maturity ≈ 1 yr, 10–40 cocoons per year: docs/research/ecology-alife.md §10.3; up to
+// a few hundred per m² in pastures.
+// Simulated as a density field (individuals per m²) with representative display markers;
+// rates are per simulated day.
+// Procedural `worm` rig.
+(
+    id: "worm",
+    name: "Common earthworm",
+    scientific_name: "Lumbricus terrestris",
+    class: annelid,
+    roles: [detritivore, decomposer, prey],
+    diet: [
+        (food: detritus, preference: 1.0),
+    ],
+    locomotion: [burrow],
+    habitat: (
+        biomes: [grassland, temperate_forest, wetland, tropical_rainforest],
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 0.004, length_m: 0.15, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 1.5, fasting_days: None, dehydration_days: 10.0, intake_per_hour: 0.4),
+    movement: (sprint_speed_m_s: Some(0.02), cruise_fraction: 0.5, endurance_s: 600.0, agility: 1.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 0.05, fov_deg: 300.0, hearing_m: 0.05),
+    life: (lifespan_years: 6.0, maturity_days: 365.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 10.0, incubation_days: 100.0),
+        litter: (1, 1),
+        breeding_seasons: [spring, autumn],
+        interval_days: 365.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.01),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: solitary, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: nocturnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.5,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.0, defence: 0.01, aggression: 0.0),
+    climate: (preferred_c: (8.0, 20.0), tolerance_c: (-2.0, 30.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: field((max_density_m2: 80.0, max_birth_per_day: 0.01, mortality_per_day: 0.002, dispersal_per_day: 0.01, half_saturation_kg_m2: 0.1, flower_visits_per_hour: 0.0, individuals_per_marker: 5000.0)),
+    visual: (model: None, procedural: Some("worm"), body_plan: worm, color: (0.6, 0.35, 0.35), scale: 1.0),
+)

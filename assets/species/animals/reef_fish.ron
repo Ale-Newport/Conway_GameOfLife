@@ -1,0 +1,57 @@
+// Damselfish and clownfish (Pomacentridae): small schooling herbivores of coral reefs.
+// Mass ≈ 50 g, ≈ 8 yr, maturity ≈ 1 yr (FishBase, order of magnitude); graze algal turf.
+// Fish feel the air temperature of their cell (at least 4 °C in water) as a proxy for water
+// temperature. `litter` counts recruits that survive the larval stage, not eggs.
+// Model: manifest `fish_clown`; rig `clownfish`.
+// Reproduction: a settling recruit weighs ≈ 0.5 g (1 % of the mother); `laying_days` (15) is
+// the gonad maturation over which the female builds her eggs from food (checked by
+// `species::tests`).
+(
+    id: "reef_fish",
+    name: "Damselfish",
+    scientific_name: "Pomacentridae",
+    class: fish,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(algae), preference: 1.0),
+        (food: plant(aquatic), preference: 0.5),
+    ],
+    locomotion: [swim],
+    habitat: (
+        biomes: [reef, ocean],
+        aquatic: true,
+        water: salt,
+        min_depth_m: 0.5,
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 0.05, length_m: 0.1, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: None, dehydration_days: 1000.0, intake_per_hour: 0.3),
+    movement: (sprint_speed_m_s: Some(1.0), cruise_fraction: 0.4, endurance_s: 300.0, agility: 4.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 8.0, fov_deg: 300.0, hearing_m: 4.0),
+    life: (lifespan_years: 8.0, maturity_days: 365.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 15.0, incubation_days: 7.0),
+        litter: (3, 8),
+        breeding_seasons: [],
+        interval_days: 30.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.01),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: school, group_size: (5, 30), cohesion: 0.5, alignment: Some(0.6), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.5, drink: 0.0, rest: 0.4, sleep: 1.0, mate: 1.0, wander: 0.2, defend: 0.0, migrate: 0.0),
+        boldness: 0.2,
+        vigilance: 0.7,
+        hunting: none,
+    ),
+    combat: (attack: 0.02, defence: 0.1, aggression: 0.4),
+    climate: (preferred_c: (24.0, 30.0), tolerance_c: (15.0, 34.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("fish_clown"), procedural: Some("clownfish"), body_plan: fish, color: (0.95, 0.5, 0.15), scale: 1.0),
+)

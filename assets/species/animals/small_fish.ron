@@ -1,0 +1,62 @@
+// Three-spined stickleback (Gasterosteus aculeatus): small schooling fish of fresh, brackish
+// and coastal water (euryhaline), stands for forage fish. Mass ≈ 3 g, ≈ 3 yr, maturity ≈ 1 yr
+// (AnAge, order of magnitude). Schools release alarm substance (Schreckstoff).
+// Simulated as an aquatic DENSITY FIELD: forage fish live at about one per m² of littoral water
+// (hundreds of thousands in a lake), far too many for individual agents, and their predators
+// (herons, perch, pike, sharks, dolphins) eat dozens to thousands of them a day. Field values
+// (designer, orders of magnitude): density 2 m⁻² in preferred water, at most 2 % recruits per
+// day, background mortality 1 %/day (≈ 100-day mean life before predation), half-saturation
+// 5 g/m² of algae. Fish feel the air temperature of their cell (at least 4 °C in water) as a
+// proxy for water temperature. Reproduction, perception and behaviour values are kept for
+// reference; fields reproduce from their net assimilation instead.
+// Model: manifest `fish_perch` (small-fish stand-in); rig `minnow`.
+(
+    id: "small_fish",
+    name: "Three-spined stickleback",
+    scientific_name: "Gasterosteus aculeatus",
+    class: fish,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(algae), preference: 1.0),
+        (food: plant(aquatic), preference: 0.4),
+        (food: detritus, preference: 0.3),
+    ],
+    locomotion: [swim],
+    habitat: (
+        biomes: [lake, river, wetland, ocean, reef],
+        aquatic: true,
+        water: any,
+        min_depth_m: 0.2,
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 0.003, length_m: 0.07, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: None, dehydration_days: 1000.0, intake_per_hour: 0.3),
+    movement: (sprint_speed_m_s: Some(0.8), cruise_fraction: 0.4, endurance_s: 600.0, agility: 4.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 5.0, fov_deg: 300.0, hearing_m: 3.0),
+    life: (lifespan_years: 3.0, maturity_days: 300.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 3.0, incubation_days: 8.0),
+        litter: (4, 10),
+        breeding_seasons: [spring, summer],
+        interval_days: 60.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.05),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: school, group_size: (10, 50), cohesion: 0.7, alignment: Some(0.8), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.5, drink: 0.0, rest: 0.4, sleep: 1.0, mate: 1.0, wander: 0.2, defend: 0.0, migrate: 0.0),
+        boldness: 0.1,
+        vigilance: 0.7,
+        hunting: none,
+    ),
+    combat: (attack: 0.01, defence: 0.05, aggression: 0.1),
+    climate: (preferred_c: (4.0, 22.0), tolerance_c: (-30.0, 32.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: field((max_density_m2: 2.0, max_birth_per_day: 0.02, mortality_per_day: 0.01, dispersal_per_day: 0.2, half_saturation_kg_m2: 0.005, flower_visits_per_hour: 0.0, individuals_per_marker: 150.0)),
+    visual: (model: Some("fish_perch"), procedural: Some("minnow"), body_plan: fish, color: (0.55, 0.6, 0.45), scale: 0.5),
+)

@@ -1,0 +1,51 @@
+// African savanna: grassland with umbrella-thorn acacias and palms; plains zebras and
+// elephants in herds, wild boar as a warthog stand-in, lions hunting in prides led by their
+// leader, vultures soaring over carcasses, and insects, lizards and snakes in the grass.
+(
+    id: "african_savanna",
+    name: "African savanna",
+    description: "An 3.7 km² savanna (96 × 96 cells of 20 m) with a hot wet season and a dry season. Zebra herds give alarm calls and keep together as boids; elephant families browse acacias; lion prides hunt as a pack whose members join their leader's chase; white-backed vultures spot carcasses from 2.5 km; bees and butterflies pollinate the flowers. Watch population.zebra and population.lion, kills, energy.scavenging and flowers.pollination.",
+    seed: 23,
+    config: (
+        world: (
+            width: 96,
+            height: 96,
+            cell_size_m: 20.0,
+            // Savanna climate (hot, wet season and dry season) with the low relief of a
+            // 2 km landscape (the `savanna` preset's relief is meant for large maps).
+            sea_level: 0.0,
+            relief: 0.0,
+            roughness: 0.45,
+            continentality: 0.7,
+            river_count: 2,
+            lake_tendency: 0.4,
+            base_temperature_c: 25.0,
+            latitude_gradient: 2.0,
+            rainfall_mm: 900.0,
+            seasonality: 4.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 20.0, species: ["acacia", "palm", "ceiba"]),
+        soil: (litter_kg_m2: 0.1, deadwood_kg_m2: 0.03, mycelium_kg_m2: 0.008, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "zebra", count: 60),
+            (species: "elephant", count: 10),
+            (species: "boar", count: 20),
+            (species: "rat", count: 30),
+            (species: "lion", count: 8, groups: Some(1)),
+            (species: "vulture", count: 10),
+            (species: "eagle", count: 2),
+            (species: "songbird", count: 30),
+            (species: "lizard", count: 40),
+            (species: "snake", count: 10),
+            (species: "beetle", count: 60000000),
+            (species: "butterfly", count: 1500000),
+            (species: "spider", count: 6000000),
+            (species: "ant", count: 6),
+            (species: "bee", count: 2),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)

@@ -1,0 +1,53 @@
+// Wapiti / elk (Cervus canadensis): large migratory deer of forest edges and mountain meadows.
+// Mass 225–320 kg, longevity ~20 yr wild, maturity ~2 yr, one calf after ~247 d (AnAge,
+// order of magnitude); sprint ~72 km/h (Hirt et al. 2017 dataset, Cervus). Herding, alarm barks and
+// altitudinal migration are designer translations of its natural history. Model: manifest `stag`.
+(
+    id: "stag",
+    name: "Wapiti (elk)",
+    scientific_name: "Cervus canadensis",
+    class: mammal,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(grass), preference: 1.0),
+        (food: browse, preference: 0.8),
+        (food: plant(shrubs), preference: 0.7),
+        (food: plant(flowers), preference: 0.3),
+        (food: plant(moss), preference: 0.1),
+    ],
+    locomotion: [walk, run, jump, swim],
+    habitat: (
+        biomes: [temperate_forest, grassland, mountain, tundra, wetland],
+        max_slope: 1.2,
+        max_wade_depth_m: 0.8,
+        refuges: [dense_vegetation, water],
+    ),
+    body: (mass_kg: 300.0, length_m: 2.3, thermoregulation: endotherm, body_temperature_c: 38.5),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(18.0), dehydration_days: 3.0, intake_per_hour: 0.15),
+    movement: (sprint_speed_m_s: Some(20.0), cruise_fraction: 0.25, endurance_s: 180.0, agility: 2.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 350.0, fov_deg: 300.0, hearing_m: 300.0),
+    life: (lifespan_years: 18.0, maturity_days: 760.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 247.0),
+        litter: (1, 1),
+        breeding_seasons: [autumn],
+        interval_days: 330.0,
+        parental_care_days: 180.0,
+        birth_mass_fraction: Some(0.06),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: herd, group_size: (5, 40), cohesion: 0.5, alignment: Some(0.4), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: crepuscular,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 1.5),
+        boldness: 0.3,
+        vigilance: 0.6,
+        hunting: none,
+    ),
+    combat: (attack: 0.4, defence: 0.8, aggression: 0.3),
+    climate: (preferred_c: (-10.0, 18.0), tolerance_c: (-40.0, 32.0)),
+    seasonal: (migrates: true, migration_range_m: 4000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("stag"), procedural: Some("elk"), body_plan: quadruped, color: (0.55, 0.4, 0.25), scale: 1.0),
+)

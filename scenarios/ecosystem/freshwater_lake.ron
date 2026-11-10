@@ -1,0 +1,50 @@
+// Freshwater lake: a round lake (radius 18 cells, 6 m deep) in a wet meadow. Algae and water
+// plants feed sticklebacks (a density field of about one fish per m²) and bream; perch eat
+// sticklebacks; pike ambush perch, bream and frogs; herons fish sticklebacks in the shallows
+// (water up to 1 m deep); mallards dabble; frogs spawn in the water and hunt beetles on land;
+// pond turtles and grass snakes live on the shore.
+(
+    id: "freshwater_lake",
+    name: "Freshwater lake",
+    description: "A 2.6 km² lake district cell (80 × 80 cells of 20 m) with a 1 km lake. Fish are confined to fresh water of their depth and swim below the surface; sticklebacks are a density field (hundreds of thousands); herons only reach fish in the shallows; ducks swim, fly and migrate; frogs move between land and water and spawn in the lake; turtles, snakes, frogs and bats hibernate. Watch population.small_fish, perch, pike and bream, and energy.predation.",
+    seed: 31,
+    config: (
+        world: (
+            width: 80,
+            height: 80,
+            cell_size_m: 20.0,
+            river_count: 0,
+            lake_tendency: 1.0,
+            base_temperature_c: 12.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 800.0,
+            seasonality: 9.0,
+        ),
+        terrain: basin(elevation_m: 40.0, depth_m: 6.0, radius_cells: 18.0),
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 15.0, species: ["birch", "oak"]),
+        soil: (litter_kg_m2: 0.15, deadwood_kg_m2: 0.03, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "small_fish", count: 400000),
+            (species: "bream", count: 40),
+            (species: "perch", count: 40),
+            (species: "pike", count: 6),
+            (species: "duck", count: 30),
+            (species: "heron", count: 6),
+            (species: "frog", count: 40),
+            (species: "turtle", count: 12),
+            (species: "snake", count: 8),
+            (species: "rabbit", count: 30),
+            (species: "fox", count: 3),
+            (species: "songbird", count: 20),
+            (species: "bat", count: 20),
+            (species: "beetle", count: 30000000),
+            (species: "worm", count: 40000000),
+            (species: "butterfly", count: 800000),
+            (species: "spider", count: 4000000),
+            (species: "bee", count: 1),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)

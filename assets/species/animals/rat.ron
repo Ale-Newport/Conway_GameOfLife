@@ -1,0 +1,57 @@
+// Brown rat (Rattus norvegicus): colonial omnivore, a classic invasive species on islands.
+// Mass ≈ 0.3 kg, longevity ≈ 3 yr (≈ 1 yr wild), maturity ≈ 75 d, litter 6–10 after 22 d
+// (AnAge, order of magnitude); raids nests (eggs), preys on insects, small lizards and frogs, eats seeds
+// (grass), litter and carrion. Model: manifest `rat`.
+(
+    id: "rat",
+    name: "Brown rat",
+    scientific_name: "Rattus norvegicus",
+    class: mammal,
+    roles: [omnivore, predator, prey, scavenger, social],
+    diet: [
+        (food: prey("beetle"), preference: 1.0),
+        (food: eggs, preference: 0.9),
+        (food: carrion, preference: 0.5),
+        (food: plant(grass), preference: 0.4),
+        (food: prey("lizard"), preference: 0.4),
+        (food: plant(flowers), preference: 0.3),
+        (food: prey("worm"), preference: 0.3),
+        (food: detritus, preference: 0.3),
+        (food: prey("frog"), preference: 0.2),
+    ],
+    locomotion: [walk, run, swim, climb, burrow],
+    habitat: (
+        biomes: [grassland, temperate_forest, beach, wetland, tropical_rainforest, savanna],
+        max_slope: 1.5,
+        max_wade_depth_m: 0.05,
+        refuges: [burrow, dense_vegetation],
+    ),
+    body: (mass_kg: 0.3, length_m: 0.25, thermoregulation: endotherm, body_temperature_c: 37.5),
+    metabolism: (field_multiplier: 2.5, fasting_days: Some(3.0), dehydration_days: 2.0, intake_per_hour: 0.4),
+    movement: (sprint_speed_m_s: Some(3.5), cruise_fraction: 0.3, endurance_s: 60.0, agility: 3.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 40.0, fov_deg: 320.0, hearing_m: 60.0),
+    life: (lifespan_years: 2.5, maturity_days: 75.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 22.0),
+        litter: (6, 10),
+        breeding_seasons: [spring, summer, autumn],
+        interval_days: 40.0,
+        parental_care_days: 25.0,
+        birth_mass_fraction: Some(0.02),
+        min_energy_fraction: 0.4,
+    ),
+    social: (structure: colony, group_size: (2, 20), cohesion: 0.2, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: nocturnal,
+        weights: (forage: 1.0, hunt: 0.8, scavenge: 0.8, flee: 3.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.2, defend: 0.0, migrate: 0.0),
+        boldness: 0.4,
+        vigilance: 0.6,
+        hunting: stalk,
+    ),
+    combat: (attack: 0.25, defence: 0.2, aggression: 0.4),
+    climate: (preferred_c: (5.0, 30.0), tolerance_c: (-20.0, 40.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("rat"), procedural: Some("rat"), body_plan: quadruped, color: (0.42, 0.36, 0.3), scale: 1.0),
+)

@@ -1,0 +1,54 @@
+// Black garden ant (Lasius niger): eusocial omnivore; colonies are super-agents with forager
+// squads that lay trail pheromone (research note §10.4: colony super-agents); honeydew is
+// represented by nectar, harvested seeds by grass. Worker ≈ 1 mg,
+// walking ≈ 3 cm/s, queen up to 28 yr, colonies of thousands of workers (AnAge, order of
+// magnitude). `life` and `reproduction` describe the queen; colonies grow by laying and split
+// in summer (nuptial flights). Procedural `ant` rig.
+(
+    id: "ant",
+    name: "Black garden ant",
+    scientific_name: "Lasius niger",
+    class: insect,
+    roles: [omnivore, predator, scavenger, social],
+    diet: [
+        (food: carrion, preference: 1.0),
+        (food: nectar, preference: 0.6),
+        (food: prey("beetle"), preference: 0.6),
+        (food: plant(grass), preference: 0.2),
+    ],
+    locomotion: [walk, climb],
+    habitat: (
+        biomes: [grassland, temperate_forest, savanna, beach],
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 1e-06, length_m: 0.004, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: None, dehydration_days: 10.0, intake_per_hour: 0.3),
+    movement: (sprint_speed_m_s: Some(0.05), cruise_fraction: 0.6, endurance_s: 3600.0, agility: 4.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 2.0, fov_deg: 300.0, hearing_m: 0.5),
+    life: (lifespan_years: 15.0, maturity_days: 50.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 1.0, incubation_days: 50.0),
+        litter: (1, 1),
+        breeding_seasons: [summer],
+        interval_days: 365.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.5),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: colony, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: cathemeral,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.5,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.01, defence: 0.01, aggression: 0.5),
+    climate: (preferred_c: (10.0, 30.0), tolerance_c: (-5.0, 42.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: colony((workers_per_forager: 100.0, founding_workers: 2000.0, max_workers: 10000.0, forager_fraction: 0.2, max_foragers: 10, foraging_range_m: 30.0, travel_fraction: 1.0, load_kg: 0.000001, worker_lifespan_days: 180.0, development_days: 50.0, max_eggs_per_day: 30.0, pheromone: true, swarm_workers: 8000.0)),
+    visual: (model: None, procedural: Some("ant"), body_plan: insect, color: (0.1, 0.08, 0.07), scale: 1.0),
+)

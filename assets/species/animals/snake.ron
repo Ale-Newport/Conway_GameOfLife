@@ -1,0 +1,58 @@
+// Grass snake (Natrix natrix): semi-aquatic, actively searching predator of amphibians and fish
+// (it stalks along banks and glean-fishes sticklebacks); hibernates.
+// Mass 0.094–0.096 kg, longevity 20 yr, maturity 4 yr, 10–40 eggs incubated 60–70 d: docs/
+// research/ecology-alife.md §10.3 (`litter` = surviving hatchlings). Model: manifest `snake`.
+// Snakes swallow prey whole (a frog is weeks of a snake's metabolism: `intake_per_hour` 40) and
+// fast for months (McCue 2007): reserve of 60 days of field metabolism. Reptiles cover
+// most of their water need from prey (`food_water` 2, Nagy 1982) and tolerate about 10 days of
+// dehydration. `smell_m` is chemoreception by tongue flicking: resting prey and their trails
+// are found within tens of metres (designer value).
+(
+    id: "snake",
+    name: "Grass snake",
+    scientific_name: "Natrix natrix",
+    class: reptile,
+    roles: [carnivore, predator, prey, solitary],
+    diet: [
+        (food: prey("frog"), preference: 1.0),
+        (food: prey("small_fish"), preference: 0.6),
+        (food: prey("rat"), preference: 0.3),
+        (food: prey("lizard"), preference: 0.3),
+        (food: eggs, preference: 0.4),
+    ],
+    locomotion: [walk, swim, climb],
+    habitat: (
+        biomes: [wetland, grassland, temperate_forest],
+        max_slope: 1.5,
+        max_wade_depth_m: 0.2,
+        refuges: [water, dense_vegetation],
+    ),
+    body: (mass_kg: 0.1, length_m: 1.0, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 1.8, fasting_days: Some(60.0), dehydration_days: 10.0, intake_per_hour: 40.0, food_water: 2.0),
+    movement: (sprint_speed_m_s: Some(1.5), cruise_fraction: 0.3, endurance_s: 60.0, agility: 3.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 15.0, fov_deg: 300.0, hearing_m: 10.0, smell_m: 40.0),
+    life: (lifespan_years: 15.0, maturity_days: 1460.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 10.0, incubation_days: 60.0),
+        litter: (3, 10),
+        breeding_seasons: [spring],
+        interval_days: 330.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.05),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: solitary, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 0.6, hunt: 1.2, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.7, sleep: 1.0, mate: 1.0, wander: 0.1, defend: 0.0, migrate: 0.0),
+        boldness: 0.3,
+        vigilance: 0.5,
+        hunting: stalk,
+    ),
+    combat: (attack: 0.3, defence: 0.2, aggression: 0.1),
+    climate: (preferred_c: (12.0, 30.0), tolerance_c: (0.0, 38.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: Some((below_c: 6.0, wake_above_c: 9.0, metabolic_fraction: 0.2, min_reserve_fraction: 0.3))),
+    representation: individual,
+    visual: (model: Some("snake"), procedural: Some("snake"), body_plan: serpent, color: (0.3, 0.38, 0.22), scale: 1.0),
+)

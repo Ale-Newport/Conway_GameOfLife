@@ -1,0 +1,52 @@
+// American bison (Bison bison): herding grazer of temperate grasslands.
+// Mass 625–630 kg, longevity 33.5 yr record, maturity 2.5 yr, one calf after 274–283 d:
+// docs/research/ecology-alife.md §10.3; sprint 52–54 km/h (Hirt et al. 2017). Seasonal
+// movements are designer values. Model: manifest `bull` (bison proxy).
+(
+    id: "bison",
+    name: "American bison",
+    scientific_name: "Bison bison",
+    class: mammal,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(grass), preference: 1.0),
+        (food: plant(flowers), preference: 0.3),
+        (food: plant(shrubs), preference: 0.2),
+        (food: plant(moss), preference: 0.1),
+    ],
+    locomotion: [walk, run, swim],
+    habitat: (
+        biomes: [grassland, temperate_forest, tundra],
+        max_slope: 0.9,
+        max_wade_depth_m: 1.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 630.0, length_m: 3.0, thermoregulation: endotherm, body_temperature_c: 38.5),
+    metabolism: (field_multiplier: 1.8, fasting_days: Some(30.0), dehydration_days: 3.0, intake_per_hour: 0.12),
+    movement: (sprint_speed_m_s: Some(15.0), cruise_fraction: 0.2, endurance_s: 300.0, agility: 2.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 250.0, fov_deg: 300.0, hearing_m: 300.0),
+    life: (lifespan_years: 20.0, maturity_days: 900.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 280.0),
+        litter: (1, 1),
+        breeding_seasons: [summer],
+        interval_days: 330.0,
+        parental_care_days: 210.0,
+        birth_mass_fraction: Some(0.04),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: herd, group_size: (10, 80), cohesion: 0.6, alignment: Some(0.5), territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 2.5, drink: 1.2, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.1, defend: 0.0, migrate: 1.2),
+        boldness: 0.6,
+        vigilance: 0.4,
+        hunting: none,
+    ),
+    combat: (attack: 0.8, defence: 1.2, aggression: 0.4),
+    climate: (preferred_c: (-15.0, 20.0), tolerance_c: (-45.0, 38.0)),
+    seasonal: (migrates: true, migration_range_m: 5000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("bull"), procedural: Some("bison"), body_plan: quadruped, color: (0.35, 0.25, 0.18), scale: 1.0),
+)

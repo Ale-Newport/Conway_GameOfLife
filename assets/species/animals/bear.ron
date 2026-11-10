@@ -1,0 +1,60 @@
+// Brown bear (Ursus arctos): solitary omnivore and apex predator; hibernates.
+// Mass 196–278 kg, longevity 40 yr record (≈ 25 yr wild), maturity 3.6 yr, 2 cubs after 103 d
+// of gestation: docs/research/ecology-alife.md §10.3; sprint 35–47 km/h (Hirt et al. 2017).
+// Hibernation at ≈ 25 % of basal metabolism (order of magnitude); berries, fish, ungulate
+// calves and carrion. No authored model: procedural `bear` rig.
+(
+    id: "bear",
+    name: "Brown bear",
+    scientific_name: "Ursus arctos",
+    class: mammal,
+    roles: [omnivore, predator, apex, scavenger, solitary],
+    diet: [
+        (food: plant(shrubs), preference: 1.0),
+        (food: carrion, preference: 0.9),
+        (food: fungi, preference: 0.5),
+        (food: prey("bream"), preference: 0.5),
+        (food: plant(grass), preference: 0.4),
+        (food: prey("perch"), preference: 0.3),
+        (food: prey("deer"), preference: 0.3),
+        (food: prey("beetle"), preference: 0.3),
+        (food: prey("stag"), preference: 0.2),
+        (food: prey("boar"), preference: 0.2),
+        (food: prey("worm"), preference: 0.2),
+    ],
+    locomotion: [walk, run, swim, climb],
+    habitat: (
+        biomes: [temperate_forest, tundra, mountain, grassland, wetland],
+        max_slope: 1.5,
+        max_wade_depth_m: 1.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 250.0, length_m: 2.0, thermoregulation: endotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(40.0), dehydration_days: 3.0, intake_per_hour: 0.4),
+    movement: (sprint_speed_m_s: Some(13.0), cruise_fraction: 0.25, endurance_s: 120.0, agility: 2.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 150.0, fov_deg: 230.0, hearing_m: 500.0),
+    life: (lifespan_years: 25.0, maturity_days: 1300.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 103.0),
+        litter: (1, 3),
+        breeding_seasons: [spring],
+        interval_days: 730.0,
+        parental_care_days: 500.0,
+        birth_mass_fraction: Some(0.0016),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: solitary, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: crepuscular,
+        weights: (forage: 1.0, hunt: 0.8, scavenge: 1.0, flee: 1.0, drink: 1.2, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.2, defend: 0.0, migrate: 0.0),
+        boldness: 0.9,
+        vigilance: 0.4,
+        hunting: stalk,
+    ),
+    combat: (attack: 1.5, defence: 1.5, aggression: 0.6),
+    climate: (preferred_c: (-10.0, 20.0), tolerance_c: (-45.0, 35.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: Some((below_c: 0.0, wake_above_c: 5.0, metabolic_fraction: 0.25, min_reserve_fraction: 0.5))),
+    representation: individual,
+    visual: (model: None, procedural: Some("bear"), body_plan: quadruped, color: (0.4, 0.28, 0.17), scale: 1.0),
+)

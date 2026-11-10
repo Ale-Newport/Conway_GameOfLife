@@ -1,0 +1,34 @@
+// Wolves, sheep and grass — the rules of NetLogo's Wolf Sheep Predation (Wilensky 1997),
+// re-implemented from their description (docs/research/ecology-alife.md §1; no NetLogo code
+// or text is copied). 51 × 51 toroidal plain, NetLogo slider defaults, grass version.
+(
+    id: "wolf_sheep_grass",
+    name: "Wolves, sheep and grass (NetLogo rules)",
+    description: "Classic predator–prey dynamics: sheep wander and eat grass that regrows after 30 ticks, wolves eat sheep on their patch, both reproduce with fixed probabilities. Expect noisy quasi-cycles with both species persisting (watch population.sheep, population.wolf and green_patches). Set the grass parameter to false and reset to see the unstable no-grass version collapse.",
+    seed: 1,
+    config: (
+        world: (
+            width: 51,
+            height: 51,
+            cell_size_m: 20.0,
+            river_count: 0,
+            lake_tendency: 0.0,
+            sea_level: 0.0,
+            rainfall_mm: 600.0,
+        ),
+        terrain: flat(elevation_m: 50.0),
+        rules: netlogo((
+            sheep_species: "sheep",
+            wolf_species: "wolf",
+            initial_sheep: 100,
+            initial_wolves: 50,
+            sheep_gain_from_food: 4.0,
+            wolf_gain_from_food: 20.0,
+            sheep_reproduce_percent: 4.0,
+            wolf_reproduce_percent: 5.0,
+            grass: true,
+            grass_regrowth_time: 30,
+            max_sheep: 30000,
+        )),
+    ),
+)

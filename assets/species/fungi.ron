@@ -1,0 +1,37 @@
+// Fungal guilds: saprotrophic decomposers (litter and white-rot of dead wood), fruiting bodies
+// and mycorrhizal root symbionts. Fungi are not plants: they take no light and feed on dead
+// matter (saprotrophs) or on plant carbon (mycorrhiza). Designer values with first-order
+// (Olson 1963) decay, Q10 = 2 and a moisture hump (research note §4.5–4.6).
+(
+    saprotroph: (
+        litter_decay_per_day: 0.02,
+        microbial_fraction: 0.3,
+        wood_decay_per_day: 0.004,
+        half_saturation_kg_m2: 0.02,
+        growth_yield: 0.3,
+        mortality_per_day: 0.02,
+        q10: 2.0,
+        moisture_optimum: 0.6,
+        humification: 0.15,
+        spread_per_day: 0.02,
+        nutrient_g_per_kg: 40.0,
+        // Bacterial decay of labile detritus in water (Enríquez, Duarte & Sand-Jensen 1993).
+        aquatic_decay_per_day: 0.1,
+    ),
+    fruiting: (
+        rate_per_day: 0.02,
+        min_moisture: 0.55,
+        temperature_c: (5.0, 25.0),
+        decay_per_day: 0.25,
+        min_mycelium_kg_m2: 0.005,
+    ),
+    mycorrhiza: (
+        growth_per_day: 0.05,
+        capacity_per_host: 0.05,
+        uptake_boost: 0.5,
+        half_saturation_kg_m2: 0.01,
+        mortality_per_day: 0.01,
+    ),
+    mushroom_models: ["mushroom_cluster", "kenney_mushroom_tan", "kenney_mushroom_tanGroup", "kenney_mushroom_redGroup"],
+    bracket_models: ["fungus_bracket"],
+)

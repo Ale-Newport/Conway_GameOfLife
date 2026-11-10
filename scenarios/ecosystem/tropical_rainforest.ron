@@ -1,0 +1,52 @@
+// Tropical rainforest: a hot, very wet forest of kapok emergents and palms. Most animal
+// biomass is insects: ant colonies, bees, butterflies, beetles, spiders and wasps, eaten by
+// songbirds, bats, frogs and lizards; snakes and an eagle hunt them; boar and rats forage on
+// the forest floor and forest elephants browse.
+(
+    id: "tropical_rainforest",
+    name: "Tropical rainforest",
+    description: "A 2.6 km² tropical rainforest (80 × 80 cells of 20 m) under a closed canopy of kapok and palms. Litter decays fast in the heat; ants (12 colonies) lay pheromone trails, bees pollinate, insectivorous birds, bats, frogs and lizards glean the insect fields. Watch biomass_decomposers, population.ant, flowers.pollination and pheromone.",
+    seed: 53,
+    config: (
+        world: (
+            width: 80,
+            height: 80,
+            cell_size_m: 20.0,
+            // Rainforest climate with the low relief of a 1.6 km landscape.
+            sea_level: 0.0,
+            relief: 0.02,
+            roughness: 0.55,
+            continentality: 0.5,
+            river_count: 3,
+            lake_tendency: 0.3,
+            base_temperature_c: 26.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 3200.0,
+            seasonality: 2.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 90.0, species: ["ceiba", "palm"]),
+        soil: (litter_kg_m2: 0.3, deadwood_kg_m2: 0.15, mycelium_kg_m2: 0.02, mycorrhiza_kg_m2: 0.004),
+        animals: [
+            (species: "elephant", count: 4),
+            (species: "boar", count: 16),
+            (species: "rat", count: 40),
+            (species: "bat", count: 40),
+            (species: "songbird", count: 40),
+            (species: "eagle", count: 2),
+            (species: "snake", count: 12),
+            (species: "frog", count: 50),
+            (species: "lizard", count: 40),
+            (species: "beetle", count: 60000000),
+            (species: "worm", count: 30000000),
+            (species: "butterfly", count: 2000000),
+            (species: "spider", count: 12000000),
+            (species: "wasp", count: 300000),
+            (species: "ant", count: 12),
+            (species: "bee", count: 3),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)

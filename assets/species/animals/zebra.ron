@@ -1,0 +1,51 @@
+// Plains zebra (Equus quagga): herding grazer of African savannas.
+// Mass ≈ 250 kg, longevity ≈ 20 yr wild, maturity ≈ 2.5 yr, one foal after ≈ 360 d (AnAge,
+// order of magnitude); sprint ≈ 65 km/h (Hirt et al. 2017 dataset, Equus). Alarm calls and
+// herding are designer translations. Model: manifest `zebra`.
+(
+    id: "zebra",
+    name: "Plains zebra",
+    scientific_name: "Equus quagga",
+    class: mammal,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(grass), preference: 1.0),
+        (food: plant(flowers), preference: 0.2),
+        (food: plant(shrubs), preference: 0.2),
+    ],
+    locomotion: [walk, run, swim],
+    habitat: (
+        biomes: [savanna, grassland],
+        max_slope: 1.0,
+        max_wade_depth_m: 0.8,
+        refuges: [],
+    ),
+    body: (mass_kg: 250.0, length_m: 2.3, thermoregulation: endotherm, body_temperature_c: 37.5),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(15.0), dehydration_days: 2.5, intake_per_hour: 0.15),
+    movement: (sprint_speed_m_s: Some(18.0), cruise_fraction: 0.25, endurance_s: 300.0, agility: 2.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 400.0, fov_deg: 300.0, hearing_m: 400.0),
+    life: (lifespan_years: 20.0, maturity_days: 900.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 360.0),
+        litter: (1, 1),
+        breeding_seasons: [],
+        interval_days: 400.0,
+        parental_care_days: 300.0,
+        birth_mass_fraction: Some(0.13),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: herd, group_size: (5, 30), cohesion: 0.6, alignment: Some(0.5), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.1, defend: 0.0, migrate: 0.0),
+        boldness: 0.3,
+        vigilance: 0.6,
+        hunting: none,
+    ),
+    combat: (attack: 0.4, defence: 0.8, aggression: 0.3),
+    climate: (preferred_c: (15.0, 35.0), tolerance_c: (-5.0, 45.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("zebra"), procedural: Some("zebra"), body_plan: quadruped, color: (0.92, 0.92, 0.9), scale: 1.0),
+)

@@ -1,0 +1,53 @@
+// Mallard (Anas platyrhynchos): dabbling omnivore of wetlands, flocks and migrates.
+// Mass 1.05–1.14 kg, longevity 29 yr record (≈ 10 yr wild), maturity 1 yr, clutch ≈ 9 eggs
+// incubated 26 d: docs/research/ecology-alife.md §10.3; flight 105 km/h (Hirt et al. 2017).
+// Procedural `duck` rig.
+(
+    id: "duck",
+    name: "Mallard",
+    scientific_name: "Anas platyrhynchos",
+    class: bird,
+    roles: [omnivore, prey, social],
+    diet: [
+        (food: plant(aquatic), preference: 1.0),
+        (food: plant(algae), preference: 0.5),
+        (food: plant(grass), preference: 0.4),
+        (food: prey("worm"), preference: 0.3),
+        (food: prey("beetle"), preference: 0.3),
+    ],
+    locomotion: [walk, fly, swim],
+    habitat: (
+        biomes: [wetland, lake, river, grassland, temperate_forest],
+        max_slope: 100.0,
+        max_wade_depth_m: 0.3,
+        refuges: [water],
+    ),
+    body: (mass_kg: 1.1, length_m: 0.58, thermoregulation: endotherm, body_temperature_c: 41.0),
+    metabolism: (field_multiplier: 2.5, fasting_days: Some(4.0), dehydration_days: 2.0, intake_per_hour: 0.4),
+    movement: (sprint_speed_m_s: Some(29.0), cruise_fraction: 0.4, endurance_s: 3600.0, agility: 2.0, flight_altitude_m: 50.0),
+    perception: (vision_m: 300.0, fov_deg: 300.0, hearing_m: 100.0),
+    life: (lifespan_years: 10.0, maturity_days: 365.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 12.0, incubation_days: 27.0),
+        litter: (6, 10),
+        breeding_seasons: [spring],
+        interval_days: 330.0,
+        parental_care_days: 55.0,
+        birth_mass_fraction: Some(0.03),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: flock, group_size: (5, 30), cohesion: 0.5, alignment: Some(0.6), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 1.5),
+        boldness: 0.3,
+        vigilance: 0.7,
+        hunting: none,
+    ),
+    combat: (attack: 0.05, defence: 0.15, aggression: 0.1),
+    climate: (preferred_c: (0.0, 25.0), tolerance_c: (-25.0, 38.0)),
+    seasonal: (migrates: true, migration_range_m: 5000.0, hibernation: None),
+    representation: individual,
+    visual: (model: None, procedural: Some("duck"), body_plan: bird, color: (0.3, 0.45, 0.25), scale: 1.0),
+)

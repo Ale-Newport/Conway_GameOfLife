@@ -1,0 +1,55 @@
+// Balanced meadow: a temperate landscape of grassland and woodland with a full food web —
+// grass, shrubs, flowers and moss, oak / birch / pine trees, decomposer and mycorrhizal fungi,
+// rabbits, red deer, foxes, wolves and ravens, warblers gleaning insects, honey bees and
+// butterflies pollinating the flowers, ants, beetles and earthworms in the soil — with the
+// nutrient cycle closed through litter, dung, carcasses and decomposition.
+(
+    id: "balanced_meadow",
+    name: "Balanced meadow",
+    description: "A 4 km² temperate meadow and woodland (100 × 100 cells of 20 m). Rabbits and deer graze and browse; foxes stalk rabbits, wolves course deer in packs led by their leader; ravens and foxes scavenge carcasses; warblers, foxes and ants eat insects; bees and butterflies pollinate the flowers; beetles, earthworms and fungi decompose litter and dead wood. Watch population.*, biomass_* per trophic level, energy.* flows and the nutrient pools; nutrient_balance_error stays at rounding level.",
+    seed: 7,
+    config: (
+        world: (
+            width: 100,
+            height: 100,
+            cell_size_m: 20.0,
+            sea_level: 0.0,
+            relief: 0.0,
+            roughness: 0.4,
+            continentality: 0.6,
+            river_count: 1,
+            lake_tendency: 0.5,
+            base_temperature_c: 13.0,
+            latitude_gradient: 2.0,
+            rainfall_mm: 650.0,
+            seasonality: 9.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 25.0, species: ["oak", "birch", "pine"]),
+        soil: (litter_kg_m2: 0.1, deadwood_kg_m2: 0.05, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "rabbit", count: 150),
+            (species: "deer", count: 40),
+            (species: "fox", count: 8),
+            (species: "wolf", count: 6, groups: Some(1)),
+            (species: "raven", count: 6),
+            (species: "songbird", count: 30),
+            (species: "bee", count: 3),
+            (species: "ant", count: 6),
+            (species: "butterfly", count: 1200000),
+            (species: "beetle", count: 50000000),
+            (species: "worm", count: 60000000),
+        ],
+        // External nutrient fluxes of this landscape (set "external_fluxes": false to close the budget):
+        // atmospheric deposition in, leaching with percolating water and fire volatilisation out.
+        params: {
+            "mutation_rate": 0.1,
+            "deposition_g_m2_year": 0.5,
+            "leaching_loss": true,
+            "volatilisation_fraction": 0.5,
+            "external_fluxes": true,
+        },
+    ),
+)

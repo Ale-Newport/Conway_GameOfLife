@@ -1,0 +1,53 @@
+// Common wasp (Vespula vulgaris): social predator of caterpillars and other insects; adults
+// drink nectar. Mass ≈ 0.1 g. Nests are not modelled: wasps are a density field (order-of-
+// magnitude densities).
+// Simulated as a density field (individuals per m²) with representative display markers;
+// rates are per simulated day.
+// Model: manifest `wasp`.
+(
+    id: "wasp",
+    name: "Common wasp",
+    scientific_name: "Vespula vulgaris",
+    class: insect,
+    roles: [carnivore, predator, pollinator, prey],
+    diet: [
+        (food: prey("butterfly"), preference: 1.0),
+        (food: nectar, preference: 0.6),
+        (food: prey("beetle"), preference: 0.4),
+    ],
+    locomotion: [walk, fly],
+    habitat: (
+        biomes: [grassland, temperate_forest, savanna, wetland],
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 0.0001, length_m: 0.015, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 2.5, fasting_days: None, dehydration_days: 10.0, intake_per_hour: 0.3),
+    movement: (sprint_speed_m_s: Some(3.0), cruise_fraction: 0.4, endurance_s: 600.0, agility: 4.0, flight_altitude_m: 2.0),
+    perception: (vision_m: 2.0, fov_deg: 300.0, hearing_m: 0.5),
+    life: (lifespan_years: 1.0, maturity_days: 30.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 1.0, incubation_days: 20.0),
+        litter: (1, 1),
+        breeding_seasons: [summer],
+        interval_days: 365.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.01),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: solitary, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.6,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.05, defence: 0.02, aggression: 0.6),
+    climate: (preferred_c: (15.0, 30.0), tolerance_c: (0.0, 40.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: field((max_density_m2: 0.5, max_birth_per_day: 0.1, mortality_per_day: 0.03, dispersal_per_day: 0.2, half_saturation_kg_m2: 0.002, flower_visits_per_hour: 5.0, individuals_per_marker: 200.0)),
+    visual: (model: Some("wasp"), procedural: Some("wasp"), body_plan: insect, color: (0.9, 0.75, 0.1), scale: 1.0),
+)

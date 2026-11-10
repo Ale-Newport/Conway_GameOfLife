@@ -1,0 +1,55 @@
+// Sand lizard (Lacerta agilis): basking insectivore of heaths, dunes and grassland; hibernates.
+// Mass ≈ 0.009–0.015 kg, ≈ 10 yr, maturity ≈ 2 yr, 5–15 eggs incubated 40–60 d: docs/research/
+// ecology-alife.md §10.3 (Hirt et al. 2017: 6 km/h; `litter` = surviving hatchlings).
+// Reptiles cover most of their water need from prey (`food_water` 2, Nagy 1982) and tolerate
+// about 10 days of dehydration (designer). Procedural `lizard` rig.
+// Reproduction: a hatchling weighs ≈ 0.5 g (4 % of the mother); `laying_days` (20) is the
+// vitellogenesis over which the female builds her eggs from food (checked by `species::tests`).
+(
+    id: "lizard",
+    name: "Sand lizard",
+    scientific_name: "Lacerta agilis",
+    class: reptile,
+    roles: [carnivore, prey, solitary],
+    diet: [
+        (food: prey("beetle"), preference: 1.0),
+        (food: prey("spider"), preference: 0.8),
+        (food: prey("butterfly"), preference: 0.5),
+        (food: prey("wasp"), preference: 0.2),
+    ],
+    locomotion: [walk, run, climb, burrow],
+    habitat: (
+        biomes: [grassland, beach, desert, temperate_forest, savanna, tropical_rainforest],
+        max_slope: 1.5,
+        max_wade_depth_m: 0.02,
+        refuges: [burrow, dense_vegetation],
+    ),
+    body: (mass_kg: 0.012, length_m: 0.2, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: None, dehydration_days: 10.0, intake_per_hour: 0.3, food_water: 2.0),
+    movement: (sprint_speed_m_s: Some(1.7), cruise_fraction: 0.3, endurance_s: 30.0, agility: 4.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 10.0, fov_deg: 300.0, hearing_m: 5.0),
+    life: (lifespan_years: 10.0, maturity_days: 730.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 20.0, incubation_days: 50.0),
+        litter: (3, 8),
+        breeding_seasons: [spring],
+        interval_days: 330.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.04),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: solitary, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.2,
+        vigilance: 0.7,
+        hunting: none,
+    ),
+    combat: (attack: 0.01, defence: 0.05, aggression: 0.1),
+    climate: (preferred_c: (15.0, 32.0), tolerance_c: (2.0, 42.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: Some((below_c: 8.0, wake_above_c: 10.0, metabolic_fraction: 0.2, min_reserve_fraction: 0.3))),
+    representation: individual,
+    visual: (model: None, procedural: Some("lizard"), body_plan: quadruped, color: (0.45, 0.55, 0.3), scale: 1.0),
+)

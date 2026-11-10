@@ -1,0 +1,54 @@
+// European perch (Perca fluviatilis): schooling predator of small fish in lakes and rivers.
+// Mass ≈ 0.3 kg (up to 2 kg), ≈ 12 yr, maturity 2–3 yr (AnAge, order of magnitude).
+// Fish feel the air temperature of their cell (at least 4 °C in water) as a proxy for water
+// temperature. `litter` counts recruits that survive the larval stage, not eggs.
+// Model: manifest `fish_perch`.
+(
+    id: "perch",
+    name: "European perch",
+    scientific_name: "Perca fluviatilis",
+    class: fish,
+    roles: [carnivore, predator, prey, social],
+    diet: [
+        (food: prey("small_fish"), preference: 1.0),
+        (food: prey("frog"), preference: 0.3),
+    ],
+    locomotion: [swim],
+    habitat: (
+        biomes: [lake, river, wetland],
+        aquatic: true,
+        water: fresh,
+        min_depth_m: 0.5,
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 0.3, length_m: 0.25, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: None, dehydration_days: 1000.0, intake_per_hour: 1.0),
+    movement: (sprint_speed_m_s: Some(2.0), cruise_fraction: 0.3, endurance_s: 300.0, agility: 3.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 10.0, fov_deg: 300.0, hearing_m: 5.0),
+    life: (lifespan_years: 12.0, maturity_days: 900.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 2.0, incubation_days: 12.0),
+        litter: (3, 8),
+        breeding_seasons: [spring],
+        interval_days: 330.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.01),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: school, group_size: (5, 25), cohesion: 0.5, alignment: Some(0.6), territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 1.2, scavenge: 0.0, flee: 3.0, drink: 0.0, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.2, defend: 0.0, migrate: 0.0),
+        boldness: 0.4,
+        vigilance: 0.5,
+        hunting: stalk,
+    ),
+    combat: (attack: 0.3, defence: 0.2, aggression: 0.3),
+    climate: (preferred_c: (6.0, 24.0), tolerance_c: (-30.0, 31.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("fish_perch"), procedural: Some("perch"), body_plan: fish, color: (0.45, 0.55, 0.25), scale: 1.0),
+)

@@ -1,0 +1,56 @@
+// Common bream (Abramis brama): benthic schooling fish of lowland lakes and slow rivers.
+// Mass ≈ 1.5 kg, ≈ 17 yr, maturity ≈ 4 yr (AnAge, order of magnitude); feeds on detritus,
+// aquatic plants and algae.
+// Fish feel the air temperature of their cell (at least 4 °C in water) as a proxy for water
+// temperature. `litter` counts recruits that survive the larval stage, not eggs.
+// Model: manifest `fish_bream`.
+(
+    id: "bream",
+    name: "Common bream",
+    scientific_name: "Abramis brama",
+    class: fish,
+    roles: [herbivore, detritivore, prey, social],
+    diet: [
+        (food: plant(aquatic), preference: 1.0),
+        (food: plant(algae), preference: 0.6),
+        (food: detritus, preference: 0.6),
+    ],
+    locomotion: [swim],
+    habitat: (
+        biomes: [lake, river, wetland],
+        aquatic: true,
+        water: fresh,
+        min_depth_m: 0.8,
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 1.5, length_m: 0.45, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 1.8, fasting_days: None, dehydration_days: 1000.0, intake_per_hour: 0.3),
+    movement: (sprint_speed_m_s: Some(1.5), cruise_fraction: 0.3, endurance_s: 300.0, agility: 2.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 8.0, fov_deg: 300.0, hearing_m: 5.0),
+    life: (lifespan_years: 17.0, maturity_days: 1460.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 3.0, incubation_days: 5.0),
+        litter: (3, 8),
+        breeding_seasons: [spring, summer],
+        interval_days: 330.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.002),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: school, group_size: (5, 30), cohesion: 0.5, alignment: Some(0.5), territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: cathemeral,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 0.0, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.2,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.05, defence: 0.3, aggression: 0.1),
+    climate: (preferred_c: (10.0, 26.0), tolerance_c: (-30.0, 32.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: Some("fish_bream"), procedural: Some("bream"), body_plan: fish, color: (0.6, 0.55, 0.35), scale: 1.0),
+)

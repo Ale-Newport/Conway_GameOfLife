@@ -1,0 +1,49 @@
+// European rabbit (Oryctolagus cuniculus).
+// Mass, longevity, maturity, litter and gestation: docs/research/ecology-alife.md §10.3
+// (AnAge Build 15, PanTHERIA 1.0); sprint speed 54 km/h (Hirt et al. 2017 dataset);
+// perception and behaviour weights are designer values. Warning thumps are alarm calls.
+(
+    id: "rabbit",
+    name: "European rabbit",
+    scientific_name: "Oryctolagus cuniculus",
+    class: mammal,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(grass), preference: 1.0),
+        (food: plant(flowers), preference: 0.7),
+        (food: plant(shrubs), preference: 0.2),
+    ],
+    locomotion: [walk, run, jump, burrow],
+    habitat: (
+        biomes: [grassland, temperate_forest, savanna, beach, wetland],
+        max_slope: 0.8,
+        max_wade_depth_m: 0.1,
+        refuges: [burrow, dense_vegetation],
+    ),
+    body: (mass_kg: 1.7, length_m: 0.45, thermoregulation: endotherm, body_temperature_c: 38.5),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(4.0), dehydration_days: 4.0, intake_per_hour: 0.2),
+    movement: (sprint_speed_m_s: Some(15.0), cruise_fraction: 0.25, endurance_s: 40.0, agility: 3.0),
+    perception: (vision_m: 150.0, fov_deg: 340.0, hearing_m: 100.0),
+    life: (lifespan_years: 9.0, maturity_days: 150.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 30.0),
+        litter: (3, 7),
+        breeding_seasons: [spring, summer],
+        interval_days: 35.0,
+        parental_care_days: 25.0,
+        birth_mass_fraction: Some(0.03),
+        min_energy_fraction: 0.45,
+    ),
+    social: (structure: colony, group_size: (2, 20), cohesion: 0.2, territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: crepuscular,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.5, drink: 0.8, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.15),
+        boldness: 0.15,
+        vigilance: 0.7,
+        hunting: none,
+    ),
+    combat: (attack: 0.05, defence: 0.15, aggression: 0.0),
+    climate: (preferred_c: (5.0, 22.0), tolerance_c: (-20.0, 38.0)),
+    visual: (model: Some("rabbit"), procedural: Some("rabbit"), body_plan: quadruped, color: (0.55, 0.45, 0.35), scale: 1.0),
+)

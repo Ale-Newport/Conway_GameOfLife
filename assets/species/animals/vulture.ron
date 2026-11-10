@@ -1,0 +1,49 @@
+// White-backed vulture (Gyps africanus): soaring obligate scavenger of savannas.
+// Mass 4–7 kg, longevity ≈ 30 yr, maturity ≈ 5 yr, one egg incubated ≈ 56 d (AnAge, order of
+// magnitude); fasts for days and gorges ≈ 1 kg. Vision capped at 2.5 km for query cost.
+// Procedural `vulture` rig.
+(
+    id: "vulture",
+    name: "White-backed vulture",
+    scientific_name: "Gyps africanus",
+    class: bird,
+    roles: [carnivore, scavenger, social],
+    diet: [
+        (food: carrion, preference: 1.0),
+    ],
+    locomotion: [walk, fly],
+    habitat: (
+        biomes: [savanna, desert, grassland, mountain],
+        max_slope: 100.0,
+        max_wade_depth_m: 0.05,
+        refuges: [trees],
+    ),
+    body: (mass_kg: 6.0, length_m: 0.9, thermoregulation: endotherm, body_temperature_c: 40.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(14.0), dehydration_days: 3.0, intake_per_hour: 4.0),
+    movement: (sprint_speed_m_s: Some(20.0), cruise_fraction: 0.4, endurance_s: 7200.0, agility: 1.5, flight_altitude_m: 200.0),
+    perception: (vision_m: 2500.0, fov_deg: 320.0, hearing_m: 100.0),
+    life: (lifespan_years: 30.0, maturity_days: 1800.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 5.0, incubation_days: 56.0),
+        litter: (1, 1),
+        breeding_seasons: [],
+        interval_days: 365.0,
+        parental_care_days: 120.0,
+        birth_mass_fraction: Some(0.03),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: flock, group_size: (5, 30), cohesion: 0.3, alignment: Some(0.2), territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 0.0, hunt: 0.0, scavenge: 1.5, flee: 1.5, drink: 1.0, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.4, defend: 0.0, migrate: 0.0),
+        boldness: 0.6,
+        vigilance: 0.6,
+        hunting: none,
+    ),
+    combat: (attack: 0.4, defence: 0.5, aggression: 0.5),
+    climate: (preferred_c: (15.0, 35.0), tolerance_c: (-5.0, 45.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: None, procedural: Some("vulture"), body_plan: bird, color: (0.45, 0.38, 0.32), scale: 1.0),
+)

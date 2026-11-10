@@ -1,0 +1,52 @@
+// African bush elephant (Loxodonta africana): mega-herbivore, grazer and browser.
+// Mass 3,800–4,800 kg, longevity 65 yr record, maturity 11–13.6 yr, one calf after 660–670 d:
+// docs/research/ecology-alife.md §10.3; sprint 34–40 km/h (Hirt et al. 2017). Matriarchal
+// family herds; infrasound hearing (designer 2 km). Procedural `elephant` rig.
+(
+    id: "elephant",
+    name: "African bush elephant",
+    scientific_name: "Loxodonta africana",
+    class: mammal,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(grass), preference: 1.0),
+        (food: browse, preference: 1.0),
+        (food: plant(shrubs), preference: 0.8),
+        (food: plant(flowers), preference: 0.2),
+    ],
+    locomotion: [walk, run, swim],
+    habitat: (
+        biomes: [savanna, grassland, tropical_rainforest],
+        max_slope: 0.6,
+        max_wade_depth_m: 1.5,
+        refuges: [],
+    ),
+    body: (mass_kg: 4000.0, length_m: 6.5, thermoregulation: endotherm, body_temperature_c: 36.0),
+    metabolism: (field_multiplier: 1.7, fasting_days: Some(40.0), dehydration_days: 2.0, intake_per_hour: 0.15),
+    movement: (sprint_speed_m_s: Some(10.0), cruise_fraction: 0.3, endurance_s: 600.0, agility: 1.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 200.0, fov_deg: 250.0, hearing_m: 2000.0),
+    life: (lifespan_years: 60.0, maturity_days: 4000.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 660.0),
+        litter: (1, 1),
+        breeding_seasons: [],
+        interval_days: 1500.0,
+        parental_care_days: 1000.0,
+        birth_mass_fraction: Some(0.025),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: herd, group_size: (5, 20), cohesion: 0.7, alignment: Some(0.5), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: cathemeral,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 1.5, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.1, defend: 0.0, migrate: 0.0),
+        boldness: 0.8,
+        vigilance: 0.4,
+        hunting: none,
+    ),
+    combat: (attack: 2.0, defence: 3.0, aggression: 0.5),
+    climate: (preferred_c: (15.0, 35.0), tolerance_c: (0.0, 45.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: None, procedural: Some("elephant"), body_plan: quadruped, color: (0.5, 0.48, 0.46), scale: 1.0),
+)

@@ -1,0 +1,36 @@
+// Norway spruce (Picea abies): shade-tolerant evergreen conifer of cold-temperate, boreal and
+// mountain forests, 30–50 m, cones from ~25 yr, winged seeds by wind, thin bark (fire-sensitive).
+// Designer values, order of magnitude (research note §10.5 conifer functional type).
+(
+    id: "spruce",
+    name: "Norway spruce",
+    scientific_name: "Picea abies",
+    style: conifer,
+    deciduous: false,
+    max_height_m: 35.0,
+    mature_biomass_kg: 2000.0,
+    crown_ratio: 0.18,
+    leaf_area_index: 7.0,
+    leaf_area_per_kg: 5.0,
+    height_growth_m_per_year: 0.4,
+    maturity_years: 25.0,
+    lifespan_years: 300.0,
+    shade_tolerance: 0.8,
+    drought_tolerance: 0.3,
+    temperature_c: (-5.0, 15.0, 32.0),
+    biomes: [temperate_forest, tundra, mountain],
+    seeds_per_year: 40.0,
+    seeding_seasons: [autumn],
+    dispersal: two_dt(scale_m2: 400.0, shape: 1.5),
+    wood_nutrient_g_per_kg: 1.2,
+    leaf_nutrient_g_per_kg: 12.0,
+    bark_resistance: 0.2,
+    flammability: 0.45,
+    resprouts: false,
+    models: (
+        young: ["tree_pine_a", "kenney_tree_pineRoundA"],
+        mature: ["tree_pine_b", "tree_pine_c", "kenney_tree_pineTallA"],
+        old: ["tree_pine_d", "tree_pine_e"],
+        dead: ["tree_dead_b"],
+    ),
+)

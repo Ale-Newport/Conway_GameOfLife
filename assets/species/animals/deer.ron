@@ -1,0 +1,52 @@
+// Red deer (Cervus elaphus), a mixed grazer–browser.
+// Mass (females ~100 kg, males ~190 kg), longevity 31.5 yr record, maturity ~2 yr,
+// gestation 235–245 d, one calf: docs/research/ecology-alife.md §10.3.
+// Sprint 72 km/h (Hirt et al. 2017 dataset). Rut in autumn, calves born in late spring.
+(
+    id: "deer",
+    name: "Red deer",
+    scientific_name: "Cervus elaphus",
+    class: mammal,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(grass), preference: 1.0),
+        (food: plant(shrubs), preference: 0.8),
+        (food: browse, preference: 0.7),
+        (food: plant(flowers), preference: 0.4),
+        (food: plant(moss), preference: 0.1),
+        (food: fungi, preference: 0.2),
+    ],
+    locomotion: [walk, run, jump, swim],
+    habitat: (
+        biomes: [temperate_forest, grassland, wetland, tundra, mountain],
+        max_slope: 1.0,
+        max_wade_depth_m: 0.7,
+        refuges: [dense_vegetation, water],
+    ),
+    body: (mass_kg: 120.0, length_m: 1.9, thermoregulation: endotherm, body_temperature_c: 38.5),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(14.0), dehydration_days: 3.0, intake_per_hour: 0.15),
+    movement: (sprint_speed_m_s: Some(20.0), cruise_fraction: 0.25, endurance_s: 120.0, agility: 2.0),
+    perception: (vision_m: 300.0, fov_deg: 300.0, hearing_m: 250.0),
+    life: (lifespan_years: 20.0, maturity_days: 730.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 240.0),
+        litter: (1, 1),
+        breeding_seasons: [autumn],
+        interval_days: 330.0,
+        parental_care_days: 180.0,
+        birth_mass_fraction: Some(0.08),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: herd, group_size: (3, 30), cohesion: 0.5, alignment: Some(0.4), territorial: false, territory_radius_m: 0.0, alarm_calls: true),
+    behaviour: (
+        activity: crepuscular,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.15),
+        boldness: 0.25,
+        vigilance: 0.6,
+        hunting: none,
+    ),
+    combat: (attack: 0.3, defence: 0.6, aggression: 0.2),
+    climate: (preferred_c: (-5.0, 20.0), tolerance_c: (-35.0, 34.0)),
+    visual: (model: Some("deer"), procedural: Some("deer"), body_plan: quadruped, color: (0.55, 0.35, 0.2), scale: 1.0),
+)

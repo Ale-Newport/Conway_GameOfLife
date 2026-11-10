@@ -1,0 +1,48 @@
+// Domestic / feral sheep (Ovis aries), the prey of the Wolf–Sheep scenario.
+// Designer values for a 45 kg grazer; sprint speed from Hirt et al. (2017) for its mass.
+(
+    id: "sheep",
+    name: "Sheep",
+    scientific_name: "Ovis aries",
+    class: mammal,
+    roles: [herbivore, prey, social],
+    diet: [
+        (food: plant(grass), preference: 1.0),
+        (food: plant(flowers), preference: 0.5),
+        (food: plant(shrubs), preference: 0.3),
+        (food: plant(moss), preference: 0.1),
+    ],
+    locomotion: [walk, run, jump],
+    habitat: (
+        biomes: [grassland, temperate_forest, mountain, tundra, savanna],
+        max_slope: 1.5,
+        max_wade_depth_m: 0.4,
+        refuges: [],
+    ),
+    body: (mass_kg: 45.0, length_m: 1.2, thermoregulation: endotherm, body_temperature_c: 39.0),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(10.0), dehydration_days: 3.0, intake_per_hour: 0.15),
+    movement: (cruise_fraction: 0.2, endurance_s: 60.0, agility: 2.0),
+    perception: (vision_m: 250.0, fov_deg: 300.0, hearing_m: 150.0),
+    life: (lifespan_years: 12.0, maturity_days: 240.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 150.0),
+        litter: (1, 2),
+        breeding_seasons: [autumn],
+        interval_days: 330.0,
+        parental_care_days: 120.0,
+        birth_mass_fraction: Some(0.08),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: herd, group_size: (5, 50), cohesion: 0.7, territorial: false, territory_radius_m: 0.0),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.6, sleep: 1.0, mate: 1.0, wander: 0.1),
+        boldness: 0.1,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.15, defence: 0.3, aggression: 0.1),
+    climate: (preferred_c: (0.0, 20.0), tolerance_c: (-30.0, 38.0)),
+    visual: (model: Some("sheep"), procedural: Some("sheep"), body_plan: quadruped, color: (0.9, 0.88, 0.82), scale: 1.0),
+)

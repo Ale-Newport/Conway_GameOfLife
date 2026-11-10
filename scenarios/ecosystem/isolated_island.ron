@@ -1,0 +1,47 @@
+// Isolated island: a small volcanic island in a warm ocean, colonised only by animals that
+// can fly or raft there: lizards, songbirds, mallards, frogs, a pair of golden eagles, insects
+// and spiders. Without large mammals the lizards are the main ground predators of insects and
+// mallards and lizards the eagles' prey. Wading herons do not settle: the volcanic coast drops
+// off steeply (a dozen cells of water at most 1 m deep), too little to fish.
+(
+    id: "isolated_island",
+    name: "Isolated island",
+    description: "A small island (80 × 80 cells of 20 m, mostly ocean) far from the mainland. Populations are small and closed: lizards, songbirds and frogs share the insect fields; mallards use the coast and pond; a pair of golden eagles is the top predator and hunts mallards and lizards. Small populations drift: watch the genes in the inspector and population.* over years.",
+    seed: 61,
+    config: (
+        world: (
+            width: 80,
+            height: 80,
+            cell_size_m: 20.0,
+            // A warm oceanic island of low relief.
+            island: true,
+            sea_level: 0.5,
+            relief: 0.03,
+            roughness: 0.5,
+            continentality: 0.6,
+            river_count: 1,
+            lake_tendency: 0.5,
+            base_temperature_c: 23.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 1400.0,
+            seasonality: 4.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 40.0, species: ["palm", "ceiba", "acacia"]),
+        soil: (litter_kg_m2: 0.12, deadwood_kg_m2: 0.04, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "lizard", count: 80),
+            (species: "songbird", count: 30),
+            (species: "duck", count: 40),
+            (species: "frog", count: 20),
+            (species: "eagle", count: 2),
+            (species: "beetle", count: 8000000),
+            (species: "butterfly", count: 300000),
+            (species: "spider", count: 1500000),
+            (species: "bee", count: 1),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)

@@ -1,0 +1,48 @@
+// Prolonged drought: a grazed grassland in which the rain fails. From day 10 a drought spell
+// of 50 days stops the rain and the mean annual rainfall drops to a fifth. Soil moisture,
+// plant growth and the water in forage fall; herbivores lose condition, crowd at the
+// remaining water and die of thirst or hunger; predators follow.
+(
+    id: "prolonged_drought",
+    name: "Prolonged drought",
+    description: "A 2.6 km² grazed grassland (80 × 80 cells of 20 m) with sheep, wild horses, deer and rabbits, wolves and foxes. On day 10 a 50-day drought starts and the annual rainfall falls from 750 to 160 mm (no lightning: fires only start from scheduled ignitions). Compare drought_index, soil_moisture, biomass_producers and the herbivore populations with the first ten days (and with the same scenario without its events).",
+    seed: 83,
+    config: (
+        world: (
+            width: 80,
+            height: 80,
+            cell_size_m: 20.0,
+            sea_level: 0.0,
+            relief: 0.0,
+            roughness: 0.35,
+            river_count: 3,
+            lake_tendency: 0.6,
+            base_temperature_c: 14.0,
+            latitude_gradient: 1.0,
+            rainfall_mm: 750.0,
+            seasonality: 8.0,
+            // Fires only from scheduled ignitions: the experiment compares like with like.
+            lightning_rate: 0.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.7, seed_bank: 1.0),
+        trees: (density_per_ha: 8.0, species: ["oak", "pine"]),
+        soil: (litter_kg_m2: 0.1, deadwood_kg_m2: 0.02, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "sheep", count: 80),
+            (species: "horse", count: 20),
+            (species: "deer", count: 20),
+            (species: "rabbit", count: 100),
+            (species: "wolf", count: 6, groups: Some(1)),
+            (species: "fox", count: 4),
+            (species: "beetle", count: 20000000),
+            (species: "worm", count: 20000000),
+        ],
+        events: [
+            (day: 10.0, action: world(drought(days: 50.0))),
+            (day: 10.0, action: set_param(key: "rainfall_mm", value: 160.0)),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)

@@ -1,0 +1,53 @@
+// Lion (Panthera leo): cooperative stalking predator of savanna ungulates, apex.
+// Mass 159–175 kg, longevity 28–30 yr record (≈ 15 yr wild), maturity 2.7–3 yr, litter
+// 2.75–3 after 109 d: docs/research/ecology-alife.md §10.3; sprint 55–80 km/h (Hirt et al.
+// 2017). Prides are packs whose leader starts the hunt. Procedural `lion` rig.
+(
+    id: "lion",
+    name: "Lion",
+    scientific_name: "Panthera leo",
+    class: mammal,
+    roles: [carnivore, predator, apex, scavenger, social],
+    diet: [
+        (food: prey("zebra"), preference: 1.0),
+        (food: prey("horse"), preference: 0.6),
+        (food: prey("boar"), preference: 0.5),
+        (food: carrion, preference: 0.7),
+        (food: prey("elephant"), preference: 0.1),
+    ],
+    locomotion: [walk, run, swim, climb],
+    habitat: (
+        biomes: [savanna, grassland, desert],
+        max_slope: 1.0,
+        max_wade_depth_m: 0.6,
+        refuges: [],
+    ),
+    body: (mass_kg: 170.0, length_m: 2.5, thermoregulation: endotherm, body_temperature_c: 38.1),
+    metabolism: (field_multiplier: 2.0, fasting_days: Some(10.0), dehydration_days: 4.0, intake_per_hour: 3.0),
+    movement: (sprint_speed_m_s: Some(22.0), cruise_fraction: 0.2, endurance_s: 40.0, agility: 3.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 500.0, fov_deg: 200.0, hearing_m: 500.0),
+    life: (lifespan_years: 15.0, maturity_days: 1000.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 110.0),
+        litter: (1, 4),
+        breeding_seasons: [],
+        interval_days: 600.0,
+        parental_care_days: 360.0,
+        birth_mass_fraction: Some(0.008),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: pack, group_size: (3, 12), cohesion: 0.6, alignment: Some(0.4), territorial: true, territory_radius_m: 3000.0, alarm_calls: false),
+    behaviour: (
+        activity: nocturnal,
+        weights: (forage: 0.0, hunt: 1.3, scavenge: 1.0, flee: 1.0, drink: 1.2, rest: 0.8, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 1.0, migrate: 0.0),
+        boldness: 0.9,
+        vigilance: 0.5,
+        hunting: stalk,
+    ),
+    combat: (attack: 1.5, defence: 1.2, aggression: 0.7),
+    climate: (preferred_c: (15.0, 35.0), tolerance_c: (-5.0, 45.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: individual,
+    visual: (model: None, procedural: Some("lion"), body_plan: quadruped, color: (0.78, 0.62, 0.38), scale: 1.0),
+)

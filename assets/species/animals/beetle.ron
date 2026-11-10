@@ -1,0 +1,53 @@
+// Ground and dung beetles (Carabidae, Scarabaeidae): litter and dung processors that also
+// nibble plants and mushrooms; the main insect prey of birds, lizards and frogs. Mass ≈ 0.1 g,
+// tens per m² (order of magnitude).
+// Simulated as a density field (individuals per m²) with representative display markers;
+// rates are per simulated day.
+// Procedural `beetle` rig.
+(
+    id: "beetle",
+    name: "Ground and dung beetles",
+    scientific_name: "Carabidae, Scarabaeidae",
+    class: insect,
+    roles: [detritivore, herbivore, prey],
+    diet: [
+        (food: detritus, preference: 1.0),
+        (food: fungi, preference: 0.3),
+        (food: plant(grass), preference: 0.2),
+    ],
+    locomotion: [walk, fly, burrow],
+    habitat: (
+        biomes: [grassland, temperate_forest, savanna, tropical_rainforest, wetland, desert, beach],
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [],
+    ),
+    body: (mass_kg: 0.0001, length_m: 0.015, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 1.6, fasting_days: None, dehydration_days: 10.0, intake_per_hour: 0.6),
+    movement: (sprint_speed_m_s: Some(0.3), cruise_fraction: 0.3, endurance_s: 60.0, agility: 3.0, flight_altitude_m: 0.5),
+    perception: (vision_m: 0.5, fov_deg: 300.0, hearing_m: 0.0),
+    life: (lifespan_years: 2.0, maturity_days: 120.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 10.0, incubation_days: 15.0),
+        litter: (1, 1),
+        breeding_seasons: [spring, summer],
+        interval_days: 365.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.01),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: solitary, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: nocturnal,
+        weights: (forage: 1.0, hunt: 0.0, scavenge: 0.0, flee: 3.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.15, defend: 0.0, migrate: 0.0),
+        boldness: 0.5,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.0, defence: 0.02, aggression: 0.0),
+    climate: (preferred_c: (10.0, 30.0), tolerance_c: (-5.0, 40.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: None),
+    representation: field((max_density_m2: 40.0, max_birth_per_day: 0.05, mortality_per_day: 0.01, dispersal_per_day: 0.05, half_saturation_kg_m2: 0.05, flower_visits_per_hour: 0.0, individuals_per_marker: 2000.0)),
+    visual: (model: None, procedural: Some("beetle"), body_plan: insect, color: (0.12, 0.12, 0.1), scale: 1.0),
+)

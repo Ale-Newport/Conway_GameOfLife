@@ -1,0 +1,54 @@
+// European pond turtle (Emys orbicularis): long-lived amphibious omnivore; hibernates in mud.
+// Mass ≈ 0.5 kg, ≈ 40 yr, maturity ≈ 8 yr, 3–16 eggs incubated ≈ 75 d (AnAge, order of
+// magnitude; `litter` = surviving hatchlings). The shell gives a high defence. Rig `turtle`.
+// Water economy `food_water` 1.5: a reptile, but it lives in and drinks from ponds (designer).
+(
+    id: "turtle",
+    name: "European pond turtle",
+    scientific_name: "Emys orbicularis",
+    class: reptile,
+    roles: [omnivore, predator, scavenger, prey, solitary],
+    diet: [
+        (food: plant(aquatic), preference: 0.8),
+        (food: carrion, preference: 0.5),
+        (food: prey("small_fish"), preference: 0.5),
+        (food: plant(algae), preference: 0.4),
+        (food: prey("worm"), preference: 0.3),
+        (food: prey("beetle"), preference: 0.3),
+    ],
+    locomotion: [walk, swim],
+    habitat: (
+        biomes: [wetland, lake, river],
+        max_slope: 0.8,
+        max_wade_depth_m: 0.2,
+        refuges: [water],
+    ),
+    body: (mass_kg: 0.5, length_m: 0.18, thermoregulation: ectotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 1.6, fasting_days: None, dehydration_days: 5.0, intake_per_hour: 0.5, food_water: 1.5),
+    movement: (sprint_speed_m_s: Some(0.4), cruise_fraction: 0.4, endurance_s: 120.0, agility: 1.0, flight_altitude_m: 30.0),
+    perception: (vision_m: 15.0, fov_deg: 300.0, hearing_m: 5.0),
+    life: (lifespan_years: 40.0, maturity_days: 3000.0),
+    reproduction: (
+        mode: sexual,
+        development: eggs(laying_days: 7.0, incubation_days: 75.0),
+        litter: (2, 6),
+        breeding_seasons: [spring],
+        interval_days: 330.0,
+        parental_care_days: 0.0,
+        birth_mass_fraction: Some(0.02),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: solitary, group_size: (1, 1), cohesion: 0.0, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: diurnal,
+        weights: (forage: 1.0, hunt: 0.8, scavenge: 0.8, flee: 2.0, drink: 1.2, rest: 0.7, sleep: 1.0, mate: 1.0, wander: 0.1, defend: 0.0, migrate: 0.0),
+        boldness: 0.6,
+        vigilance: 0.4,
+        hunting: ambush,
+    ),
+    combat: (attack: 0.05, defence: 2.0, aggression: 0.0),
+    climate: (preferred_c: (15.0, 30.0), tolerance_c: (0.0, 38.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: Some((below_c: 6.0, wake_above_c: 9.0, metabolic_fraction: 0.1, min_reserve_fraction: 0.3))),
+    representation: individual,
+    visual: (model: None, procedural: Some("turtle"), body_plan: amphibian, color: (0.25, 0.28, 0.2), scale: 1.0),
+)

@@ -1,0 +1,51 @@
+// Little brown bat (Myotis lucifugus): nocturnal aerial insectivore roosting in colonies;
+// hibernates in caves. Mass 8–10 g, longevity 34 yr record (≈ 10 yr wild), maturity 0.6–0.8 yr,
+// one pup after 55–60 d: docs/research/ecology-alife.md §10.3. Torpor at ≈ 3 % of basal
+// metabolism (order of magnitude). Moths are represented by the butterfly field. Model: `bat`.
+(
+    id: "bat",
+    name: "Little brown bat",
+    scientific_name: "Myotis lucifugus",
+    class: mammal,
+    roles: [carnivore, predator, prey, social],
+    diet: [
+        (food: prey("butterfly"), preference: 1.0),
+        (food: prey("beetle"), preference: 0.6),
+        (food: prey("wasp"), preference: 0.3),
+    ],
+    locomotion: [fly, walk, climb],
+    habitat: (
+        biomes: [temperate_forest, wetland, grassland, tropical_rainforest],
+        max_slope: 100.0,
+        max_wade_depth_m: 0.0,
+        refuges: [trees],
+    ),
+    body: (mass_kg: 0.009, length_m: 0.09, thermoregulation: endotherm, body_temperature_c: 37.0),
+    metabolism: (field_multiplier: 3.0, fasting_days: Some(3.0), dehydration_days: 1.0, intake_per_hour: 0.6),
+    movement: (sprint_speed_m_s: Some(9.0), cruise_fraction: 0.5, endurance_s: 3600.0, agility: 4.0, flight_altitude_m: 8.0),
+    perception: (vision_m: 20.0, fov_deg: 360.0, hearing_m: 30.0),
+    life: (lifespan_years: 10.0, maturity_days: 270.0),
+    reproduction: (
+        mode: sexual,
+        development: live(gestation_days: 55.0),
+        litter: (1, 1),
+        breeding_seasons: [spring],
+        interval_days: 330.0,
+        parental_care_days: 30.0,
+        birth_mass_fraction: Some(0.25),
+        min_energy_fraction: 0.5,
+    ),
+    social: (structure: colony, group_size: (10, 60), cohesion: 0.3, alignment: None, territorial: false, territory_radius_m: 0.0, alarm_calls: false),
+    behaviour: (
+        activity: nocturnal,
+        weights: (forage: 1.2, hunt: 0.0, scavenge: 0.0, flee: 2.0, drink: 1.2, rest: 0.5, sleep: 1.0, mate: 1.0, wander: 0.2, defend: 0.0, migrate: 0.0),
+        boldness: 0.5,
+        vigilance: 0.5,
+        hunting: none,
+    ),
+    combat: (attack: 0.02, defence: 0.05, aggression: 0.1),
+    climate: (preferred_c: (10.0, 30.0), tolerance_c: (-5.0, 40.0)),
+    seasonal: (migrates: false, migration_range_m: 2000.0, hibernation: Some((below_c: 5.0, wake_above_c: 8.0, metabolic_fraction: 0.03, min_reserve_fraction: 0.5))),
+    representation: individual,
+    visual: (model: Some("bat"), procedural: Some("bat"), body_plan: bird, color: (0.3, 0.24, 0.2), scale: 1.0),
+)

@@ -1,0 +1,48 @@
+// Extreme seasons: a continental landscape with a hot summer and a deep winter (±25 °C around
+// a 4 °C mean) and a north–south temperature gradient. Bears, bats, frogs and snakes hibernate;
+// mallards, warblers and wapiti migrate towards their preferred climate; wolves, foxes,
+// rabbits and deer stay and endure. Insects and worms go dormant in the cold.
+(
+    id: "extreme_seasons",
+    name: "Extreme seasons",
+    description: "A 3.7 km² continental landscape (96 × 96 cells of 20 m) with seasonality 25 °C and a 30 °C gradient from the cold north (top) to the warm south. Watch hibernating and migrating, mean_temperature, the populations of hibernators (bear, bat, frog, snake), migrants (duck, songbird, stag) and residents, and deaths by exposure.",
+    seed: 127,
+    config: (
+        world: (
+            width: 96,
+            height: 96,
+            cell_size_m: 20.0,
+            sea_level: 0.0,
+            relief: 0.03,
+            roughness: 0.45,
+            river_count: 2,
+            lake_tendency: 0.6,
+            base_temperature_c: 4.0,
+            latitude_gradient: 30.0,
+            rainfall_mm: 600.0,
+            seasonality: 25.0,
+        ),
+        terrain: generated,
+        rules: ecological,
+        vegetation: (initial_fraction: 0.6, seed_bank: 1.0),
+        trees: (density_per_ha: 30.0, species: ["spruce", "pine", "birch"]),
+        soil: (litter_kg_m2: 0.15, deadwood_kg_m2: 0.05, mycelium_kg_m2: 0.01, mycorrhiza_kg_m2: 0.002),
+        animals: [
+            (species: "bear", count: 3),
+            (species: "bat", count: 30),
+            (species: "frog", count: 30),
+            (species: "snake", count: 8),
+            (species: "duck", count: 40),
+            (species: "songbird", count: 40),
+            (species: "stag", count: 30),
+            (species: "deer", count: 20),
+            (species: "rabbit", count: 60),
+            (species: "wolf", count: 6, groups: Some(1)),
+            (species: "fox", count: 4),
+            (species: "beetle", count: 30000000),
+            (species: "worm", count: 40000000),
+            (species: "butterfly", count: 600000),
+        ],
+        params: {"mutation_rate": 0.1},
+    ),
+)
