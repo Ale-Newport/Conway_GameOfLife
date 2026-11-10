@@ -158,7 +158,7 @@ fn edit_value(ui: &mut Ui, spec: &ParamSpec, value: &ParamValue) -> Option<Param
             let mut v = value.as_i64().unwrap_or(*min).clamp(*min, *max);
             let span = max.saturating_sub(*min);
             let response = if span <= 100_000 {
-                ui.add(egui::Slider::new(&mut v, *min..=*max).clamping(egui::SliderClamping::Always))
+                ui.add(egui::Slider::new(&mut v, *min..=*max).clamping(egui::SliderClamping::Edits))
             } else {
                 ui.add(egui::DragValue::new(&mut v).range(*min..=*max).speed((span as f64 / 2_000.0).max(1.0)))
             };
@@ -168,9 +168,13 @@ fn edit_value(ui: &mut Ui, spec: &ParamSpec, value: &ParamValue) -> Option<Param
             let mut v = value.as_f64().unwrap_or(*min);
             let response = if min.is_finite() && max.is_finite() && min < max {
                 v = v.clamp(*min, *max);
+                // `Edits`, not `Always`: with `Always` egui re-applies the
+                // step rounding to the displayed value every frame and
+                // reports it as a change, so merely showing a value that is
+                // off the step grid would send a new value to the model.
                 let mut slider = egui::Slider::new(&mut v, *min..=*max)
                     .logarithmic(*logarithmic)
-                    .clamping(egui::SliderClamping::Always);
+                    .clamping(egui::SliderClamping::Edits);
                 if let Some(step) = slider_step(*step, *logarithmic) {
                     slider = slider.step_by(step);
                 }
@@ -318,5 +322,20 @@ mod tests {
         let ctx = egui::Context::default();
         let _ = crate::run_headless_ui(&ctx, |ui| param_editor(ui, &descriptor, &params, fake.as_ref()));
         assert!(fake.calls().is_empty(), "rendering alone must not change parameters");
+    }
+
+    #[test]
+    fn values_off_the_step_grid_are_shown_unchanged() {
+        // Step 1.0 (range / 1000): 0.006 lies between grid points, and egui's
+        // step rounding must not turn displaying it into an edit.
+        let fake = Arc::new(FakeSession::new());
+        let mut descriptor = fake.descriptor.clone();
+        descriptor.params = vec![ParamSpec::float("m", "Metabolism", 0.0, 1000.0, 0.006)];
+        let params = ParamSet::from_defaults(&descriptor.params);
+        let ctx = egui::Context::default();
+        for _ in 0..3 {
+            let _ = crate::run_headless_ui(&ctx, |ui| param_editor(ui, &descriptor, &params, fake.as_ref()));
+        }
+        assert!(fake.calls().is_empty(), "an off-grid value was re-sent: {:?}", fake.calls());
     }
 }

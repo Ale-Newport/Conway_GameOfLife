@@ -75,10 +75,23 @@ fn mode_title(ui: &mut Ui, world: &mut World, frame: &Frame) {
         |c| (c.glyph.clone(), c.title.clone()),
     );
     ui.label(RichText::new(glyph).size(16.0).color(p.accent));
-    ui.label(RichText::new(title).size(16.0).strong().color(p.text));
-    if let Some(descriptor) = frame.session.as_ref().map(|s| s.session().descriptor()) {
-        ui.label(RichText::new(&descriptor.name).size(12.5).color(p.text_muted)).on_hover_text(&descriptor.summary);
+    let descriptor = frame.session.as_ref().map(|s| s.session().descriptor());
+    let response = ui.label(RichText::new(&title).size(16.0).strong().color(p.text));
+    match descriptor {
+        // The model's name is shown only when it adds something to the title.
+        Some(d) if !same_name(&d.name, &title) => {
+            ui.label(RichText::new(&d.name).size(12.5).color(p.text_muted)).on_hover_text(&d.summary);
+        }
+        Some(d) => {
+            response.on_hover_text(&d.summary);
+        }
+        None => {}
     }
+}
+
+/// Whether a model name merely repeats the mode title.
+fn same_name(model: &str, title: &str) -> bool {
+    model.trim().eq_ignore_ascii_case(title.trim())
 }
 
 fn scenario_picker(ui: &mut Ui, world: &mut World, frame: &Frame) {
@@ -293,5 +306,17 @@ fn start_sequence(world: &mut World, mode: AppMode, frames: u32) {
     });
     if let Err(e) = result {
         world.resource_mut::<Toasts>().error(format!("Cannot record frames: {e}"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::same_name;
+
+    #[test]
+    fn model_name_is_hidden_only_when_it_repeats_the_title() {
+        assert!(same_name("Emergent Civilizations", "Emergent Civilizations"));
+        assert!(same_name(" emergent civilizations", "Emergent Civilizations "));
+        assert!(!same_name("Lenia", "Continuous Life"));
     }
 }
