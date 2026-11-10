@@ -209,19 +209,24 @@ fn upload_grid_frames(
         let Some(frame) = surface.pending.take() else { continue };
         let geometry = frame.geometry();
         let Some(mut image) = images.get_mut(&gpu.image) else { continue };
-        if image.width() == frame.width
+        let reallocated = if image.width() == frame.width
             && image.height() == frame.height
             && image.texture_descriptor.format == DATA_FORMAT
         {
             // Same size: move the bytes in; the GPU texture is reused.
             image.data = Some(frame.data);
+            false
         } else {
             *image = data_image(frame.width, frame.height, frame.data);
-        }
+            true
+        };
         let first_upload = surface.geometry.is_none();
         surface.geometry = Some(geometry);
         let uniforms = GridUniforms::new(appearance, geometry.cells_per_texel, geometry.origin);
-        if materials.get(&gpu.material).is_some_and(|m| m.params != uniforms.params)
+        // A reallocated texture is a new GPU resource: the material's bind
+        // group still points at the old one until the material is marked
+        // modified, so it is touched even when its uniforms are unchanged.
+        if (reallocated || materials.get(&gpu.material).is_some_and(|m| m.params != uniforms.params))
             && let Some(mut material) = materials.get_mut(&gpu.material)
         {
             material.params = uniforms.params;
