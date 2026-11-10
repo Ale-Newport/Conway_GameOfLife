@@ -1,0 +1,61 @@
+// Robot swarm: aggregation from simple local rules (BEECLUST-like).
+(
+    id: "robot-swarm",
+    name: "Robot swarm",
+    description: "Simple robots wander at random. When a moving robot bumps into another robot it stops and waits; the more robots it can sense around it, the longer it waits (a Rhai script computes the waiting time). Waiting robots also drop a little 'beacon' marker on the floor. No robot knows where the clusters are, yet clusters grow because large clusters hold robots longer: aggregation as an emergent property of local rules (Schmickl & Hamann, BEECLUST).",
+    seed: 3,
+    expected: "Robots that start spread out gather into a few clusters; the clustering index (Clark–Evans ratio) falls well below 1, unlike for robots that never stop.",
+    tags: ["swarm robotics", "aggregation", "scripting"],
+    system: (
+        name: "Robot swarm",
+        description: "BEECLUST-style aggregation of wandering robots.",
+        entity_types: [
+            (
+                name: "robot",
+                description: "Wanders; stops on contact with another robot and waits longer in larger groups.",
+                color: (0.70, 0.75, 0.80, 1.0),
+                icon: "🤖",
+                sprite: "robot",
+                size: 0.8,
+                states: ["moving", "waiting"],
+                movement: Directed(speed: 0.5, turn: 0.8),
+                energy: (initial: 10.0, max: 10.0, metabolism: 0.0, starvation: false),
+                perception: 2.5,
+                initial: (count: 150, distribution: Uniform),
+            ),
+        ],
+        rules: [
+            "rule bump for robot: on_collision with robot when state == \"moving\" and state_age >= 5 then set_state(waiting), stay() priority 500",
+        ],
+        scripts: [
+            (
+                name: "wait",
+                entity: "robot",
+                priority: 10,
+                source: "
+// Waiting time grows with the number of robots nearby.
+fn run(me) {
+    if me.state == \"waiting\" {
+        let neighbours = nearby(\"robot\", 2.5);
+        if me.state_age >= 10 + 25 * neighbours {
+            set_state(\"moving\");
+            wander(3.14);
+        } else {
+            stay();
+            emit(\"beacon\", 0.05);
+        }
+    }
+}
+",
+            ),
+        ],
+        world: (
+            width: 48,
+            height: 48,
+            topology: torus,
+            resources: [
+                (name: "beacon", color: (0.30, 0.85, 0.95, 1.0), initial: Uniform(0.0), regen: 0.0, max: 0.0, diffusion: 0.1, decay: 0.02),
+            ],
+        ),
+    ),
+)

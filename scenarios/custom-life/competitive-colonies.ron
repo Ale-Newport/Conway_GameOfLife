@@ -1,0 +1,66 @@
+// Competitive colonies: exploitation and interference competition for one nutrient.
+(
+    id: "competitive-colonies",
+    name: "Competitive colonies",
+    description: "Two bacterial colonies start on opposite sides of a dish and feed on the same nutrient field. Where they meet they also fight (interference competition). The amber colony needs less energy for maintenance, so it can persist at lower nutrient levels than the violet colony (a lower R*, Tilman 1982); over time it displaces its rival even though both start equal.",
+    seed: 11,
+    expected: "Both colonies expand and meet; the combined population stays below the shared carrying capacity; the amber colony (lower maintenance cost) gradually excludes the violet one.",
+    tags: ["ecology", "competition", "R*"],
+    system: (
+        name: "Competitive colonies",
+        description: "Two consumers of one resource: competitive exclusion by the lower R*.",
+        entity_types: [
+            (
+                name: "amber",
+                description: "Thrifty colony: maintenance 0.06 energy per tick.",
+                color: (0.95, 0.70, 0.20, 1.0),
+                icon: "🟠",
+                sprite: "colony",
+                size: 0.6,
+                movement: RandomWalk(speed: 0.5),
+                energy: (initial: 6.0, max: 20.0, metabolism: 0.06, starvation: true),
+                reproduction: (mode: Asexual, cost: 6.0, cooldown: 5, litter: 1),
+                perception: 2.0,
+                initial: (count: 25, distribution: Cluster(x: 12.0, y: 24.0, radius: 5.0)),
+            ),
+            (
+                name: "violet",
+                description: "Costly colony: maintenance 0.10 energy per tick.",
+                color: (0.60, 0.35, 0.90, 1.0),
+                icon: "🟣",
+                sprite: "colony",
+                size: 0.6,
+                movement: RandomWalk(speed: 0.5),
+                energy: (initial: 6.0, max: 20.0, metabolism: 0.10, starvation: true),
+                reproduction: (mode: Asexual, cost: 6.0, cooldown: 5, litter: 1),
+                perception: 2.0,
+                initial: (count: 25, distribution: Cluster(x: 36.0, y: 24.0, radius: 5.0)),
+            ),
+        ],
+        relationships: [
+            (subject: "amber", kind: Consumes(hunger: Some(18.0), bite: 0.5), object: "nutrient"),
+            (subject: "violet", kind: Consumes(hunger: Some(18.0), bite: 0.5), object: "nutrient"),
+            (subject: "amber", kind: CompetesWith(aggression: 0.2, damage: 1.0), object: "violet"),
+        ],
+        rules: [
+            "rule divide for amber: when energy >= 12 then reproduce() priority 300",
+            "rule divide for violet: when energy >= 12 then reproduce() priority 300",
+        ],
+        world: (
+            width: 48,
+            height: 48,
+            topology: bounded,
+            resources: [
+                (
+                    name: "nutrient",
+                    color: (0.85, 0.85, 0.55, 1.0),
+                    initial: Uniform(1.0),
+                    regen: 0.01,
+                    max: 1.0,
+                    diffusion: 0.05,
+                ),
+            ],
+        ),
+        end_conditions: [Extinction("amber"), Extinction("violet")],
+    ),
+)

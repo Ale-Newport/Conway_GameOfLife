@@ -1,0 +1,29 @@
+[package]
+name = "rule-engine"
+description = "Custom life creator: rule DSL, sandboxed Rhai scripting, entity and relationship definitions and the custom-life simulation."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+simulation-core.workspace = true
+organism-engine.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ron.workspace = true
+rhai.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "custom_life"
+harness = false
+
+[lints]
+workspace = true
