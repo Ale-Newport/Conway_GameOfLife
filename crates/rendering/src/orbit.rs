@@ -13,7 +13,8 @@
 //! when [`OrbitCameraRig::edge_pan`] is set, when the cursor rests near a
 //! viewport edge. Input is gated by [`WorldInput`]: `PanOrbitCamera::enabled`
 //! follows `WorldInput::pointer` (a drag that started over the world
-//! continues), and keys require `WorldInput::keyboard`.
+//! continues), and keys require `WorldInput::keyboard` and are ignored while
+//! Ctrl, Cmd or Alt is held ([`crate::shortcut_modifier_held`]).
 //!
 //! For the orthographic preset `PanOrbitCamera` interprets its radius as the
 //! projection scale; the rig uses `ScalingMode::FixedVertical { 1.0 }`, so the
@@ -26,7 +27,7 @@ use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use serde::{Deserialize, Serialize};
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
-use crate::{WorldCamera, WorldInput};
+use crate::{WorldCamera, WorldInput, shortcut_modifier_held};
 
 /// Pitch used for the top-down aerial preset (just below 90° so yaw stays defined).
 pub const AERIAL_PITCH: f32 = FRAC_PI_2 - 1e-3;
@@ -394,7 +395,7 @@ fn keyboard_and_edge_controls(
     for (rig, mut cam) in &mut rigs {
         let mut screen_dir = Vec2::ZERO;
         let mut rotate = 0.0;
-        if input.keyboard {
+        if input.keyboard && !shortcut_modifier_held(&keys) {
             screen_dir += PAN_KEYS.iter().filter(|(k, _)| keys.pressed(*k)).map(|(_, d)| *d).sum::<Vec2>();
             let step = rig.preset.config().rotate_step;
             match step {
@@ -508,6 +509,8 @@ fn follow_targets(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::time::TimeUpdateStrategy;
+    use std::time::Duration;
 
     #[test]
     fn ortho_conversion_round_trips() {
@@ -637,6 +640,39 @@ mod tests {
         app.world_mut().get_mut::<OrbitCameraRig>(cam).expect("rig").fov = 0.7;
         app.update();
         assert_eq!(fov_of(&app), Some(0.7));
+    }
+
+    #[test]
+    fn shortcut_chords_never_move_the_rig() {
+        fn press(app: &mut App, keys: &[KeyCode]) {
+            let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+            input.reset_all();
+            for key in keys {
+                input.press(*key);
+            }
+            app.update();
+        }
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(100)))
+            .insert_resource(WorldInput { keyboard: true, ..default() })
+            .init_resource::<ButtonInput<KeyCode>>()
+            .add_systems(Update, keyboard_and_edge_controls);
+        let cam = app.world_mut().spawn(OrbitCameraRig::new(OrbitPreset::Strategic)).id();
+        // The first frame has no time delta.
+        app.update();
+        let pose = |app: &App| {
+            let pan = app.world().get::<PanOrbitCamera>(cam).expect("camera");
+            (pan.target_focus, pan.target_yaw)
+        };
+        let start = pose(&app);
+        for modifier in [KeyCode::ControlRight, KeyCode::SuperLeft, KeyCode::AltLeft] {
+            press(&mut app, &[modifier, KeyCode::KeyW, KeyCode::KeyE]);
+            assert_eq!(pose(&app), start, "{modifier:?}+W / {modifier:?}+E");
+        }
+        press(&mut app, &[KeyCode::KeyW, KeyCode::KeyE]);
+        let (focus, yaw) = pose(&app);
+        assert!(focus != start.0 && yaw > start.1, "W pans and E rotates without modifiers");
     }
 
     #[test]

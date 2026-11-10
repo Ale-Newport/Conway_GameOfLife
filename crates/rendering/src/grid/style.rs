@@ -30,7 +30,8 @@ pub enum GridStyle {
     Gradient,
     /// Activity channel (B) through the ramp colormap.
     Heatmap,
-    /// Age channel (G) of live cells through the ramp colormap.
+    /// Age channel (G) of live cells through the ramp colormap, on the
+    /// logarithmic scale of [`age_ramp_position`].
     Age,
     /// Density channel (A, fraction of live cells per texel) through the ramp
     /// colormap; intended for zoomed-out level-of-detail frames.
@@ -96,6 +97,22 @@ impl GridStyle {
             Self::History => 9,
         }
     }
+}
+
+/// Lowest ramp position of the [`GridStyle::Age`] style: newborn cells start
+/// here so they stay visible on dark backgrounds (mirrored in `grid.wesl`).
+pub const AGE_RAMP_MIN: f32 = 0.25;
+
+/// Ramp position at which [`GridStyle::Age`] draws a live cell that is `age`
+/// generations old (G channel; 0 = not tracked, drawn as newborn). The scale
+/// is logarithmic from [`AGE_RAMP_MIN`] at 1 generation to 1.0 at 255, so the
+/// young cells that dominate active regions spread over the ramp (16
+/// generations sit halfway) instead of sharing its darkest end. The shader
+/// (`age_ramp_position` in `grid.wesl`) uses the same mapping; Age legends
+/// should sample the ramp through it.
+pub fn age_ramp_position(age: u8) -> f32 {
+    let generations = f32::from(age.max(1));
+    AGE_RAMP_MIN + (1.0 - AGE_RAMP_MIN) * generations.log2() / 255f32.log2()
 }
 
 /// Appearance of one grid surface. Changing it updates the material uniforms
@@ -325,6 +342,25 @@ mod tests {
         assert_eq!(u.params.glow, 1.0, "non-finite glow falls back");
         assert_eq!(u.palette.colors[0], Vec4::new(0.0, 0.0, 0.0, 1.0));
         assert_eq!(u.palette.colors[31], Vec4::ONE);
+    }
+
+    #[test]
+    fn age_scale_spreads_young_cells() {
+        assert_eq!(age_ramp_position(0), AGE_RAMP_MIN, "untracked ages are drawn as newborn");
+        assert_eq!(age_ramp_position(1), AGE_RAMP_MIN);
+        assert!((age_ramp_position(16) - (1.0 + AGE_RAMP_MIN) / 2.0).abs() < 1e-3, "16 generations sit halfway");
+        assert!((age_ramp_position(255) - 1.0).abs() < 1e-6);
+        // Ages 1 to 20 cover more than half of the ramp from its minimum.
+        assert!(age_ramp_position(20) - AGE_RAMP_MIN > 0.5 * (1.0 - AGE_RAMP_MIN));
+        assert!((1..=255).map(age_ramp_position).collect::<Vec<_>>().windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn shader_uses_the_age_scale() {
+        let shader = include_str!("../../../../assets/shaders/grid.wesl");
+        let min = shader.lines().find_map(|l| l.strip_prefix("const AGE_RAMP_MIN: f32 = "));
+        assert_eq!(min.and_then(|v| v.trim_end_matches(';').parse().ok()), Some(AGE_RAMP_MIN));
+        assert!(shader.contains("ramp_lerp(age_ramp_position(raw.g))"), "the Age style reads the scale");
     }
 
     #[test]

@@ -43,7 +43,7 @@ use std::path::{Path, PathBuf};
 
 pub use frame::{FrameGeometry, GridFrame, GridFrameError, MAX_FRAME_DIMENSION, Texel, encode_range, encode_unit};
 pub use space::{GridSpace, VisibleCells};
-pub use style::{ColorTable, GridAppearance, GridParams, GridStyle};
+pub use style::{AGE_RAMP_MIN, ColorTable, GridAppearance, GridParams, GridStyle, age_ramp_position};
 
 use style::GridUniforms;
 

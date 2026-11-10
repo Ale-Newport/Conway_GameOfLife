@@ -241,6 +241,8 @@ fn setup(mut commands: Commands, space: Res<GridSpace>) {
     });
 
     let mut controller = GridCameraController::default();
+    // No application shell here, so `=` / `-` are free for zooming.
+    controller.key_zoom = true;
     let last = tile_origin(11) + I64Vec2::new(W as i64 - 1, H as i64 - 1);
     controller.fit_to_rect(I64Vec2::new(0, -3), last, 0.02);
     commands.spawn((
@@ -286,14 +288,8 @@ fn toy_frame(origin: I64Vec2, toy: &Toy) -> Option<GridFrame> {
     let mut frame = GridFrame::new(origin, W as u32, H as u32, 1).ok()?;
     for (i, px) in frame.data.as_chunks_mut::<4>().0.iter_mut().enumerate() {
         let alive = toy.cells[i] != 0;
-        // Age is scaled ×8 so a few dozen generations span the ramp.
-        *px = Texel {
-            state: toy.cells[i],
-            age: toy.age[i].saturating_mul(8),
-            activity: toy.trail[i],
-            aux: if alive { 255 } else { 0 },
-        }
-        .to_rgba();
+        *px = Texel { state: toy.cells[i], age: toy.age[i], activity: toy.trail[i], aux: if alive { 255 } else { 0 } }
+            .to_rgba();
     }
     Some(frame)
 }

@@ -55,6 +55,10 @@ const BOX_HALF: f32 = 0.38;
 const BOX_RADIUS: f32 = 0.12;
 const BOX_AREA: f32 = 0.56524; // 0.76^2 - (4 - pi) * 0.12^2
 
+// Lowest ramp position of the Age style, so newborn cells stay visible on dark
+// backgrounds. Mirrors `AGE_RAMP_MIN` in crates/rendering/src/grid/style.rs.
+const AGE_RAMP_MIN: f32 = 0.25;
+
 fn load_texel(p: vec2<i32>) -> vec4<f32> {
     let dims = vec2<i32>(textureDimensions(cells));
     return textureLoad(cells, clamp(p, vec2<i32>(0), dims - vec2<i32>(1)), 0);
@@ -74,6 +78,15 @@ fn ramp_lerp(v: f32) -> vec3<f32> {
     let i = min(u32(floor(x)), n - 1u);
     let j = min(i + 1u, n - 1u);
     return mix(ramp.colors[i].rgb, ramp.colors[j].rgb, x - f32(i));
+}
+
+// Ramp position of a live cell's age (G = generations / 255; 0 = untracked,
+// drawn as newborn): logarithmic from AGE_RAMP_MIN at 1 generation to 1 at 255,
+// so the young cells of active regions spread over the ramp instead of sharing
+// its darkest end. Mirrors `age_ramp_position` in crates/rendering/src/grid/style.rs.
+fn age_ramp_position(g: f32) -> f32 {
+    let generations = max(g * 255.0, 1.0);
+    return mix(AGE_RAMP_MIN, 1.0, log2(generations) / log2(255.0));
 }
 
 // Colour of a state (discrete palette) or field value (continuous palette).
@@ -181,7 +194,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     } else if style == STYLE_HEATMAP {
         color = ramp_lerp(raw.b);
     } else if style == STYLE_AGE {
-        color = select(bg, ramp_lerp(raw.g), alive);
+        color = select(bg, ramp_lerp(age_ramp_position(raw.g)), alive);
     } else if style == STYLE_DENSITY {
         // A carries the live fraction of LOD texels; exact frames may leave it 0.
         let density = select(f32(alive), raw.a, raw.a > 0.0);

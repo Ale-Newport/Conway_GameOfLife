@@ -5,6 +5,9 @@
 //! Input is consumed only when [`WorldInput`] allows it: pointer actions need
 //! `WorldInput::pointer`, key actions need `WorldInput::keyboard`. A drag that
 //! starts over the world keeps going if the pointer later crosses a panel.
+//! Keys pressed with Ctrl, Cmd or Alt belong to shortcuts and never move the
+//! camera ([`crate::shortcut_modifier_held`]); keyboard zoom is opt-in
+//! ([`GridCameraController::key_zoom`]).
 //!
 //! The controller requires `ScalingMode::WindowSize` (Bevy's 2D default), so
 //! the orthographic `scale` is world units per logical pixel.
@@ -15,8 +18,8 @@ use bevy::input::mouse::{AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::math::I64Vec2;
 use bevy::prelude::*;
 
-use crate::WorldInput;
 use crate::grid::{GridSpace, VisibleCells};
+use crate::{WorldInput, shortcut_modifier_held};
 
 /// Pixel-unit scroll deltas (trackpads) per equivalent wheel line.
 const PIXELS_PER_LINE: f32 = 40.0;
@@ -75,6 +78,10 @@ pub struct GridCameraController {
     pub zoom_time_constant: f32,
     /// Keyboard pan speed in logical pixels per second.
     pub key_pan_speed: f32,
+    /// Zoom with `=` / `-` and numpad `+` / `-`. Off by default: in the
+    /// application shell these keys are the Faster / Slower shortcuts
+    /// (`docs/UI_SHELL.md` §3.3), so enable it only in apps without the shell.
+    pub key_zoom: bool,
     /// Keep world coordinates small by moving [`GridSpace::anchor`] with the camera.
     pub auto_reanchor: bool,
     target_scale: Option<f32>,
@@ -92,6 +99,7 @@ impl Default for GridCameraController {
             zoom_step: 1.2,
             zoom_time_constant: 0.07,
             key_pan_speed: 900.0,
+            key_zoom: false,
             auto_reanchor: true,
             target_scale: None,
             zoom_anchor: None,
@@ -207,6 +215,7 @@ fn control_grid_camera(
 ) {
     let pinch_total: f32 = pinch.read().map(|p| p.0).sum();
     let dt = time.delta_secs();
+    let key_controls = input.keyboard && !shortcut_modifier_held(&keys);
     for (mut ctl, mut transform, mut projection, camera) in &mut cameras {
         let Projection::Orthographic(ortho) = &mut *projection else { continue };
         if !matches!(ortho.scaling_mode, ScalingMode::WindowSize) {
@@ -226,7 +235,7 @@ fn control_grid_camera(
             ctl.zoom_anchor = None;
         }
 
-        // Zoom requests: wheel / trackpad scroll and pinch over the world, +/- keys.
+        // Zoom requests: wheel / trackpad scroll and pinch over the world, +/- keys if enabled.
         let mut zoom_lines = 0.0;
         let mut pointer_zoom = false;
         if input.pointer {
@@ -236,7 +245,7 @@ fn control_grid_camera(
             };
             pointer_zoom = zoom_lines != 0.0 || pinch_total != 0.0;
         }
-        if input.keyboard {
+        if key_controls && ctl.key_zoom {
             if keys.just_pressed(KeyCode::Equal) || keys.just_pressed(KeyCode::NumpadAdd) {
                 zoom_lines += 1.0;
             }
@@ -293,7 +302,7 @@ fn control_grid_camera(
         }
 
         // Keyboard panning.
-        if input.keyboard {
+        if key_controls {
             let dir: Vec2 = PAN_KEYS.iter().filter(|(k, _)| keys.pressed(*k)).map(|(_, d)| *d).sum();
             if dir != Vec2::ZERO {
                 let delta = dir.normalize() * ctl.key_pan_speed * scale * dt;
@@ -434,6 +443,67 @@ mod tests {
 #[cfg(test)]
 mod system_tests {
     use super::*;
+    use bevy::camera::RenderTargetInfo;
+    use bevy::time::TimeUpdateStrategy;
+    use std::time::Duration;
+
+    /// An app running only `control_grid_camera` on an 800 × 600 viewport,
+    /// with 0.1 s frames and the keyboard given to the world.
+    fn key_test_app(controller: GridCameraController) -> (App, Entity) {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(100)))
+            .insert_resource(WorldInput { keyboard: true, ..default() })
+            .init_resource::<GridSpace>()
+            .init_resource::<AccumulatedMouseScroll>()
+            .init_resource::<ButtonInput<MouseButton>>()
+            .init_resource::<ButtonInput<KeyCode>>()
+            .add_message::<PinchGesture>()
+            .add_systems(Update, control_grid_camera);
+        let mut camera = Camera::default();
+        camera.computed.target_info = Some(RenderTargetInfo { physical_size: UVec2::new(800, 600), scale_factor: 1.0 });
+        let id = app.world_mut().spawn((controller, camera)).id();
+        // The first frame has no time delta.
+        app.update();
+        (app, id)
+    }
+
+    /// Runs one frame with exactly `keys` held, all newly pressed.
+    fn press(app: &mut App, keys: &[KeyCode]) {
+        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        input.reset_all();
+        for key in keys {
+            input.press(*key);
+        }
+        app.update();
+    }
+
+    #[test]
+    fn shortcut_chords_never_pan() {
+        let (mut app, cam) = key_test_app(GridCameraController::default());
+        let position = |app: &App| app.world().get::<Transform>(cam).expect("camera").translation;
+        let start = position(&app);
+        for modifier in [KeyCode::ControlLeft, KeyCode::SuperLeft, KeyCode::SuperRight, KeyCode::AltLeft] {
+            press(&mut app, &[modifier, KeyCode::KeyS]);
+            assert_eq!(position(&app), start, "{modifier:?}+S");
+        }
+        press(&mut app, &[KeyCode::KeyS]);
+        assert!(position(&app).y < start.y, "S alone pans down");
+    }
+
+    #[test]
+    fn keyboard_zoom_is_opt_in() {
+        let target = |app: &App, cam| app.world().get::<GridCameraController>(cam).expect("camera").target_scale;
+        // In the shell `=` is Faster: the default controller leaves it alone.
+        let (mut app, cam) = key_test_app(GridCameraController::default());
+        press(&mut app, &[KeyCode::Equal]);
+        assert_eq!(target(&app, cam), None);
+        let (mut app, cam) = key_test_app(GridCameraController { key_zoom: true, ..default() });
+        press(&mut app, &[KeyCode::SuperLeft, KeyCode::Equal]);
+        assert_eq!(target(&app, cam), None, "Cmd+= is a shortcut");
+        press(&mut app, &[KeyCode::NumpadAdd]);
+        assert!(target(&app, cam).is_some_and(|t| t < 1.0), "zooms in");
+    }
 
     #[test]
     fn reanchoring_moves_origin_with_camera() {

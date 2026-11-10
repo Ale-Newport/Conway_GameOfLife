@@ -6,6 +6,8 @@
 //! * [`WorldInput`] tells world-interaction systems (camera controllers,
 //!   editing tools, picking) whether the pointer and keyboard currently belong
 //!   to the world rather than to the user interface.
+//! * [`shortcut_modifier_held`]: camera key controls ignore keys pressed with
+//!   Ctrl, Cmd (Super) or Alt, which form shortcuts (Cmd+S, Ctrl+Z...).
 //!
 //! Building blocks (each a plugin plus plain-data helpers that are unit tested):
 //! * [`grid`] — styled 2D grid renderer driven by RGBA8 data frames
@@ -75,6 +77,20 @@ impl WorldInput {
         let viewport = self.viewport?;
         viewport.contains(cursor).then(|| cursor - viewport.min)
     }
+}
+
+/// Whether Ctrl, Cmd (Super) or Alt is held. A key pressed with one of them
+/// is part of a shortcut (Cmd+S, Cmd+A, Ctrl+Z...), so camera key controls
+/// ignore it.
+pub fn shortcut_modifier_held(keys: &ButtonInput<KeyCode>) -> bool {
+    keys.any_pressed([
+        KeyCode::ControlLeft,
+        KeyCode::ControlRight,
+        KeyCode::SuperLeft,
+        KeyCode::SuperRight,
+        KeyCode::AltLeft,
+        KeyCode::AltRight,
+    ])
 }
 
 /// Registers the shared world-input resource.
