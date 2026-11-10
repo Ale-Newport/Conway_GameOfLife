@@ -371,7 +371,7 @@ impl CustomLifeSim {
     }
 
     fn param_policy(&mut self, key: &str, value: &ParamValue) -> Result<ApplyPolicy, SimError> {
-        let spec = params::param_specs(&self.state.system)
+        let spec = params::specs_with_target(&self.state.system, &self.initial.0)
             .into_iter()
             .find(|s| s.key == key)
             .ok_or_else(|| SimError::UnknownParameter(key.to_string()))?;
@@ -407,7 +407,7 @@ impl Simulation for CustomLifeSim {
     type View = CustomLifeView;
 
     fn descriptor(&self) -> ModelDescriptor {
-        report::descriptor(&self.compiled, &self.reference)
+        report::descriptor(&self.compiled, &self.initial.0, &self.reference)
     }
 
     fn tick(&self) -> u64 {
@@ -516,7 +516,7 @@ impl Simulation for CustomLifeSim {
     }
 
     fn params(&self) -> ParamSet {
-        params::current_params(&self.state.system, self.initial.1, self.state.pause_on_end)
+        params::params_with_target(&self.state.system, &self.initial.0, self.initial.1, self.state.pause_on_end)
     }
 
     fn set_param(&mut self, key: &str, value: ParamValue) -> Result<ApplyPolicy, SimError> {

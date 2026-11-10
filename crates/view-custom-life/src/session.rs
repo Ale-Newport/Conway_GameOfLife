@@ -357,7 +357,7 @@ pub fn exit(
     mut resume: ResMut<ClResume>,
 ) {
     if let Some(runner) = runner {
-        let rx = runner.0.request(rebuild_parts);
+        let rx = runner.0.query(rebuild_parts);
         resume.0 = match rx.recv_timeout(RESUME_TIMEOUT) {
             Ok(Ok(parts)) => Some(Resume::State(Box::new(parts))),
             _ => data.info.as_ref().map(|i| Resume::Reset(Box::new(i.target.clone()), i.seed)),
@@ -370,11 +370,10 @@ pub fn exit(
 
 /// Everything needed to rebuild a simulation elsewhere (runs on the
 /// simulation thread).
-fn rebuild_parts(sim: &mut CustomLifeSim) -> Result<RebuildParts, String> {
+fn rebuild_parts(sim: &CustomLifeSim) -> Result<RebuildParts, String> {
     let (target, seed) = sim.reset_target();
-    let (target, seed) = (target.clone(), seed);
     sim.snapshot()
-        .map(|snapshot| RebuildParts { snapshot, running: sim.system().clone(), target, seed })
+        .map(|snapshot| RebuildParts { snapshot, running: sim.system().clone(), target: target.clone(), seed })
         .map_err(|e| e.to_string())
 }
 
@@ -515,7 +514,7 @@ pub fn poll_data(
     if (data.info_wanted || data.info_timer >= INFO_PERIOD) && !pending(&data.info_rx) {
         data.info_wanted = false;
         data.info_timer = 0.0;
-        let rx = runner.0.request(|sim| SimInfo::read(sim));
+        let rx = runner.0.query(SimInfo::read);
         store(&data.info_rx, rx);
     }
     if let Some(detail) = take(&data.detail_rx)
@@ -529,7 +528,7 @@ pub fn poll_data(
             let stale = data.detail.as_ref().is_none_or(|d| d.id != id);
             if (stale || data.detail_timer >= INSPECT_PERIOD) && !pending(&data.detail_rx) {
                 data.detail_timer = 0.0;
-                let rx = runner.0.request(move |sim| EntityDetail {
+                let rx = runner.0.query(move |sim| EntityDetail {
                     id,
                     tick: sim.current_tick(),
                     entity: sim.entities().find(|(i, _)| i.get() == id).map(|(_, e)| e.clone()),
@@ -595,10 +594,10 @@ mod tests {
         let session = spawn_session(sim("bacterial-growth"));
         assert!(session.can_clear() && session.can_randomize());
         session.clear();
-        let count = wait_for(&session.request(|s| s.total_population()));
+        let count = wait_for(&session.query(|s| s.total_population()));
         assert_eq!(count, 0, "clear removes every entity");
         session.randomize(12345);
-        let (count, seed) = wait_for(&session.request(|s| (s.total_population(), s.reset_target().1)));
+        let (count, seed) = wait_for(&session.query(|s| (s.total_population(), s.reset_target().1)));
         assert_eq!(count, 20, "randomize restarts the preset's initial population");
         assert_eq!(seed, 12345);
     }
@@ -619,7 +618,7 @@ mod tests {
         let session = rebuild(parts).unwrap();
         let start = Instant::now();
         let (tick, pending, width) = loop {
-            let r = wait_for(&session.request(|s| (s.current_tick(), s.reset_pending(), s.system().world.width)));
+            let r = wait_for(&session.query(|s| (s.current_tick(), s.reset_pending(), s.system().world.width)));
             if r.0 == 15 || start.elapsed() > Duration::from_secs(5) {
                 break r;
             }
@@ -654,7 +653,7 @@ mod tests {
         session.set_param(KEY, default()); // what ↺ sends
         eventually("the value is back at the design's", || value() == Some(designed.clone()));
         // Applying from the editor makes the draft the design.
-        let info = wait_for(&session.request(|s| SimInfo::read(s)));
+        let info = wait_for(&session.query(SimInfo::read));
         let mut editor = ClEditor::default();
         editor.load(info.target.clone(), info.seed, "test");
         rule_engine::sim::params::apply_param(&mut editor.draft, KEY, &ParamValue::Float(0.25)).unwrap();
@@ -725,7 +724,7 @@ mod tests {
             let runner = world.resource::<ClRunner>().clone();
             runner.0.step(25);
             let start = Instant::now();
-            while wait_for(&runner.0.request(|s| s.current_tick())) < 25 {
+            while wait_for(&runner.0.query(|s| s.current_tick())) < 25 {
                 assert!(start.elapsed() < Duration::from_secs(10));
             }
         }
@@ -738,10 +737,38 @@ mod tests {
         world.run_system_once(enter).unwrap();
         assert!(!world.resource::<ClResume>().is_some());
         let runner = world.resource::<ClRunner>().clone();
-        let (tick, population) = wait_for(&runner.0.request(|s| (s.current_tick(), s.total_population())));
+        let (tick, population) = wait_for(&runner.0.query(|s| (s.current_tick(), s.total_population())));
         assert_eq!(tick, 25, "the world continues where it was left");
         assert!(population > 0);
         assert_eq!(world.resource::<ClEditor>().draft.description, "my unapplied edit");
+    }
+
+    /// Reading the definitions and the selected entity is not a state
+    /// change: while paused the runner publishes no new view and records no
+    /// metric sample for it.
+    #[test]
+    fn polling_reads_without_changing_the_session() {
+        use bevy::ecs::system::RunSystemOnce;
+        let runner = ClRunner(spawn_session(sim("bacterial-growth")));
+        let id = wait_for(&runner.0.query(|s| s.entities().next().map(|(id, _)| id.get()))).expect("an entity");
+        let seq = runner.0.latest_view().expect("a published view").seq;
+        let mut world = World::new();
+        world.insert_resource(runner.clone());
+        world.insert_resource(ClData::default());
+        world.resource_mut::<ClData>().refresh_info();
+        world.insert_resource(ClUi { selected: Some(id), ..ClUi::default() });
+        world.insert_resource(ClEditor::default());
+        world.insert_resource(Time::<Real>::default());
+        world.insert_resource(MetricsHistory::default());
+        let start = Instant::now();
+        while world.resource::<ClData>().info.is_none() || world.resource::<ClData>().detail.is_none() {
+            assert!(start.elapsed() < Duration::from_secs(10), "the reads are answered");
+            world.run_system_once(poll_data).unwrap();
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        wait_for(&runner.0.query(|_| ()));
+        assert_eq!(runner.0.latest_view().map(|v| v.seq), Some(seq), "no view was published again");
+        assert!(runner.0.drain_metrics().is_empty(), "no metric sample was recorded");
     }
 
     #[test]

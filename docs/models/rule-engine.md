@@ -122,6 +122,10 @@ Model parameters are the definition itself (see [`RULE_ENGINE.md` §2](../RULE_E
 (`RequiresReset`). Validation bounds: world side 4–4096, diffusion ≤ 0.25, sensing radius ≤ 32, litter ≤ 100,
 spawn ≤ 100 per action, entity cap ≤ 10⁶, script limits ≤ documented ceilings.
 
+Parameter defaults are the values of the system as last loaded or applied from the editor (the design; the seed's
+default is 0); a parameter change alters the simulated system (reset-only ones that of the next reset), not that
+reference. Reset-only parameters show their pending values (those of the next reset), with ranges that accept them.
+
 ## 5. Approximations
 
 * **First-order kinematics**: no inertia; desired velocities are reached within one tick.

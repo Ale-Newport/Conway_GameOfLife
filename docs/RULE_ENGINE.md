@@ -473,6 +473,14 @@ Parameters (generated from the definition; `set_param` returns the policy): `see
 `resource.<name>.regen|max|diffusion|decay`, per type `entity.<name>.metabolism|reproduction_rate` (`NextTick`) and
 `entity.<name>.initial_count` (`RequiresReset`), per random event `event.<name>.probability` (`NextTick`).
 
+Parameter defaults are the values of the design: the system as last loaded (`CustomLifeSim::new`) or applied from
+the editor (`edit_system` / `ReplaceSystem`), kept as `CustomLifeSim::reference()` and carried by snapshots (a
+system holds no seed: the seed's default is 0). `set_param` changes the system of the next reset (and, for next-tick
+parameters, the running system) but not that reference, so a UI can offer going back to the design. Reset-only
+parameters show their pending values, those the next reset uses (`reset_target()`), and their ranges follow it: an
+initial count is bounded by the entity cap of the next reset, and the initial counts listed are those of the next
+reset's entity types.
+
 ---
 
 ## 8. Views and metrics
@@ -540,8 +548,10 @@ system is capped at 10 000 entries (256 entity types).
 * **Determinism**: id order everywhere, no hash-map iteration, random streams keyed by (seed, tick, entity, rule),
   rayon only over the pure decision phase and field diffusion (double buffered). Verified by tests comparing 1 and 4
   threads and by snapshot replay.
-* **Snapshots** (`schema_version` 1) contain the definition (rules as text), entities, fields, the world RNG,
-  counters, script status and the event log; restoring recompiles the definition and checks consistency.
+* **Snapshots** (`schema_version` 2) contain the definition (rules as text), the reference design (parameter
+  defaults, §7), entities, fields, the world RNG, counters, script status and the event log; restoring recompiles
+  the definition and checks consistency. Version 1 snapshots (without the reference) are still restored, with their
+  definition as the reference.
 * **Vocabulary**: `compile::vocab::FUNCTIONS` lists every sensor and action with its parameters, value kinds, slot
   and whether it is allowed in `on_death`; the validator binds arguments against this table, so editor palettes built
   from it cannot drift from what is accepted. `BUILTIN_PROPERTIES`, `EVENTS`, `MODIFIERS` and

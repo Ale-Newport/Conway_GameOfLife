@@ -119,9 +119,10 @@ pub fn metric_specs(compiled: &CompiledSystem) -> Vec<MetricSpec> {
     specs
 }
 
-/// Formal description including the current rules; parameter defaults
-/// are the values of the `reference` design.
-pub fn descriptor(compiled: &CompiledSystem, reference: &LifeSystem) -> ModelDescriptor {
+/// Formal description including the current rules; reset-only parameters
+/// describe the reset `target` and parameter defaults are the values of
+/// the `reference` design.
+pub fn descriptor(compiled: &CompiledSystem, target: &LifeSystem, reference: &LifeSystem) -> ModelDescriptor {
     let sys = compiled.source();
     let mut rules = format!(
         "## Custom life: {}\n\n{PIPELINE}\n\n### Rules (per entity type, in evaluation order)\n\n```text\n",
@@ -151,7 +152,7 @@ pub fn descriptor(compiled: &CompiledSystem, reference: &LifeSystem) -> ModelDes
     ModelDescriptor::new(MODEL_ID, "Custom Life Creator", ModelFamily::Hybrid)
         .summary(&summary)
         .rules(&rules)
-        .params(params::specs_with_defaults(sys, reference))
+        .params(params::specs_with_defaults(sys, target, reference))
         .metrics(metric_specs(compiled))
         .time("tick", 1.0)
 }

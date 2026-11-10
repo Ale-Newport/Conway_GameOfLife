@@ -4,8 +4,10 @@
 //! one group per resource field, entity type and random event. Each spec
 //! states its [`ApplyPolicy`]; editing a parameter edits the definition
 //! (next-tick parameters are applied like
-//! [`crate::CustomLifeSim::edit_system`]). The declared defaults are the
-//! values of the reference design, the system as last loaded or applied
+//! [`crate::CustomLifeSim::edit_system`]). Reset-only parameters describe
+//! the reset target, so their values are what the next reset uses
+//! ([`params_with_target`]). The declared defaults are the values of the
+//! reference design, the system as last loaded or applied
 //! ([`specs_with_defaults`]); parameter changes leave it alone, so a UI can
 //! offer going back to it.
 
@@ -149,14 +151,35 @@ pub fn param_specs(sys: &LifeSystem) -> Vec<ParamSpec> {
     specs
 }
 
-/// Specs of the running system `sys` whose defaults are the values of
-/// `reference`, the design as last loaded or applied. A parameter the
-/// reference lacks (a structural edit waiting for a reset) or whose
-/// reference value the running system's range rejects defaults to its
-/// running value.
-pub fn specs_with_defaults(sys: &LifeSystem, reference: &LifeSystem) -> Vec<ParamSpec> {
+/// Specs of the running system `sys` whose reset-only parameters are those
+/// of the reset target `target`, with its values as defaults: a pending
+/// value is accepted by the range even when a structural edit waiting for
+/// the reset raised `max_entities` above the running cap, and the initial
+/// counts are those of the target's types (a type a structural edit added
+/// is listed, after the running system's parameters; one it removed or
+/// renamed is not).
+pub fn specs_with_target(sys: &LifeSystem, target: &LifeSystem) -> Vec<ParamSpec> {
+    let reset_only = |s: &ParamSpec| s.apply == ApplyPolicy::RequiresReset;
+    let mut pending: Vec<ParamSpec> = param_specs(target).into_iter().filter(reset_only).collect();
+    let mut specs = Vec::new();
+    for spec in param_specs(sys) {
+        if !reset_only(&spec) {
+            specs.push(spec);
+        } else if let Some(i) = pending.iter().position(|p| p.key == spec.key) {
+            specs.push(pending.remove(i));
+        }
+    }
+    specs.extend(pending);
+    specs
+}
+
+/// [`specs_with_target`] whose defaults are the values of `reference`, the
+/// design as last loaded or applied. A parameter the reference lacks (a
+/// structural edit waiting for a reset) or whose reference value the range
+/// rejects defaults to its current value.
+pub fn specs_with_defaults(sys: &LifeSystem, target: &LifeSystem, reference: &LifeSystem) -> Vec<ParamSpec> {
     let defaults = ParamSet::from_defaults(&param_specs(reference));
-    let mut specs = param_specs(sys);
+    let mut specs = specs_with_target(sys, target);
     for spec in &mut specs {
         if let Some(valid) = defaults.get(&spec.key).and_then(|v| spec.validate(v).ok()) {
             spec.default = valid;
@@ -165,12 +188,20 @@ pub fn specs_with_defaults(sys: &LifeSystem, reference: &LifeSystem) -> Vec<Para
     specs
 }
 
-/// Current values (the specs' defaults are the definition's values).
-pub fn current_params(sys: &LifeSystem, seed: u64, pause_on_end: bool) -> ParamSet {
-    let mut set = ParamSet::from_defaults(&param_specs(sys));
+/// Values of the running system `sys` whose next reset starts from
+/// `target` and `seed`: reset-only parameters show what the next reset
+/// uses, the others the running values.
+pub fn params_with_target(sys: &LifeSystem, target: &LifeSystem, seed: u64, pause_on_end: bool) -> ParamSet {
+    let mut set = ParamSet::from_defaults(&specs_with_target(sys, target));
     set.set("seed", ParamValue::Int((seed & i64::MAX as u64) as i64));
     set.set("pause_on_end", ParamValue::Bool(pause_on_end));
     set
+}
+
+/// Values of the definition `sys` run from `seed` (nothing waits for a
+/// reset).
+pub fn current_params(sys: &LifeSystem, seed: u64, pause_on_end: bool) -> ParamSet {
+    params_with_target(sys, sys, seed, pause_on_end)
 }
 
 /// Writes a validated parameter value into a definition.

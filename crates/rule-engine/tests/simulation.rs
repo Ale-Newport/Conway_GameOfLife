@@ -4,10 +4,12 @@
 
 mod common;
 
+use std::time::{Duration, Instant};
+
 use common::system;
 use rule_engine::dsl::parse_rule;
 use rule_engine::{CustomLifeCommand, CustomLifeSim, CustomLifeViewRequest, LifeSystem, PaintMode};
-use simulation_core::{ApplyPolicy, ParamValue, Simulation, Topology};
+use simulation_core::{ApplyPolicy, ParamValue, Runner, RunnerConfig, SessionControl, Simulation, Topology};
 
 /// One world, two types; `rules` are DSL rule strings.
 fn world(types: &str, rules: &[&str], extra: &str) -> LifeSystem {
@@ -381,6 +383,80 @@ fn parameter_defaults_are_the_design_as_last_loaded_or_applied() {
     renamed.entity_types[0].name = "b".into();
     s.edit_system(renamed).unwrap();
     assert_eq!(default(&s, "entity.a.metabolism"), ParamValue::Float(0.5), "`a` is renamed at the next reset");
+}
+
+/// Waits (at most 10 s) until `done`, e.g. for a runner status to follow
+/// the controls sent before.
+fn eventually(what: &str, done: impl Fn() -> bool) {
+    let start = Instant::now();
+    while !done() {
+        assert!(start.elapsed() < Duration::from_secs(10), "timed out waiting until {what}");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+/// Reset-only parameters show the value the next reset uses, as a UI
+/// reads them through the runner: the slider keeps a pending change, the
+/// default (↺) is offered and takes the change back.
+#[test]
+fn reset_only_parameters_show_the_values_of_the_next_reset() {
+    let t = format!(r#"(name: "a", {STILL}, initial: (count: 5, distribution: Uniform))"#);
+    let runner = Runner::spawn(sim(world(&t, &[], ", max_entities: 10")), RunnerConfig::default());
+    let shown = |key: &str| runner.status().params.get(key).cloned();
+    let default = |key: &str| runner.descriptor().param(key).unwrap().default.clone();
+    let pending = || runner.query(|s| s.reset_pending()).recv_timeout(Duration::from_secs(10)).unwrap();
+    for (key, value) in [
+        ("width", ParamValue::Int(32)),
+        ("height", ParamValue::Int(24)),
+        ("topology", ParamValue::Text("bounded".into())),
+        ("entity.a.initial_count", ParamValue::Int(7)),
+    ] {
+        let designed = default(key);
+        runner.set_param(key, value.clone());
+        eventually(&format!("{key} shows its pending value"), || shown(key).as_ref() == Some(&value));
+        assert!(pending());
+        assert_eq!(default(key), designed);
+        runner.set_param(key, designed.clone());
+        eventually(&format!("{key} is back at its default"), || shown(key).as_ref() == Some(&designed));
+        assert!(!pending(), "going back to the default cancels the pending change of {key}");
+    }
+    // A structural edit raising the entity cap and an initial count waits
+    // for the reset; the pending count is shown, is its default and can be
+    // changed within the new cap.
+    let mut applied = runner.query(|s| s.system().clone()).recv_timeout(Duration::from_secs(10)).unwrap();
+    applied.world.width = 32;
+    applied.world.max_entities = 100;
+    applied.entity_types[0].initial.count = 50;
+    runner.edit(CustomLifeCommand::ReplaceSystem(Box::new(applied)));
+    let key = "entity.a.initial_count";
+    eventually("the applied count is shown", || shown(key) == Some(ParamValue::Int(50)));
+    assert_eq!(default(key), ParamValue::Int(50));
+    runner.set_param(key, ParamValue::Int(40));
+    eventually("the changed count is shown", || shown(key) == Some(ParamValue::Int(40)));
+    assert_eq!(runner.take_errors(), Vec::<String>::new());
+    runner.reset();
+    let count = runner.query(|s| s.population("a")).recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(count, 40);
+}
+
+/// While a renamed type waits for the reset, its initial count is listed
+/// (and set) under the name the next reset uses.
+#[test]
+fn initial_counts_are_those_of_the_types_of_the_next_reset() {
+    let t = format!(r#"(name: "a", {STILL}, initial: (count: 5, distribution: Uniform))"#);
+    let mut s = sim(world(&t, &[], ""));
+    let mut renamed = s.system().clone();
+    renamed.entity_types[0].name = "b".into();
+    assert_eq!(s.edit_system(renamed).unwrap().policy, ApplyPolicy::RequiresReset);
+    let d = s.descriptor();
+    assert!(d.param("entity.a.initial_count").is_none(), "the next reset has no `a`");
+    assert!(d.param("entity.a.metabolism").is_some(), "next-tick parameters are the running types'");
+    assert_eq!(d.param("entity.b.initial_count").map(|p| p.default.clone()), Some(ParamValue::Int(5)));
+    assert_eq!(s.set_param("entity.b.initial_count", ParamValue::Int(3)).unwrap(), ApplyPolicy::RequiresReset);
+    assert_eq!(s.params().get("entity.b.initial_count"), Some(&ParamValue::Int(3)));
+    assert_eq!(s.params().get("entity.a.initial_count"), None);
+    s.reset();
+    assert_eq!(s.population("b"), 3);
 }
 
 #[test]

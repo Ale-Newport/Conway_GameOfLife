@@ -35,6 +35,11 @@
 //!   trip to the dashboard). The runner thread itself stops on exit.
 //! * Changes made outside the editor (Parameters tab, undo / redo, loading
 //!   a save) flow into the draft, so Apply never reverts them silently.
+//! * The Parameters tab's defaults (↺) are the design as last loaded or
+//!   applied from the editor (the seed's is 0: a design holds no seed);
+//!   changing a parameter there does not move them. Reset-only parameters
+//!   (size, topology, seed, initial counts) show the value the next reset
+//!   uses.
 //! * The served descriptor is named after the running system
 //!   ([`session::served_descriptor`]).
 
