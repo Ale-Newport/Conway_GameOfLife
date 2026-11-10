@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 use civilization::agent::Target;
 use civilization::{CivCommand, Resource as Stock};
-use rendering::WorldInput;
+use rendering::{WorldInput, shortcut_modifier_held};
 use simulation_core::Control;
 
 use crate::coords::{HeightField, WATER_LEVEL, ray_point_distance, to_world};
@@ -80,20 +80,7 @@ pub fn tool_command(state: &ViewState, point: Vec3, size: UVec2) -> Option<CivCo
 
 /// Keyboard shortcuts of the mode (no modifiers, keyboard not used by egui).
 pub fn mode_shortcuts(input: Res<WorldInput>, keys: Res<ButtonInput<KeyCode>>, mut state: ResMut<ViewState>) {
-    if !input.keyboard {
-        return;
-    }
-    let modifiers = [
-        KeyCode::ShiftLeft,
-        KeyCode::ShiftRight,
-        KeyCode::ControlLeft,
-        KeyCode::ControlRight,
-        KeyCode::SuperLeft,
-        KeyCode::SuperRight,
-        KeyCode::AltLeft,
-        KeyCode::AltRight,
-    ];
-    if keys.any_pressed(modifiers) {
+    if !input.keyboard || keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) || shortcut_modifier_held(&keys) {
         return;
     }
     for key in keys.get_just_pressed() {

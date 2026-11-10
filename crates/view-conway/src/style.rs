@@ -5,6 +5,7 @@
 
 use bevy::prelude::*;
 use bevy_egui::egui::Color32;
+use rendering::grid::age_ramp_position;
 use rendering::palette::{Colormap, GridPalette};
 use rendering::{GridAppearance, GridStyle};
 use serde::{Deserialize, Serialize};
@@ -264,19 +265,27 @@ pub fn appearance(settings: &ViewSettings) -> GridAppearance {
     }
 }
 
+/// Egui colour of a Bevy colour (sRGB, opaque).
+fn egui_color(c: Color) -> Color32 {
+    let s = c.to_srgba();
+    Color32::from_rgb((s.red * 255.0).round() as u8, (s.green * 255.0).round() as u8, (s.blue * 255.0).round() as u8)
+}
+
 /// `n` colours of a colormap (for legends).
 pub fn ramp_stops(map: Colormap, n: usize) -> Vec<Color32> {
-    map.stops(n.max(2))
-        .into_iter()
-        .map(|c| {
-            let s = c.to_srgba();
-            Color32::from_rgb(
-                (s.red * 255.0).round() as u8,
-                (s.green * 255.0).round() as u8,
-                (s.blue * 255.0).round() as u8,
-            )
-        })
-        .collect()
+    map.stops(n.max(2)).into_iter().map(egui_color).collect()
+}
+
+/// Ages (generations) of the Age legend's stops. Powers of two are evenly
+/// spaced on the logarithmic scale of [`age_ramp_position`] (255 is almost
+/// 2⁸), so the evenly spaced stops follow the shader and 16 sits in the
+/// middle.
+const AGE_LEGEND_AGES: [u8; 9] = [1, 2, 4, 8, 16, 32, 64, 128, 255];
+
+/// Legend colours of the Age style: the colours the shader gives cells of
+/// the ages in [`AGE_LEGEND_AGES`].
+fn age_stops(map: Colormap) -> Vec<Color32> {
+    AGE_LEGEND_AGES.iter().map(|&age| egui_color(map.sample(age_ramp_position(age)))).collect()
 }
 
 /// What the legend of a style shows.
@@ -305,9 +314,10 @@ pub enum Legend {
 /// The legend of the current settings.
 pub fn legend(settings: &ViewSettings) -> Legend {
     let (dead, alive) = settings.colors.colors();
-    let stops = ramp_stops(settings.style.ramp(), 12);
+    let map = settings.style.ramp();
+    let stops = if settings.style == RenderStyle::Age { age_stops(map) } else { ramp_stops(map, 12) };
     match settings.style {
-        RenderStyle::Age => Legend::Ramp { stops, low: "born now", high: "255+ generations", alive: None },
+        RenderStyle::Age => Legend::Ramp { stops, low: "1 generation", high: "255+ (log scale)", alive: None },
         RenderStyle::Trails => {
             Legend::Ramp { stops, low: "16 ticks ago", high: "changed this tick", alive: Some(color32(alive)) }
         }
@@ -372,6 +382,25 @@ mod tests {
                 assert!(alive.is_some());
             }
             other => panic!("unexpected legend {other:?}"),
+        }
+    }
+
+    /// The Age legend is drawn on the shader's logarithmic scale: where the
+    /// bar places an age, it shows the colour the shader gives a live cell
+    /// of that age (not the ramp from 0, whose dark start no cell has).
+    #[test]
+    fn age_legend_matches_the_shader_scale() {
+        let settings = ViewSettings { style: RenderStyle::Age, ..default() };
+        let Legend::Ramp { stops, .. } = legend(&settings) else { panic!("the Age style has a ramp legend") };
+        let shader = |age: u8| egui_color(appearance(&settings).ramp.sample(age_ramp_position(age)));
+        let ends = [stops[0], stops[stops.len() / 2], stops[stops.len() - 1]];
+        assert_eq!(ends, [shader(1), shader(16), shader(255)], "1, 16 and 255 generations: start, middle, end");
+        // Between stops the bar interpolates linearly, which bends a little
+        // less than the colormap.
+        for age in [2, 3, 7, 40, 100, 200] {
+            let bar = interface::widgets::color_ramp(f32::from(age).ln() / 255f32.ln(), &stops);
+            let close = bar.to_array().iter().zip(shader(age).to_array()).all(|(a, b)| a.abs_diff(b) <= 8);
+            assert!(close, "age {age}: legend {bar:?}, shader {:?}", shader(age));
         }
     }
 }

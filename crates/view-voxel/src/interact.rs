@@ -8,7 +8,7 @@
 
 use bevy::prelude::*;
 use interface::{ModeScenarios, RightPanelTab, ShellCommand, Toasts};
-use rendering::{OrbitPreset, WorldInput};
+use rendering::{OrbitPreset, WorldInput, shortcut_modifier_held};
 use simulation_core::Control;
 use voxel_life::{Axis, VoxelCommand};
 
@@ -128,11 +128,7 @@ pub(crate) fn keyboard_shortcuts(
     mut settings: ResMut<ViewSettings>,
     mut camera: MessageWriter<CameraAction>,
 ) {
-    if !input.keyboard {
-        return;
-    }
-    let modifier = [KeyCode::ControlLeft, KeyCode::ControlRight, KeyCode::SuperLeft, KeyCode::SuperRight];
-    if keys.any_pressed(modifier.into_iter().chain([KeyCode::AltLeft, KeyCode::AltRight])) {
+    if !input.keyboard || shortcut_modifier_held(&keys) {
         return;
     }
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);

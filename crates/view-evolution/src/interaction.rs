@@ -22,7 +22,7 @@ use bevy::prelude::*;
 use evolution::{EvolutionCommand, Shape, Species};
 use interface::{RightPanelTab, ShellCommand};
 use organism_engine::AgentId;
-use rendering::{FollowTarget, OrbitPreset, WorldInput};
+use rendering::{FollowTarget, OrbitPreset, WorldInput, shortcut_modifier_held};
 
 use crate::organisms::{EvoOrganism, pick_along_ray};
 use crate::scene::{EvoCamera, SceneState, scene_to_world};
@@ -186,18 +186,7 @@ pub fn shortcuts(
     mut scene: ResMut<SceneState>,
     mut shell: MessageWriter<ShellCommand>,
 ) {
-    if !input.keyboard {
-        return;
-    }
-    let modifier = keys.any_pressed([
-        KeyCode::ControlLeft,
-        KeyCode::ControlRight,
-        KeyCode::SuperLeft,
-        KeyCode::SuperRight,
-        KeyCode::AltLeft,
-        KeyCode::AltRight,
-    ]);
-    if modifier {
+    if !input.keyboard || shortcut_modifier_held(&keys) {
         return;
     }
     const DIGITS: [KeyCode; 5] = [KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3, KeyCode::Digit4, KeyCode::Digit5];

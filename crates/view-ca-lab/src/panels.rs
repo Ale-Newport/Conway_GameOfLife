@@ -16,7 +16,7 @@ use interface::widgets::{badge, gradient_bar, legend_row, swatch};
 use interface::{ActiveSession, MetricsHistory, ModeRegistry, Palette, SessionStatus, ThemeSettings};
 use patterns::{GenerationsRule, LifeRule};
 use rendering::WorldInput;
-use rendering::grid::VisibleCells;
+use rendering::grid::{VisibleCells, age_ramp_position};
 use simulation_core::{Control, ParamSet, ParamValue, Topology};
 
 use crate::family::{self, Family, Rgb, color32};
@@ -1552,28 +1552,65 @@ fn legend_entries(info: &LabInfo) -> Vec<(Rgb, String)> {
     }
 }
 
-/// Colour ramp of the colourings that read the age or activity channel:
-/// stops and the labels of both ends.
-pub fn ramp_legend(
-    info: &LabInfo,
-    settings: &ViewSettings,
-) -> Option<(Vec<egui::Color32>, &'static str, &'static str)> {
+/// Ages (generations) of the Age legend's stops. Powers of two are evenly
+/// spaced on the logarithmic scale of the shader ([`age_ramp_position`];
+/// 255 is almost 2⁸), so the evenly spaced stops follow it and 16 sits in
+/// the middle.
+const AGE_LEGEND_AGES: [u8; 9] = [1, 2, 4, 8, 16, 32, 64, 128, 255];
+
+/// Colour ramp of a colouring that reads the age or activity channel.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RampLegend {
+    /// Evenly spaced colours of the bar.
+    pub stops: Vec<egui::Color32>,
+    /// Label of the low end.
+    pub low: &'static str,
+    /// Label under the middle of the bar.
+    pub mid: Option<&'static str>,
+    /// Label of the high end.
+    pub high: &'static str,
+}
+
+/// The colour ramp of the colourings that read the age or activity channel.
+pub fn ramp_legend(info: &LabInfo, settings: &ViewSettings) -> Option<RampLegend> {
     let colouring = if settings.colouring.available(info.family()) { settings.colouring } else { Colouring::States };
-    let (map, low, high) = match colouring {
+    let (map, low, mid, high) = match colouring {
         Colouring::States => return None,
         Colouring::Trail | Colouring::Activity if info.family() == Family::Wolfram => {
-            (rendering::palette::Colormap::Inferno, "same as above", "differs from the row above")
+            (rendering::palette::Colormap::Inferno, "same as above", None, "differs from the row above")
         }
-        Colouring::Trail | Colouring::Activity => (rendering::palette::Colormap::Inferno, "16+ ticks ago", "this tick"),
-        Colouring::Age => (rendering::palette::Colormap::Viridis, "1 generation", "255+ generations"),
+        Colouring::Trail | Colouring::Activity => {
+            (rendering::palette::Colormap::Inferno, "16+ ticks ago", None, "this tick")
+        }
+        Colouring::Age => (rendering::palette::Colormap::Viridis, "1 generation", Some("16"), "255+ (log scale)"),
     };
-    let stops = (0..16)
-        .map(|i| {
-            let [r, g, b] = map.sample_srgb(i as f32 / 15.0).map(|v| (v * 255.0).round() as u8);
+    let positions: Vec<f32> = if colouring == Colouring::Age {
+        AGE_LEGEND_AGES.map(age_ramp_position).to_vec()
+    } else {
+        (0..16).map(|i| i as f32 / 15.0).collect()
+    };
+    let stops = positions
+        .into_iter()
+        .map(|t| {
+            let [r, g, b] = map.sample_srgb(t).map(|v| (v * 255.0).round() as u8);
             egui::Color32::from_rgb(r, g, b)
         })
         .collect();
-    Some((stops, low, high))
+    Some(RampLegend { stops, low, mid, high })
+}
+
+/// [`gradient_bar`] of a ramp legend, with its middle label centred under
+/// the bar on the row of the end labels.
+fn ramp_bar(ui: &mut Ui, ramp: &RampLegend, width: f32) {
+    let rect = ui.scope(|ui| gradient_bar(ui, &ramp.stops, width, ramp.low, ramp.high)).response.rect;
+    if let Some(mid) = ramp.mid {
+        let color = ui.visuals().text_color();
+        let galley = ui.painter().layout_no_wrap(mid.to_owned(), egui::TextStyle::Small.resolve(ui.style()), color);
+        // The end labels are centred in a row at least `interact_size.y` tall.
+        let row = ui.spacing().interact_size.y.max(galley.size().y);
+        let centre = egui::pos2(rect.min.x + width / 2.0, rect.max.y - row / 2.0);
+        ui.painter().galley(centre - galley.size() / 2.0, galley, color);
+    }
 }
 
 /// What a zoomed-out texel (`k` × `k` cells) shows, or `None` at one texel per cell.
@@ -1684,8 +1721,8 @@ pub(crate) fn overlay_panel(
                     compact_chip(ui, &palette, palette.accent, "line under the newest row (time runs down)");
                 }
             });
-            if let Some((stops, low, high)) = ramp_legend(info, &settings) {
-                gradient_bar(ui, &stops, 200.0, low, high);
+            if let Some(ramp) = ramp_legend(info, &settings) {
+                ramp_bar(ui, &ramp, 200.0);
             }
             let k = view.grid.cells_per_texel;
             if let Some(note) = zoom_note(info, &settings, k) {
@@ -1841,6 +1878,34 @@ mod tests {
         assert!(zoom_note(&life, &age, 2).is_some_and(|n| n.contains("mean age")));
         let heat = ViewSettings { colouring: Colouring::Activity, ..default() };
         assert!(zoom_note(&life, &heat, 2).is_some_and(|n| n.contains("most recent change") && !n.contains("age")));
+    }
+
+    /// The Age legend is drawn on the shader's logarithmic scale: where the
+    /// bar places an age, it shows the colour the shader gives a live cell
+    /// of that age (not the ramp from 0, whose dark start no cell has).
+    #[test]
+    fn age_legend_matches_the_shader_scale() {
+        let life = sim("seeds").info();
+        let settings = ViewSettings { colouring: Colouring::Age, ..default() };
+        let ramp = ramp_legend(&life, &settings).expect("the Age colouring has a ramp");
+        let map = crate::world::appearance(&life, &settings, 1).ramp;
+        let shader = |age: u8| {
+            let [r, g, b] = map.sample_srgb(age_ramp_position(age)).map(|v| (v * 255.0).round() as u8);
+            egui::Color32::from_rgb(r, g, b)
+        };
+        let stops = &ramp.stops;
+        let ends = [stops[0], stops[stops.len() / 2], stops[stops.len() - 1]];
+        assert_eq!(ends, [shader(1), shader(16), shader(255)], "1, 16 and 255 generations: start, middle, end");
+        assert_eq!((ramp.low, ramp.mid, ramp.high), ("1 generation", Some("16"), "255+ (log scale)"));
+        // Between stops the bar interpolates linearly, which bends a little
+        // less than the colormap.
+        for age in [2, 3, 7, 40, 100, 200] {
+            let bar = interface::widgets::color_ramp(f32::from(age).ln() / 255f32.ln(), stops);
+            let close = bar.to_array().iter().zip(shader(age).to_array()).all(|(a, b)| a.abs_diff(b) <= 8);
+            assert!(close, "age {age}: legend {bar:?}, shader {:?}", shader(age));
+        }
+        let trail = ViewSettings { colouring: Colouring::Trail, ..default() };
+        assert!(ramp_legend(&life, &trail).is_some_and(|r| r.mid.is_none() && r.stops.len() == 16));
     }
 
     #[test]

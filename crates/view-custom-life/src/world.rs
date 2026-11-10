@@ -12,7 +12,8 @@
 //!   brush preview.
 //! * Input (only when [`WorldInput`] allows it): wheel zoom about the
 //!   cursor, right/middle drag (or left drag on empty space) to pan, arrow
-//!   keys, and the tools (select, spawn, remove, paint).
+//!   keys (not with Ctrl, Cmd or Alt, which make them shortcuts), and the
+//!   tools (select, spawn, remove, paint).
 
 use std::collections::HashMap;
 
@@ -25,6 +26,7 @@ use interface::{ModeRegistry, Palette, ThemeSettings, Toasts};
 use rendering::grid::encode_unit;
 use rendering::{
     Colormap, GridAppearance, GridFrame, GridPalette, GridSpace, GridStyle, GridSurface, WorldCamera, WorldInput,
+    shortcut_modifier_held,
 };
 use rule_engine::sim::view::FieldView;
 use rule_engine::{CustomLifeCommand, CustomLifeView};
@@ -569,7 +571,7 @@ pub fn world_input(
     } else {
         ctl.pan_from = None;
     }
-    if input.keyboard {
+    if input.keyboard && !shortcut_modifier_held(&keys) {
         let mut dir = Vec2::ZERO;
         for (key, d) in [
             (KeyCode::ArrowLeft, Vec2::NEG_X),
@@ -665,18 +667,7 @@ pub fn world_input(
     }
 
     // ---- shortcuts ----------------------------------------------------------
-    if !input.keyboard {
-        return;
-    }
-    let modifier = keys.any_pressed([
-        KeyCode::ControlLeft,
-        KeyCode::ControlRight,
-        KeyCode::SuperLeft,
-        KeyCode::SuperRight,
-        KeyCode::AltLeft,
-        KeyCode::AltRight,
-    ]);
-    if modifier {
+    if !input.keyboard || shortcut_modifier_held(&keys) {
         return;
     }
     for (key, digit) in [(KeyCode::Digit1, 1), (KeyCode::Digit2, 2), (KeyCode::Digit3, 3), (KeyCode::Digit4, 4)] {
@@ -909,6 +900,46 @@ mod tests {
         assert!(back.distance(p) < 1e-3);
         let outside = WorldInput { cursor: Some(Vec2::new(10.0, 10.0)), ..input };
         assert_eq!(cursor_sim(&outside, camera), None);
+    }
+
+    /// Arrow keys pressed with Ctrl, Cmd or Alt are shortcuts (Ctrl+arrows
+    /// switch macOS spaces) that leave the camera where it is.
+    #[test]
+    fn shortcut_chords_do_not_pan() {
+        use bevy::ecs::system::RunSystemOnce;
+        use rule_engine::{CustomLifeSim, scenarios};
+        use simulation_core::Simulation;
+        use std::sync::Arc;
+        use std::time::Duration;
+        let sim = CustomLifeSim::from_scenario(&scenarios::builtin_by_id("bacterial-growth").unwrap()).unwrap();
+        let mut data = ClData::default();
+        data.view = Some(Arc::new(sim.view(&crate::session::view_request())));
+        let mut time = Time::<Real>::default();
+        time.update_with_duration(Duration::ZERO);
+        time.update_with_duration(Duration::from_millis(100));
+        let mut world = World::new();
+        let viewport = Rect::new(0.0, 0.0, 800.0, 600.0);
+        world.insert_resource(WorldInput { keyboard: true, viewport: Some(viewport), ..default() });
+        world.insert_resource(data);
+        world.insert_resource(time);
+        world.insert_resource(ClUi { fit_requested: false, ..default() });
+        world.init_resource::<ClEditor>();
+        world.init_resource::<AccumulatedMouseScroll>();
+        world.init_resource::<ButtonInput<MouseButton>>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        let projection = Projection::Orthographic(OrthographicProjection::default_2d());
+        let camera = world.spawn((ClCamera, ClCameraController::default(), Transform::default(), projection)).id();
+        let x = |world: &World| world.get::<Transform>(camera).unwrap().translation.x;
+        for modifier in [KeyCode::ControlLeft, KeyCode::SuperRight, KeyCode::AltLeft] {
+            let mut keys = world.resource_mut::<ButtonInput<KeyCode>>();
+            keys.press(modifier);
+            keys.press(KeyCode::ArrowLeft);
+            world.run_system_once(world_input).expect("world_input runs");
+            assert_eq!(x(&world), 0.0, "{modifier:?}+Left");
+            world.resource_mut::<ButtonInput<KeyCode>>().release(modifier);
+        }
+        world.run_system_once(world_input).expect("world_input runs");
+        assert!(x(&world) < 0.0, "Left pans");
     }
 
     #[test]
