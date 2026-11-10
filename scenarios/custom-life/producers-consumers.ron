@@ -8,7 +8,7 @@
     tags: ["ecology", "energy flow", "trophic levels"],
     system: (
         name: "Producers & consumers",
-        description: "Sunlight → plants → grazers → hunters.",
+        description: "Sunlight -> plants -> grazers -> hunters.",
         entity_types: [
             (
                 name: "plant",

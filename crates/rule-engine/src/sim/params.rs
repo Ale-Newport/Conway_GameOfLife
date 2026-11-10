@@ -28,7 +28,9 @@ fn topology_key(t: Topology) -> &'static str {
     }
 }
 
-/// Parameter specs for `sys`.
+/// Parameter specs for `sys`. Quantities whose useful values span several
+/// orders of magnitude (regrowth, maxima, decay, metabolism, event
+/// probabilities) use logarithmic sliders, so small values stay reachable.
 pub fn param_specs(sys: &LifeSystem) -> Vec<ParamSpec> {
     let side = (i64::from(MIN_WORLD_SIDE), i64::from(MAX_WORLD_SIDE));
     let mut specs = vec![
@@ -68,12 +70,14 @@ pub fn param_specs(sys: &LifeSystem) -> Vec<ParamSpec> {
         let key = |k: &str| format!("resource.{}.{k}", r.name);
         specs.push(
             ParamSpec::float(&key("regen"), "Regrowth per tick", 0.0, 100.0, f64::from(r.regen))
+                .logarithmic()
                 .describe("Amount added to every cell below the maximum each tick.")
                 .group(&group)
                 .apply(ApplyPolicy::NextTick),
         );
         specs.push(
             ParamSpec::float(&key("max"), "Maximum per cell", 0.0, 1.0e6, f64::from(r.max))
+                .logarithmic()
                 .describe("Regrowth ceiling per cell.")
                 .group(&group)
                 .apply(ApplyPolicy::NextTick),
@@ -86,6 +90,7 @@ pub fn param_specs(sys: &LifeSystem) -> Vec<ParamSpec> {
         );
         specs.push(
             ParamSpec::float(&key("decay"), "Decay", 0.0, 1.0, f64::from(r.decay))
+                .logarithmic()
                 .describe("Fraction lost per tick.")
                 .group(&group)
                 .apply(ApplyPolicy::NextTick),
@@ -96,6 +101,7 @@ pub fn param_specs(sys: &LifeSystem) -> Vec<ParamSpec> {
         let key = |k: &str| format!("entity.{}.{k}", t.name);
         specs.push(
             ParamSpec::float(&key("metabolism"), "Metabolism", 0.0, 1000.0, t.energy.metabolism)
+                .logarithmic()
                 .describe("Energy lost per tick.")
                 .group(&group)
                 .apply(ApplyPolicy::NextTick),
@@ -130,6 +136,7 @@ pub fn param_specs(sys: &LifeSystem) -> Vec<ParamSpec> {
                 1.0,
                 ev.probability,
             )
+            .logarithmic()
             .describe("Chance that the event happens in a tick.")
             .group(&format!("Event: {}", ev.name))
             .apply(ApplyPolicy::NextTick),

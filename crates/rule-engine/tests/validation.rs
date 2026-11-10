@@ -392,7 +392,7 @@ fn repeated_relationships_get_unique_rule_names_and_warnings() {
     let compiled = compile(&sys).unwrap();
     let w103: Vec<_> = compiled.warnings().iter().filter(|d| d.code == "W103").collect();
     assert_eq!(w103.len(), 2, "{w103:?}");
-    assert!(w103[0].message.contains("rabbit → fox → rabbit"), "{}", w103[0].message);
+    assert!(w103[0].message.contains("rabbit -> fox -> rabbit"), "{}", w103[0].message);
 }
 
 #[test]

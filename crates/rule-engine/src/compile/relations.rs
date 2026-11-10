@@ -300,7 +300,7 @@ pub(crate) fn generate(sys: &LifeSystem) -> (Vec<(RuleAst, RuleOrigin)>, Vec<Dia
                             "W103",
                             format!(
                                 "unconditional transformation cycle {}: entities keep changing type",
-                                cycle.join(" → ")
+                                cycle.join(" -> ")
                             ),
                         )
                         .context(&ctx)

@@ -8,7 +8,7 @@
     tags: ["ecology", "food chain", "invented"],
     system: (
         name: "Alien ecosystem",
-        description: "Lumen moss → medusae → spikemaws under a day-side light gradient.",
+        description: "Lumen moss -> medusae -> spikemaws under a day-side light gradient.",
         entity_types: [
             (
                 name: "lumen_moss",
