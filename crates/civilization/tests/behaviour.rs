@@ -257,3 +257,19 @@ fn surplus_food_goes_home_so_building_plans_complete() {
         assert!(a.inventory.get(civilization::Good::Food) <= a.food_to_carry() + 12.0);
     }
 }
+
+#[test]
+fn snapshots_keep_scenario_rule_overrides() {
+    // `scarcity` overrides rule parameters; those untagged values must survive
+    // a snapshot round trip (postcard alone cannot decode them).
+    let mut sim = preset("scarcity");
+    assert!(!sim.scenario().params.is_empty(), "the scenario has rule overrides");
+    sim.advance(50);
+    let snap = sim.snapshot().unwrap();
+    let mut other = preset("abundant");
+    other.restore(&snap).expect("restore a scenario with rule overrides");
+    assert_eq!(other.scenario().params, sim.scenario().params);
+    sim.advance(50);
+    other.advance(50);
+    assert_eq!(other.metrics(), sim.metrics());
+}

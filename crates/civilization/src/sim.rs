@@ -26,7 +26,7 @@ pub const MODEL_ID: &str = "civilization";
 /// Snapshot schema version. Version 2 added household food stores and the
 /// seven-way work shares; version 1 snapshots cannot be migrated (their agent
 /// layout differs) and are rejected.
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 const STREAM_AGENTS: u64 = 0xC1_71;
 /// Seeds are limited to `0..=i64::MAX` (the range of the `seed` parameter).
 const SEED_MASK: u64 = i64::MAX as u64;
@@ -45,9 +45,11 @@ pub struct CivilizationSim {
     scratch: Scratch,
 }
 
+// The scenario travels as RON text: its rule overrides are untagged
+// `ParamValue`s, which postcard cannot decode.
 #[derive(Serialize)]
 struct PayloadRef<'a> {
-    scenario: &'a Scenario,
+    scenario: String,
     rules: &'a Rules,
     seed: u64,
     state: &'a CivState,
@@ -55,7 +57,7 @@ struct PayloadRef<'a> {
 
 #[derive(Deserialize)]
 struct Payload {
-    scenario: Scenario,
+    scenario: String,
     rules: Rules,
     seed: u64,
     state: CivState,
@@ -229,9 +231,9 @@ impl CivilizationSim {
         Ok(())
     }
 
-    fn validate_restored(p: &Payload) -> Result<(), CivError> {
+    fn validate_restored(scenario: &Scenario, p: &Payload) -> Result<(), CivError> {
         let bad = |m: String| CivError::InvalidScenario(format!("corrupt snapshot: {m}"));
-        p.scenario.validate().map_err(|e| bad(e.to_string()))?;
+        scenario.validate().map_err(|e| bad(e.to_string()))?;
         if p.seed > SEED_MASK {
             return Err(bad(format!("seed {} is larger than {}", p.seed, SEED_MASK)));
         }
@@ -321,7 +323,8 @@ impl Simulation for CivilizationSim {
     }
 
     fn snapshot(&self) -> Result<Snapshot, SimError> {
-        let payload = PayloadRef { scenario: &self.scenario, rules: &self.rules, seed: self.seed, state: &self.state };
+        let scenario = ron::to_string(&self.scenario).map_err(|e| SimError::Serialization(e.to_string()))?;
+        let payload = PayloadRef { scenario, rules: &self.rules, seed: self.seed, state: &self.state };
         Snapshot::encode(MODEL_ID, SCHEMA_VERSION, self.state.tick, &payload)
     }
 
@@ -330,10 +333,12 @@ impl Simulation for CivilizationSim {
             return Err(SimError::UnsupportedVersion { found: snapshot.schema_version, supported: SCHEMA_VERSION });
         }
         let mut payload: Payload = snapshot.decode(MODEL_ID, SCHEMA_VERSION)?;
+        let scenario: Scenario =
+            ron::from_str(&payload.scenario).map_err(|e| SimError::Serialization(e.to_string()))?;
         payload.state.world.restore_derived().map_err(SimError::from)?;
-        Self::validate_restored(&payload)?;
+        Self::validate_restored(&scenario, &payload)?;
         self.scratch = Scratch::new(&payload.state.world);
-        self.scenario = payload.scenario;
+        self.scenario = scenario;
         self.rules = payload.rules;
         self.seed = payload.seed;
         self.state = payload.state;
