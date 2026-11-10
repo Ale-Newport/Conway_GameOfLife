@@ -1,0 +1,21 @@
+// Emergence Lab scenario (metapixel). See docs/models/metapixel.md for the file format.
+(
+    id: "metapixel.blinker",
+    name: "Meta-blinker",
+    description: "Three ON metacells in a row inside a 3×3 grid of OTCA metapixels running Conway's Life. Every 35 328 physical generations the row flips between horizontal and vertical: a blinker made of 342 076 live B3/S23 cells.",
+    rule: "B3/S23",
+    neighbourhood: "moore",
+    width: 3,
+    height: 3,
+    init: Rows([
+        "...",
+        "OOO",
+        "...",
+    ]),
+    seed: 1,
+    step: "35328",
+    notes: [
+        "Golden values (research note §7.2, bgolly): population 342 076 at t = 0 and 330 244 at t = 35 328; cores read horizontal at t = P and 3P, vertical at 2P and 4P; the full state is periodic with period 4P from t = P.",
+        "OTCA metapixel by Brice Due (2006); tile data GPL-2.0-or-later, see assets/patterns/otca/PROVENANCE.md.",
+    ],
+)

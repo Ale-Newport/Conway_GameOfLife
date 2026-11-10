@@ -1,0 +1,16 @@
+// Emergence Lab scenario (metapixel). See docs/models/metapixel.md for the file format.
+(
+    id: "metapixel.soup",
+    name: "Random meta-soup",
+    description: "A 6×6 grid of randomly chosen ON/OFF metacells (density 0.4) under Conway's Life. Every exact readout is compared with the accelerated macro prediction.",
+    rule: "B3/S23",
+    neighbourhood: "moore",
+    width: 6,
+    height: 6,
+    init: Random(density: 0.4),
+    seed: 7,
+    step: "35328",
+    notes: [
+        "Use the Randomize command for a fresh soup drawn from the same seeded generator.",
+    ],
+)

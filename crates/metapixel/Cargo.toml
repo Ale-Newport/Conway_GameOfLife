@@ -1,0 +1,29 @@
+[package]
+name = "metapixel"
+description = "OTCA metapixel construction: tiling, rule programming, exact B3/S23 execution via Hashlife and macro-state readout."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+simulation-core.workspace = true
+patterns.workspace = true
+hashlife.workspace = true
+serde.workspace = true
+ron.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+serde_json.workspace = true
+
+[[bench]]
+name = "metapixel"
+harness = false
+
+[lints]
+workspace = true

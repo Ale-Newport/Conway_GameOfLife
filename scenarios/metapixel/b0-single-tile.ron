@@ -1,0 +1,18 @@
+// Emergence Lab scenario (metapixel). See docs/models/metapixel.md for the file format.
+(
+    id: "metapixel.b0-single-tile",
+    name: "Single metacell under B0/S",
+    description: "One OFF metapixel programmed with B0/S, the rule Brice Due suggests for studying a single tile: with no neighbours it is born, then dies for lack of survival digits, and blinks with period 2 metagenerations. Tiles outside the grid do not exist, so they are never born.",
+    rule: "B0/S",
+    neighbourhood: "moore",
+    width: 1,
+    height: 1,
+    init: Rows([
+        ".",
+    ]),
+    seed: 1,
+    step: "35328",
+    notes: [
+        "B0 cannot run in Hashlife as a *physical* rule, but here the physical rule is always B3/S23; only the macro rule has B0.",
+    ],
+)

@@ -1,0 +1,26 @@
+// Emergence Lab scenario (metapixel). See docs/models/metapixel.md for the file format.
+(
+    id: "metapixel.parity-von-neumann",
+    name: "Parity rule, von Neumann neighbourhood",
+    description: "Rule B135/S135 with the four corner LWSS fuses removed from every tile, so metacells only hear their N, E, S and W neighbours: each metacell becomes the XOR of its four neighbours. A single ON metacell in a 9×9 grid replicates into a growing parity pattern.",
+    rule: "B135/S135",
+    neighbourhood: "von_neumann",
+    width: 9,
+    height: 9,
+    init: Rows([
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        "....O....",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+    ]),
+    seed: 1,
+    step: "35328",
+    notes: [
+        "Same programming as Golly's metapixel-parity64 demo (B135/S135, corner LWSSs removed), on a smaller grid.",
+    ],
+)

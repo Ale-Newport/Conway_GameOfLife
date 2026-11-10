@@ -1,0 +1,19 @@
+// Emergence Lab scenario (metapixel). See docs/models/metapixel.md for the file format.
+(
+    id: "metapixel.block",
+    name: "Meta-block",
+    description: "A 2×2 grid of ON metacells: a still life one level up. The physical pattern settles into exact periodicity with period 35 328 after the first, fuse-burning cycle.",
+    rule: "B3/S23",
+    neighbourhood: "moore",
+    width: 2,
+    height: 2,
+    init: Rows([
+        "OO",
+        "OO",
+    ]),
+    seed: 1,
+    step: "35328",
+    notes: [
+        "Golden values (research note §7.2): population 264 796 at t = 0 and 259 832 at every t = k·35 328, k ≥ 1.",
+    ],
+)

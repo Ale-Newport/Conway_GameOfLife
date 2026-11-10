@@ -1,0 +1,27 @@
+// Emergence Lab scenario (metapixel). See docs/models/metapixel.md for the file format.
+(
+    id: "metapixel.glider",
+    name: "Meta-glider",
+    description: "A glider of metacells in a 10×10 grid. It moves one metacell diagonally every 4 metagenerations (141 312 physical generations) until it reaches the dead border of the grid.",
+    rule: "B3/S23",
+    neighbourhood: "moore",
+    width: 10,
+    height: 10,
+    init: Rows([
+        "..........",
+        "..O.......",
+        "...O......",
+        ".OOO......",
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+    ]),
+    seed: 1,
+    step: "35328",
+    notes: [
+        "Outside the grid behaves as permanently OFF: the glider turns into a block when it hits the south-east corner.",
+    ],
+)

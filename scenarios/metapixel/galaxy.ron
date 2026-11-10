@@ -1,0 +1,32 @@
+// Emergence Lab scenario (metapixel). See docs/models/metapixel.md for the file format.
+(
+    id: "metapixel.galaxy",
+    name: "Kok's galaxy of metacells",
+    description: "Kok's galaxy (period 8) in a 15×15 grid of OTCA metapixels: the macro pattern of Golly's metapixel-galaxy demo, rebuilt with our own construction. 225 tiles, 7.4 million live cells.",
+    rule: "B3/S23",
+    neighbourhood: "moore",
+    width: 15,
+    height: 15,
+    init: Rows([
+        "...............",
+        "...............",
+        "...............",
+        "...OOOOOO.OO...",
+        "...OOOOOO.OO...",
+        "..........OO...",
+        "...OO.....OO...",
+        "...OO.....OO...",
+        "...OO.....OO...",
+        "...OO..........",
+        "...OO.OOOOOO...",
+        "...OO.OOOOOO...",
+        "...............",
+        "...............",
+        "...............",
+    ]),
+    seed: 1,
+    step: "35328",
+    notes: [
+        "The macro pattern equals the generation-0 readout of Golly's Patterns/HashLife/Metacell/metapixel-galaxy.mc.gz (checked by the test suite).",
+    ],
+)
