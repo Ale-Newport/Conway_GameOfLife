@@ -578,7 +578,7 @@ pub fn poll_data(
     let missing = view.organisms.iter().any(|o| !data.traits.contains_key(&o.id));
     if data.traits_pending.is_none() && ((missing && now - data.traits_at > 0.05) || now - data.traits_at > 2.0) {
         data.traits_at = now;
-        data.traits_pending = Some(Pending::new(runner.0.request(read_traits), data.epoch));
+        data.traits_pending = Some(Pending::new(runner.0.query(read_traits), data.epoch));
     }
 
     // Environment fields.
@@ -614,7 +614,7 @@ pub fn poll_data(
         data.env_at = now;
         if data.env_key.as_ref() != Some(&key) {
             data.env_key = Some(key);
-            data.env_pending = Some(Pending::new(runner.0.request(read_environment), data.epoch));
+            data.env_pending = Some(Pending::new(runner.0.query(read_environment), data.epoch));
         }
     }
 
@@ -636,7 +636,7 @@ pub fn poll_data(
             let stale = data.detail.as_ref().is_none_or(|d| d.id != id || d.tick != view.tick);
             if data.detail_pending.is_none() && stale && now - data.detail_at > 0.15 {
                 data.detail_at = now;
-                data.detail_pending = Some(Pending::new(runner.0.request(move |sim| read_detail(sim, id)), data.epoch));
+                data.detail_pending = Some(Pending::new(runner.0.query(move |sim| read_detail(sim, id)), data.epoch));
             }
         }
         None => data.detail = None,
@@ -660,7 +660,7 @@ pub fn poll_data(
         let interval = if data.genealogy.is_none() { 0.0 } else { 0.5 };
         if data.genealogy_pending.is_none() && stale && now - data.genealogy_at > interval {
             data.genealogy_at = now;
-            data.genealogy_pending = Some(Pending::new(runner.0.request(read_genealogy), data.epoch));
+            data.genealogy_pending = Some(Pending::new(runner.0.query(read_genealogy), data.epoch));
         }
     }
 }
@@ -670,7 +670,7 @@ fn genome_array(values: &[f32]) -> GenomeValues {
 }
 
 /// Genomes of every organism (simulation thread).
-pub fn read_traits(sim: &mut EvolutionSim) -> TraitsTable {
+pub fn read_traits(sim: &EvolutionSim) -> TraitsTable {
     let world = sim.world();
     TraitsTable {
         tick: world.tick(),
@@ -680,7 +680,7 @@ pub fn read_traits(sim: &mut EvolutionSim) -> TraitsTable {
 }
 
 /// Environment fields (simulation thread).
-pub fn read_environment(sim: &mut EvolutionSim) -> EnvSnapshot {
+pub fn read_environment(sim: &EvolutionSim) -> EnvSnapshot {
     let world = sim.world();
     let env = world.environment();
     let climate = &world.config().climate;
@@ -707,7 +707,7 @@ pub fn read_environment(sim: &mut EvolutionSim) -> EnvSnapshot {
 }
 
 /// Full state of organism `id` (simulation thread); `None` if it is gone.
-pub fn read_detail(sim: &mut EvolutionSim, id: AgentId) -> Option<OrganismDetail> {
+pub fn read_detail(sim: &EvolutionSim, id: AgentId) -> Option<OrganismDetail> {
     let world = sim.world();
     let o = world.organisms().get(id)?;
     let schema = world.schema();
@@ -772,7 +772,7 @@ pub fn read_detail(sim: &mut EvolutionSim, id: AgentId) -> Option<OrganismDetail
 }
 
 /// Pruned genealogy (simulation thread).
-pub fn read_genealogy(sim: &mut EvolutionSim) -> GenealogyData {
+pub fn read_genealogy(sim: &EvolutionSim) -> GenealogyData {
     let world = sim.world();
     let g = world.genealogy();
     let summary = g.summary();
@@ -822,21 +822,68 @@ mod tests {
         let mut sim = small();
         sim.advance(5);
         let before = sim.snapshot().unwrap();
-        let traits = read_traits(&mut sim);
+        let traits = read_traits(&sim);
         assert_eq!(traits.genomes.len(), sim.world().organisms().len());
-        let env = read_environment(&mut sim);
+        let env = read_environment(&sim);
         assert_eq!(env.temperature.len(), 32 * 24);
         assert_eq!(env.terrain.len(), env.capacity.len());
         assert!(env.max_capacity() >= 1.0);
         let id = traits.genomes[0].0;
-        let detail = read_detail(&mut sim, id).expect("organism exists");
+        let detail = read_detail(&sim, id).expect("organism exists");
         assert_eq!(detail.id, id);
         assert!(detail.storage > 0.0 && detail.budget.basal > 0.0);
         assert!((0.0..=1.0).contains(&detail.health));
-        assert!(read_detail(&mut sim, AgentId(u64::MAX)).is_none());
-        let genealogy = read_genealogy(&mut sim);
+        assert!(read_detail(&sim, AgentId(u64::MAX)).is_none());
+        let genealogy = read_genealogy(&sim);
         assert!(genealogy.nodes.len() >= genealogy.living.len());
         assert_eq!(sim.snapshot().unwrap(), before, "reading never changes the run");
+    }
+
+    /// The panels' reads (genomes, environment, the selected organism, the
+    /// genealogy) change nothing: once a later speed change shows in the
+    /// status, no metric sample was recorded and no view was published.
+    #[test]
+    fn panel_reads_are_queries() {
+        use bevy::ecs::system::RunSystemOnce;
+        use simulation_core::Speed;
+        use std::time::{Duration, Instant};
+        let sim = small();
+        let id = sim.world().organisms().iter().next().expect("organisms").0;
+        let scenario = ScenarioInfo { seed: sim.world().seed(), ..ScenarioInfo::default() };
+        let runner = EvoRunner(spawn_runner(sim));
+        let fence = |speed: Speed| {
+            runner.0.send(Control::SetSpeed(speed));
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while runner.0.status().speed != speed {
+                assert!(Instant::now() < deadline, "the runner did not answer");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        };
+        let mut world = World::new();
+        world.insert_resource(runner.clone());
+        world.init_resource::<SessionStatus>();
+        world.init_resource::<Time<Real>>();
+        let tab = crate::ui_state::PropertiesTab::Genealogy;
+        world.insert_resource(EvoUi { selected: Some(id), tab, ..EvoUi::default() });
+        world.insert_resource(EvoData {
+            traits_at: -10.0,
+            env_at: -10.0,
+            detail_at: -10.0,
+            genealogy_at: -10.0,
+            scenario,
+            ..EvoData::default()
+        });
+        fence(Speed::TicksPerSecond(3.0));
+        runner.0.drain_metrics();
+        let seq = runner.0.latest_view().map(|v| v.seq);
+        world.run_system_once(poll_data).unwrap();
+        fence(Speed::TicksPerSecond(5.0));
+        assert!(runner.0.drain_metrics().is_empty(), "a read recorded a metric sample");
+        assert_eq!(runner.0.latest_view().map(|v| v.seq), seq, "a read published a view");
+        world.run_system_once(poll_data).unwrap();
+        let data = world.resource::<EvoData>();
+        assert!(!data.traits.is_empty() && data.env.is_some() && data.genealogy.is_some());
+        assert_eq!(data.detail.as_ref().map(|d| d.id), Some(id));
     }
 
     #[test]

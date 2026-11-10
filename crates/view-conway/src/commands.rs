@@ -16,8 +16,8 @@ use rendering::grid::VisibleCells;
 use simulation_core::{Control, ParamValue, Simulation};
 
 use crate::analysis::{Analysis, MAX_ANALYSIS_POPULATION};
-use crate::geometry::{jump_plan, moved_rect, rotated_selection};
-use crate::labels::{MAX_TRANSFER_CELLS, thousands};
+use crate::geometry::{moved_rect, rotated_selection};
+use crate::labels::thousands;
 use crate::library::normalized_keeping_metadata;
 use crate::session::{ConwayRunner, LiveInfo, LiveWorld, RandomizeDensity, lock};
 use crate::style::{RenderStyle, Tracking, ViewSettings};
@@ -103,9 +103,8 @@ impl Default for TimeSettings {
     }
 }
 
-/// A jump being prepared: the preparation's outcome, `k`, and the
-/// generations per tick to restore afterwards.
-type PendingJump = (Receiver<Result<(), String>>, u32, u64);
+/// A jump being prepared: the preparation's outcome and `k`.
+type PendingJump = (Receiver<Result<(), String>>, u32);
 
 /// A Hashlife jump being prepared on the simulation thread.
 #[derive(Resource, Default)]
@@ -172,6 +171,11 @@ pub fn too_many_selected(rect: CellRect, known: Option<u64>, limit: u64) -> Opti
     }
 }
 
+/// Live cells above which a render style does not turn tracking on: the
+/// tracker updates every live cell in every generation, which this keeps
+/// interactive.
+pub const MAX_TRACKING_CELLS: u128 = 1 << 24;
+
 /// Largest random fill on the infinite plane (the model's limit for edits,
 /// [`cellular_automata::geometry::MAX_EDIT_CELLS`]); finite worlds are
 /// clipped to their area, which the model fills whole.
@@ -202,6 +206,28 @@ pub(crate) fn prepare_jump(sim: &mut LifeSim) -> Result<(), String> {
     if sim.engine_choice() != EngineChoice::Hashlife {
         sim.set_param("engine", ParamValue::Text("hashlife".into())).map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+/// Ticks of `generations_per_tick` generations that make a jump of `2^k`
+/// generations, or why there is no such number.
+pub fn jump_ticks(k: u32, generations_per_tick: u64) -> Result<u64, String> {
+    let generations = 1u64 << k;
+    if !generations.is_multiple_of(generations_per_tick) {
+        return Err(format!(
+            "A jump of 2^{k} generations is not a whole number of ticks of {} generations; lower the generations \
+             per tick or jump further.",
+            thousands(u128::from(generations_per_tick))
+        ));
+    }
+    Ok(generations / generations_per_tick)
+}
+
+/// Runs a prepared jump of `2^k` generations on the simulation thread as
+/// whole ticks of the current generations per tick, which stays in effect
+/// (Hashlife advances all of them in one memoised step).
+pub(crate) fn run_jump(sim: &mut LifeSim, k: u32) -> Result<(), String> {
+    sim.advance(jump_ticks(k, sim.generations_per_tick())?);
     Ok(())
 }
 
@@ -260,7 +286,7 @@ impl CommandContext<'_> {
         let Some(runner) = self.runner.as_deref() else { return };
         let info = self.live.current();
         let population = info.map_or(0, |i| i.population);
-        if population > MAX_TRANSFER_CELLS {
+        if population > MAX_TRACKING_CELLS {
             self.toasts.warning(format!(
                 "Not enabling {}: it records every one of the {} live cells each generation.",
                 tracking.label(),
@@ -383,7 +409,7 @@ impl CommandContext<'_> {
         }
         match op {
             SelectionOp::Copy | SelectionOp::Cut => {
-                *lock(&self.clipboard.pending) = Some(runner.request(move |sim| sim.copy_region(rect)));
+                *lock(&self.clipboard.pending) = Some(runner.query(move |sim| sim.copy_region(rect)));
                 if op == SelectionOp::Cut {
                     runner.edit(LifeCommand::ClearRegion { rect });
                 }
@@ -436,19 +462,21 @@ impl CommandContext<'_> {
     }
 
     fn jump(&mut self, runner: &ConwayRunner, k: u32) {
-        if let Some(reason) = jump_unavailable(self.live.current(), &self.status) {
+        let generations_per_tick = self.live.current().map_or(1, |i| i.generations_per_tick);
+        if let Some(reason) =
+            jump_unavailable(self.live.current(), &self.status).or_else(|| jump_ticks(k, generations_per_tick).err())
+        {
             self.toasts.warning(format!("Cannot jump: {reason}"));
             return;
         }
         if self.jump.busy() {
             return;
         }
-        let previous = self.live.current().map_or(1, |i| i.generations_per_tick);
         // Paused, so no ordinary tick runs between the steps below; the
         // empty undoable edit records the state before the jump.
         runner.send(Control::Pause);
         runner.send(Control::ExecEdit(Box::new(|_| {})));
-        *lock(&self.jump.pending) = Some((runner.request(prepare_jump), k, previous));
+        *lock(&self.jump.pending) = Some((runner.request(prepare_jump), k));
     }
 }
 
@@ -469,21 +497,14 @@ pub(crate) fn poll_async_commands(
     mut toasts: ResMut<Toasts>,
     mut egui_clipboard: Option<ResMut<EguiClipboard>>,
 ) {
-    let prepared = lock(&jump.pending).as_ref().map(|(rx, k, previous)| (rx.try_recv(), *k, *previous));
+    let prepared = lock(&jump.pending).as_ref().map(|(rx, k)| (rx.try_recv(), *k));
     match prepared {
-        Some((Ok(Ok(())), k, previous)) => {
+        Some((Ok(Ok(())), k)) => {
             *lock(&jump.pending) = None;
             if let Some(runner) = &runner {
-                let (per_tick, ticks) = jump_plan(k);
                 runner.send(Control::Exec(Box::new(move |sim: &mut LifeSim| {
-                    if let Err(e) = sim.set_param("generations_per_tick", ParamValue::Int(per_tick as i64)) {
+                    if let Err(e) = run_jump(sim, k) {
                         warn!("jump: {e}");
-                    }
-                })));
-                runner.send(Control::Step(ticks));
-                runner.send(Control::Exec(Box::new(move |sim: &mut LifeSim| {
-                    if let Err(e) = sim.set_param("generations_per_tick", ParamValue::Int(previous as i64)) {
-                        warn!("jump: could not restore the generations per tick: {e}");
                     }
                 })));
                 fit.request_fresh(runner);
@@ -526,25 +547,47 @@ pub(crate) fn poll_async_commands(
     }
 }
 
+/// Checks that the controls `read` sends to `runner` only read the model:
+/// once a later speed change shows in the status (the batch holding them is
+/// done), no metric sample was recorded and no view was published.
+#[cfg(test)]
+pub(crate) fn assert_reads_only(runner: &ConwayRunner, read: impl FnOnce()) {
+    use simulation_core::Speed;
+    use std::time::{Duration, Instant};
+    let fence = |speed: Speed| {
+        runner.send(Control::SetSpeed(speed));
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while runner.0.status().speed != speed {
+            assert!(Instant::now() < deadline, "the runner did not answer");
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    };
+    fence(Speed::TicksPerSecond(3.0));
+    runner.0.drain_metrics();
+    let seq = runner.0.latest_view().map(|v| v.seq);
+    read();
+    fence(Speed::TicksPerSecond(5.0));
+    assert!(runner.0.drain_metrics().is_empty(), "a read recorded a metric sample");
+    assert_eq!(runner.0.latest_view().map(|v| v.seq), seq, "a read published a view");
+}
+
 #[cfg(test)]
 mod tests {
+    use std::time::{Duration, Instant};
+
     use super::*;
+    use bevy::ecs::system::RunSystemOnce;
     use cellular_automata::{LifeConfig, LifeMode, PatternLibrary};
-    use simulation_core::Topology;
+    use interface::ToastLevel;
+    use simulation_core::{Runner, RunnerConfig, Topology};
 
     fn plane() -> LifeSim {
         let config = LifeConfig { topology: Topology::Infinite, init: vec![], ..LifeConfig::default() };
         LifeSim::new(&config, 1, &PatternLibrary::builtin(), LifeMode::Classic).unwrap()
     }
 
-    #[test]
-    fn jumps_fix_hashlife_and_stop_tracking() {
+    fn glider_plane() -> LifeSim {
         let mut sim = plane();
-        sim.set_param("track_ages", ParamValue::Bool(true)).unwrap();
-        prepare_jump(&mut sim).unwrap();
-        assert_eq!(sim.engine_choice(), EngineChoice::Hashlife);
-        assert_eq!(sim.params().get("track_ages").and_then(ParamValue::as_bool), Some(false));
-        // The jump itself: one tick of 2^p generations, `ticks` times.
         let glider = Pattern::from_ascii(".O.\n..O\nOOO").unwrap();
         sim.apply(LifeCommand::Paste {
             pattern: glider,
@@ -555,15 +598,111 @@ mod tests {
             mode: cellular_automata::PasteMode::Or,
         })
         .unwrap();
-        let (per_tick, ticks) = jump_plan(32);
-        sim.set_param("generations_per_tick", ParamValue::Int(per_tick as i64)).unwrap();
-        for _ in 0..ticks {
-            sim.step();
-        }
+        sim
+    }
+
+    /// A world holding `sim`'s runner and what the command executor needs.
+    fn command_world(sim: LifeSim) -> World {
+        let mut world = World::new();
+        world.insert_resource(LiveWorld { info: Some(LiveInfo::read(&sim, 0)), ..default() });
+        world.insert_resource(ConwayRunner(Arc::new(Runner::spawn(sim, RunnerConfig::default()))));
+        world.init_resource::<ModeCommands>();
+        world.init_resource::<SessionStatus>();
+        world.init_resource::<ToolSettings>();
+        world.init_resource::<Stamp>();
+        world.init_resource::<Selection>();
+        world.init_resource::<Clipboard>();
+        world.init_resource::<ViewSettings>();
+        world.init_resource::<TimeSettings>();
+        world.init_resource::<JumpState>();
+        world.init_resource::<PatternsWindow>();
+        world.init_resource::<Toasts>();
+        world.init_resource::<VisibleCells>();
+        world.init_resource::<RandomizeDensity>();
+        world.init_resource::<CameraFit>();
+        world.init_resource::<Analysis>();
+        world
+    }
+
+    #[test]
+    fn jumps_fix_hashlife_and_stop_tracking() {
+        let mut sim = glider_plane();
+        sim.set_param("track_ages", ParamValue::Bool(true)).unwrap();
+        prepare_jump(&mut sim).unwrap();
+        assert_eq!(sim.engine_choice(), EngineChoice::Hashlife);
+        assert_eq!(sim.params().get("track_ages").and_then(ParamValue::as_bool), Some(false));
+        run_jump(&mut sim, 32).unwrap();
         assert_eq!(sim.tick(), 1 << 32);
         assert_eq!(sim.population(), 5, "the glider is intact after 2^32 generations");
         let bbox = sim.engine().bounding_box().unwrap();
         assert_eq!((bbox.x0, bbox.y0), (1 << 30, 1 << 30), "it moved (1, 1) every 4 generations");
+    }
+
+    /// A jump runs whole ticks: after it one tick still advances the
+    /// generations per tick chosen before, and the rules text says so.
+    #[test]
+    fn jumps_keep_the_generations_per_tick_in_effect() {
+        let mut sim = glider_plane();
+        sim.set_param("generations_per_tick", ParamValue::Int(4)).unwrap();
+        sim.step();
+        let mut world = command_world(sim);
+        // 2^1 generations are less than one tick: refused before anything is sent.
+        world.resource_mut::<ModeCommands>().0.push(ModeCommand::Jump(1));
+        world.run_system_once(run_mode_commands).unwrap();
+        assert!(!world.resource::<JumpState>().busy());
+        let refused = &world.resource::<Toasts>().items()[0];
+        assert_eq!(refused.level, ToastLevel::Warning);
+        assert!(refused.message.contains("not a whole number of ticks of 4 generations"), "{}", refused.message);
+
+        world.resource_mut::<ModeCommands>().0.push(ModeCommand::Jump(10));
+        world.run_system_once(run_mode_commands).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while world.resource::<JumpState>().busy() {
+            assert!(Instant::now() < deadline, "the jump was not prepared");
+            world.run_system_once(poll_async_commands).unwrap();
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        let rx = world.resource::<ConwayRunner>().query(|sim| (sim.tick(), sim.population(), sim.descriptor().rules));
+        let (tick, population, rules) = rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert_eq!((tick, population), (4 + (1 << 10), 5));
+        assert!(rules.contains("One tick advances 4 generation(s)."), "{rules}");
+    }
+
+    /// Copies, the analysis' copy, framing and the selection's preview
+    /// read the model without changing it.
+    #[test]
+    fn reads_are_not_state_changes() {
+        let mut world = command_world(glider_plane());
+        let runner = world.resource::<ConwayRunner>().clone();
+        world.resource_mut::<Selection>().set(CellRect::new(0, 0, 2, 2));
+        let mut time = Time::<()>::default();
+        time.advance_by(Duration::from_secs(1));
+        world.insert_resource(time);
+        assert_reads_only(&runner, || {
+            let commands = [ModeCommand::Selection(SelectionOp::Copy), ModeCommand::Analyse];
+            world.resource_mut::<ModeCommands>().0.extend(commands);
+            world.run_system_once(run_mode_commands).unwrap();
+            world.resource_mut::<CameraFit>().request_fresh(&runner);
+            world.run_system_once(crate::tools::poll_selection).unwrap();
+        });
+        world.run_system_once(poll_async_commands).unwrap();
+        world.run_system_once(crate::tools::poll_selection).unwrap();
+        assert_eq!(world.resource::<Clipboard>().pattern.as_ref().map(|p| p.population()), Some(5));
+        assert_eq!(world.resource::<Selection>().info.as_ref().map(|i| i.population), Some(5));
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while world.resource::<Analysis>().report.is_none() {
+            assert!(Instant::now() < deadline, "the analysis did not finish");
+            world.run_system_once(crate::analysis::poll_analysis).unwrap();
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    fn jumps_are_whole_ticks() {
+        assert_eq!(jump_ticks(10, 1), Ok(1024));
+        assert_eq!(jump_ticks(10, 1024), Ok(1));
+        assert_eq!(jump_ticks(40, 1 << 30), Ok(1024));
+        assert!(jump_ticks(10, 2048).is_err());
     }
 
     #[test]

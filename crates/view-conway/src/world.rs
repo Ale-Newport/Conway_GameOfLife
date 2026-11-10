@@ -139,7 +139,7 @@ impl CameraFit {
     /// Frames the world as it is after the commands sent so far (the
     /// bounding box is read on the simulation thread after them).
     pub fn request_fresh(&mut self, runner: &ConwayRunner) {
-        *lock(&self.fresh) = Some(runner.request(|sim| (sim.world(), sim.engine().bounding_box())));
+        *lock(&self.fresh) = Some(runner.query(|sim| (sim.world(), sim.engine().bounding_box())));
     }
 
     /// Drops a pending [`Self::request_fresh`] (its world was replaced).

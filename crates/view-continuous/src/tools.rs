@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use continuous::{Blend, Brush, BrushMode, ContinuousCommand, CreatureCells, Placement};
 use rendering::grid::GridSpace;
 use rendering::palette::Colormap;
-use rendering::{WorldInput, cursor_to_cell};
+use rendering::{WorldInput, cursor_to_cell, shortcut_modifier_held};
 use simulation_core::Control;
 
 use crate::field::{creature_rgba, dab_spacing, inside_world, stroke_dabs, wrap_degrees};
@@ -330,18 +330,7 @@ pub(crate) fn mode_shortcuts(
     mut settings: ResMut<ViewSettings>,
     mut fit: ResMut<CameraFit>,
 ) {
-    if !input.keyboard {
-        return;
-    }
-    let modifier = keys.any_pressed([
-        KeyCode::ControlLeft,
-        KeyCode::ControlRight,
-        KeyCode::SuperLeft,
-        KeyCode::SuperRight,
-        KeyCode::AltLeft,
-        KeyCode::AltRight,
-    ]);
-    if modifier {
+    if !input.keyboard || shortcut_modifier_held(&keys) {
         return;
     }
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);

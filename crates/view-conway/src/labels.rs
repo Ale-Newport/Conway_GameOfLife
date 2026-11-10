@@ -3,16 +3,10 @@
 
 use cellular_automata::engine::{
     AUTO_DENSE_MAX_CELLS, AUTO_HASHLIFE_MIN_POPULATION, AUTO_HASHLIFE_MIN_REGULARITY, AUTO_HASHLIFE_MIN_STEP,
-    AUTO_REGULARITY_MAX_POPULATION, MAX_DENSE_CELLS, MAX_DENSE_WINDOW_CELLS,
+    AUTO_REGULARITY_MAX_POPULATION, MAX_DENSE_CELLS, MAX_DENSE_WINDOW_CELLS, MAX_SWITCH_CELLS,
 };
 use cellular_automata::{EngineChoice, EngineKind, World};
 use simulation_core::Topology;
-
-/// Live cells above which the user interface refuses engine switches away
-/// from Hashlife: a switch exports every live cell one by one into the new
-/// engine, which for astronomically large Hashlife patterns would exhaust
-/// memory.
-pub const MAX_TRANSFER_CELLS: u128 = 1 << 24;
 
 /// Integer with thousands separators (`1,099,511,627,776`).
 pub fn thousands(value: u128) -> String {
@@ -163,8 +157,8 @@ pub fn auto_reason(world: World, kind: EngineKind, generations: u64) -> String {
 
 /// Why `choice` cannot be selected now, or `None` when it can (the
 /// automatic choice always can). Mirrors the model's own checks
-/// (`EngineKind::check`, Hashlife's power-of-two ticks) and adds the user
-/// interface's transfer guards ([`MAX_TRANSFER_CELLS`]).
+/// (`EngineKind::check`, Hashlife's power-of-two ticks, and a switch to
+/// another engine copying at most [`MAX_SWITCH_CELLS`] live cells).
 pub fn choice_unavailable(
     choice: EngineChoice,
     world: World,
@@ -198,10 +192,12 @@ pub fn choice_unavailable(
         }
         _ => {}
     }
-    if running == EngineKind::Hashlife && kind != EngineKind::Hashlife && population > MAX_TRANSFER_CELLS {
+    if kind != running && population > u128::from(MAX_SWITCH_CELLS) {
         return Some(format!(
-            "Switching would copy {} live cells one by one out of Hashlife's compressed quadtree.",
-            thousands(population)
+            "Switching engines copies every live cell one by one; {} live cells are more than the {} a switch \
+             copies.",
+            thousands(population),
+            thousands(u128::from(MAX_SWITCH_CELLS))
         ));
     }
     None
@@ -258,8 +254,13 @@ mod tests {
         assert!(none(EngineChoice::Dense, inf, 1).is_none());
         let huge = choice_unavailable(EngineChoice::Dense, inf, 1, EngineKind::Sparse, 10, Some(1 << 30));
         assert!(huge.unwrap().contains("dense window"));
-        let leave = choice_unavailable(EngineChoice::Sparse, inf, 1, EngineKind::Hashlife, 1 << 30, None);
-        assert!(leave.unwrap().contains("copy"));
+        // The model copies at most MAX_SWITCH_CELLS live cells into another engine, in either direction.
+        let limit = u128::from(MAX_SWITCH_CELLS);
+        assert!(choice_unavailable(EngineChoice::Sparse, inf, 1, EngineKind::Hashlife, limit, None).is_none());
+        let leave = choice_unavailable(EngineChoice::Sparse, inf, 1, EngineKind::Hashlife, limit + 1, None);
+        assert!(leave.unwrap().contains("67,108,864 a switch copies"));
+        let enter = choice_unavailable(EngineChoice::Hashlife, inf, 1, EngineKind::Sparse, limit + 1, None);
+        assert!(enter.unwrap().contains("copies every live cell"));
         let stay = choice_unavailable(EngineChoice::Hashlife, inf, 1, EngineKind::Hashlife, 1 << 30, None);
         assert!(stay.is_none());
         let auto = choice_unavailable(EngineChoice::Auto, inf, 1, EngineKind::Hashlife, 1 << 30, None);

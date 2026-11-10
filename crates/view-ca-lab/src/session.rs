@@ -470,7 +470,7 @@ mod tests {
         );
         assert!(world.resource::<LoadRequests>().0.is_empty());
         // The runner now runs rule 110.
-        let rx = first.upgrade().unwrap().request(|sim| (sim.family(), sim.info().rule_text()));
+        let rx = first.upgrade().unwrap().query(|sim| (sim.family(), sim.info().rule_text()));
         let reply = rx.recv_timeout(std::time::Duration::from_secs(5)).unwrap();
         assert_eq!(reply, (Family::Wolfram, "Rule 110".to_string()));
         world.run_system_once(exit_session).unwrap();

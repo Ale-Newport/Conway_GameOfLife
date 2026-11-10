@@ -812,7 +812,7 @@ pub(crate) fn poll_data(
     if data.info_due(now) {
         data.info_wanted = false;
         data.info_forced = false;
-        let rx = session.0.request(|sim| SimInfo::read(sim));
+        let rx = session.0.query(SimInfo::read);
         *lock(&data.info_rx) = Some(rx);
         data.info_sent = Some(now);
     }
@@ -991,6 +991,34 @@ mod tests {
             ticks.extend(session.0.drain_metrics().iter().map(|m| m.tick));
             ticks.contains(&PERIOD)
         });
+    }
+
+    /// Reading the model data changes nothing: once a later speed change
+    /// shows in the status, no metric sample was recorded and no view was
+    /// published.
+    #[test]
+    fn model_data_reads_are_queries() {
+        use bevy::ecs::system::RunSystemOnce;
+        let session = MpSession(spawn_session(blinker(), density()));
+        let fence = |speed: Speed| {
+            session.send(Control::SetSpeed(speed));
+            wait_until("the runner did not answer", || session.0.status().speed == speed);
+        };
+        let mut world = World::new();
+        world.insert_resource(session.clone());
+        world.init_resource::<SessionStatus>();
+        world.init_resource::<MetricsHistory>();
+        world.init_resource::<SimData>();
+        world.resource_mut::<SimData>().refresh_info();
+        fence(Speed::TicksPerSecond(3.0));
+        session.0.drain_metrics();
+        let seq = session.0.latest_view().map(|v| v.seq);
+        world.run_system_once(poll_data).unwrap();
+        fence(Speed::TicksPerSecond(5.0));
+        assert!(session.0.drain_metrics().is_empty(), "the read recorded a metric sample");
+        assert_eq!(session.0.latest_view().map(|v| v.seq), seq, "the read published a view");
+        world.run_system_once(poll_data).unwrap();
+        assert_eq!(world.resource::<SimData>().info.as_ref().map(|i| i.tick), Some(0));
     }
 
     #[test]

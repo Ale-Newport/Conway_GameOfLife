@@ -16,7 +16,7 @@ use interface::{SessionStatus, Toasts};
 use metapixel::spec::CellRect;
 use metapixel::{MetapixelCommand, MetapixelSim, StepSize};
 use rendering::grid::GridSpace;
-use rendering::{WorldInput, cursor_to_cell};
+use rendering::{WorldInput, cursor_to_cell, shortcut_modifier_held};
 use simulation_core::{Control, ParamValue};
 
 use crate::geometry::GridShape;
@@ -284,11 +284,7 @@ pub(crate) fn mode_shortcuts(
     mut settings: ResMut<ViewSettings>,
     mut fit: ResMut<CameraFit>,
 ) {
-    if !input.keyboard {
-        return;
-    }
-    let modifiers = [KeyCode::ControlLeft, KeyCode::ControlRight, KeyCode::SuperLeft, KeyCode::SuperRight];
-    if keys.any_pressed(modifiers) {
+    if !input.keyboard || shortcut_modifier_held(&keys) {
         return;
     }
     let shape = current_shape(&data);
@@ -388,6 +384,34 @@ mod tests {
         assert_eq!(next.to_rows(), ["O..", ".OO", "..O"], "tiles outside the grid are ignored");
         let erase = Stroke { target: false, tiles: vec![(0, 0), (2, 2)] };
         assert_eq!(apply_stroke(&grid, &erase).population(), 0);
+    }
+
+    /// Keys pressed with Ctrl, Cmd or Alt are shortcuts of the shell or the
+    /// system, never of the mode.
+    #[test]
+    fn modifier_chords_are_not_mode_shortcuts() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut world = World::new();
+        world.insert_resource(WorldInput { keyboard: true, ..default() });
+        world.init_resource::<SessionStatus>();
+        world.init_resource::<SimData>();
+        world.init_resource::<ToolState>();
+        world.init_resource::<ViewSettings>();
+        world.init_resource::<CameraFit>();
+        let grid = world.resource::<ViewSettings>().tile_grid;
+        for modifier in [KeyCode::AltLeft, KeyCode::ControlRight, KeyCode::SuperLeft] {
+            let mut keys = ButtonInput::<KeyCode>::default();
+            keys.press(modifier);
+            keys.press(KeyCode::KeyG);
+            world.insert_resource(keys);
+            world.run_system_once(mode_shortcuts).unwrap();
+            assert_eq!(world.resource::<ViewSettings>().tile_grid, grid, "{modifier:?}+G toggled the tile grid");
+        }
+        let mut keys = ButtonInput::<KeyCode>::default();
+        keys.press(KeyCode::KeyG);
+        world.insert_resource(keys);
+        world.run_system_once(mode_shortcuts).unwrap();
+        assert_ne!(world.resource::<ViewSettings>().tile_grid, grid, "G alone toggles it");
     }
 
     #[test]

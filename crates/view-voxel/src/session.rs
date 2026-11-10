@@ -106,7 +106,7 @@ mod tests {
         assert!(!rules.contains('∈'), "replaced for egui's fonts");
         SessionControl::clear(&runner);
         loop {
-            let population = runner.request(|sim| sim.stats().population());
+            let population = runner.query(|sim| sim.stats().population());
             if population.recv_timeout(Duration::from_secs(5)).expect("population") == 0 {
                 break;
             }

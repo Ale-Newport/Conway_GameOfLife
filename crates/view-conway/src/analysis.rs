@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 use bevy::prelude::*;
 use cellular_automata::{CellRect, LifeCommand, LifeConfig, LifeMode, LifeSim, PasteMode, PatternLibrary, Rotation};
 use patterns::Pattern;
-use simulation_core::{ParamValue, Simulation, Snapshot, Topology};
+use simulation_core::{Control, ParamValue, Simulation, Snapshot, Topology};
 
 use crate::session::{ConwayRunner, lock};
 
@@ -252,7 +252,7 @@ impl Analysis {
         self.running = Some(CellRectOrWorld(selection));
         // Runs on the simulation thread only long enough to copy the state;
         // the analysis itself runs on its own thread.
-        runner.0.exec(move |sim: &mut LifeSim| {
+        runner.send(Control::Query(Box::new(move |sim: &LifeSim| {
             let generation = sim.tick();
             let (source, translate) = match selection {
                 Some(rect) => (Source::Cells(sim.copy_region(rect).map_err(|e| e.to_string())), true),
@@ -268,7 +268,7 @@ impl Analysis {
             if let Err(e) = spawned {
                 warn!("could not start the period analysis: {e}");
             }
-        });
+        })));
     }
 
     /// Reports, without running anything, that `population` live cells are

@@ -319,7 +319,7 @@ pub(crate) fn poll_selection(time: Res<Time>, runner: Option<Res<ConwayRunner>>,
             let Some(rect) = selection.rect else { return };
             if selection.since >= SELECTION_PERIOD {
                 selection.since = 0.0;
-                *lock(&selection.pending) = Some(runner.request(move |sim| read_selection(sim, rect)));
+                *lock(&selection.pending) = Some(runner.query(move |sim| read_selection(sim, rect)));
             }
         }
     }

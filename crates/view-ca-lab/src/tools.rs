@@ -17,7 +17,7 @@ use cellular_automata::library::EMBEDDED_PATTERNS;
 use cellular_automata::{CellRect, LifeCommand, PaintCommand, Rotation, Symmetry, WolframCommand};
 use patterns::Pattern;
 use rendering::grid::GridSpace;
-use rendering::{WorldInput, cursor_to_cell};
+use rendering::{WorldInput, cursor_to_cell, shortcut_modifier_held};
 use simulation_core::{Control, Simulation};
 
 use crate::family::Family;
@@ -556,18 +556,7 @@ pub(crate) fn mode_shortcuts(
     mut settings: ResMut<ViewSettings>,
     mut fit: ResMut<CameraFit>,
 ) {
-    if !input.keyboard {
-        return;
-    }
-    let modifier = keys.any_pressed([
-        KeyCode::ControlLeft,
-        KeyCode::ControlRight,
-        KeyCode::SuperLeft,
-        KeyCode::SuperRight,
-        KeyCode::AltLeft,
-        KeyCode::AltRight,
-    ]);
-    if modifier || latest.is_stale() {
+    if !input.keyboard || shortcut_modifier_held(&keys) || latest.is_stale() {
         return;
     }
     let Some(info) = latest.info() else { return };

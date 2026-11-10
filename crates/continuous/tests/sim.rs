@@ -467,18 +467,18 @@ fn runs_behind_the_threaded_runner_with_generic_controls() {
     let control: &dyn SessionControl = &runner;
     assert!(control.can_clear() && control.can_randomize());
     control.step(20);
-    let probe = runner.request(|s| (s.tick(), s.mass()));
+    let probe = runner.query(|s| (s.tick(), s.mass()));
     let (tick, mass) = probe.recv_timeout(Duration::from_secs(60)).expect("runner answers");
     assert_eq!(tick, 20);
     assert!((mass - 73.0).abs() < 2.0, "mass {mass}");
     control.clear();
-    let probe = runner.request(|s| s.mass());
+    let probe = runner.query(|s| s.mass());
     assert_eq!(probe.recv_timeout(Duration::from_secs(60)).expect("runner answers"), 0.0);
     control.randomize(9);
-    let probe = runner.request(|s| s.mass());
+    let probe = runner.query(|s| s.mass());
     assert!(probe.recv_timeout(Duration::from_secs(60)).expect("runner answers") > 100.0);
     control.set_param("k0.mu", ParamValue::Float(0.16));
-    let probe = runner.request(|s| s.params().f64_or("k0.mu", 0.0));
+    let probe = runner.query(|s| s.params().f64_or("k0.mu", 0.0));
     assert_eq!(probe.recv_timeout(Duration::from_secs(60)).expect("runner answers"), 0.16);
     assert!(control.take_errors().is_empty());
 }

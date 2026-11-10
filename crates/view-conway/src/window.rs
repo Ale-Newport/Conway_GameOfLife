@@ -11,12 +11,12 @@ use std::sync::{Arc, Mutex};
 use bevy::prelude::*;
 use bevy_egui::egui::{self, Color32, RichText, Sense, Stroke, Ui, vec2};
 use bevy_egui::{EguiClipboard, EguiContexts};
-use cellular_automata::CellRect;
+use cellular_automata::{CellRect, LifeSim};
 use interface::theme::with_alpha;
 use interface::widgets::badge;
 use interface::{DataLocation, ModeRegistry, Palette, ThemeSettings, Toasts};
 use patterns::{LifeRule, Pattern};
-use simulation_core::Simulation;
+use simulation_core::{Control, Simulation};
 
 use crate::commands::{ModeCommand, ModeCommands};
 use crate::geometry::thumbnail_rgba;
@@ -182,7 +182,7 @@ fn request_export(
     selection: Option<CellRect>,
 ) -> Receiver<Result<ExportText, String>> {
     let (tx, rx) = mpsc::channel();
-    runner.0.exec(move |sim| {
+    runner.send(Control::Query(Box::new(move |sim: &LifeSim| {
         let generation = sim.tick();
         let rect = match (scope, selection) {
             (ExportScope::Selection, Some(rect)) => Some(rect),
@@ -231,7 +231,7 @@ fn request_export(
         if let Err(e) = spawned {
             warn!("could not start the RLE writer: {e}");
         }
-    });
+    })));
     rx
 }
 
@@ -954,6 +954,20 @@ fn export_tab(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Exports read the model without changing it.
+    #[test]
+    fn exports_are_reads() {
+        let runner = ConwayRunner(Arc::new(simulation_core::Runner::spawn(
+            LifeSim::conway(4),
+            simulation_core::RunnerConfig::default(),
+        )));
+        let mut rx = None;
+        crate::commands::assert_reads_only(&runner, || rx = Some(request_export(&runner, ExportScope::World, None)));
+        let export = rx.unwrap().recv_timeout(std::time::Duration::from_secs(10)).unwrap().unwrap();
+        assert_eq!(export.generation, 0);
+        assert!(export.cells > 0);
+    }
 
     #[test]
     fn imports_report_formats_errors_and_rules() {

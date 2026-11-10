@@ -299,7 +299,7 @@ pub(crate) fn refresh_world(
         return;
     }
     world.since_refresh = Duration::ZERO;
-    let rx = runner.0.request(|sim| WorldInfo::capture(sim));
+    let rx = runner.0.query(WorldInfo::capture);
     world.pending.start(rx);
 }
 
@@ -365,7 +365,7 @@ pub(crate) fn poll_slice(
         return;
     }
     slice.requested = Some(key);
-    let rx = runner.0.request(move |sim| match sim.view(&VoxelViewRequest::Slice { axis, layer, window: None }) {
+    let rx = runner.0.query(move |sim| match sim.view(&VoxelViewRequest::Slice { axis, layer, window: None }) {
         VoxelView::Slice(view) => Some(view),
         _ => None,
     });
@@ -458,7 +458,7 @@ pub(crate) fn poll_region(
         return;
     }
     region.requested = Some(key);
-    let rx = runner.0.request(move |sim| count_region(sim, bounds));
+    let rx = runner.0.query(move |sim| count_region(sim, bounds));
     region.pending.start(rx);
 }
 
@@ -561,7 +561,7 @@ pub(crate) fn poll_probe(mut probe_state: ResMut<ProbeState>, runner: Res<VoxelR
         return;
     }
     probe_state.requested = Some(key);
-    let rx = runner.0.request(move |sim| probe(sim, pos));
+    let rx = runner.0.query(move |sim| probe(sim, pos));
     probe_state.pending.start(rx);
 }
 
@@ -573,6 +573,51 @@ mod tests {
 
     fn life(id: &str) -> VoxelLife {
         VoxelLife::new(scenarios::builtin_by_id(id).expect("builtin")).expect("valid")
+    }
+
+    /// The slice inspector, the region counts and the probe read the model
+    /// without changing it: once a later speed change shows in the status,
+    /// no metric sample was recorded and no view was published.
+    #[test]
+    fn inspector_reads_are_queries() {
+        use bevy::ecs::system::RunSystemOnce;
+        use simulation_core::{Control, Speed};
+        use std::time::Instant;
+        let runner = VoxelRunner(Arc::new(crate::session::spawn_runner(life("life-5766-glider"))));
+        let fence = |speed: Speed| {
+            runner.0.send(Control::SetSpeed(speed));
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while runner.0.status().speed != speed {
+                assert!(Instant::now() < deadline, "the runner did not answer");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        };
+        let mut world = World::new();
+        world.insert_resource(runner.clone());
+        world.init_resource::<MeshState>();
+        let mut settings = ViewSettings::default();
+        settings.region.enabled = true;
+        world.insert_resource(settings);
+        world.init_resource::<SliceState>();
+        world.init_resource::<RegionState>();
+        world.insert_resource(ProbeState { pinned: Some([0, 0, 0]), ..ProbeState::default() });
+        let read = |world: &mut World| {
+            world.resource_mut::<SliceState>().wanted = true;
+            world.run_system_once(poll_slice).unwrap();
+            world.run_system_once(poll_region).unwrap();
+            world.run_system_once(poll_probe).unwrap();
+        };
+        fence(Speed::TicksPerSecond(3.0));
+        runner.0.drain_metrics();
+        let seq = runner.0.latest_view().map(|v| v.seq);
+        read(&mut world);
+        fence(Speed::TicksPerSecond(5.0));
+        assert!(runner.0.drain_metrics().is_empty(), "a read recorded a metric sample");
+        assert_eq!(runner.0.latest_view().map(|v| v.seq), seq, "a read published a view");
+        read(&mut world);
+        assert!(world.resource::<SliceState>().view.is_some());
+        assert!(world.resource::<RegionState>().counts.is_some());
+        assert!(world.resource::<ProbeState>().result.is_some());
     }
 
     #[test]

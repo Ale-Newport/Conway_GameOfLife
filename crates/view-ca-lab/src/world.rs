@@ -560,7 +560,7 @@ pub(crate) fn frame_world(
     if fit.refresh {
         fit.refresh = false;
         match &runner {
-            Some(runner) => *pending_query = Some(runner.0.request(|sim| initial_fit(sim))),
+            Some(runner) => *pending_query = Some(runner.0.query(initial_fit)),
             None => fit.pending = fit.target.is_some(),
         }
     }
@@ -1059,6 +1059,47 @@ mod tests {
         let age = ViewSettings { colouring: Colouring::Age, ..default() };
         assert_eq!(appearance(&life(Topology::Torus), &age, 4).style, GridStyle::Age);
         assert_eq!(state_colors(&ww), family::WIREWORLD.to_vec());
+    }
+
+    /// Framing measures the world on the simulation thread without changing
+    /// it: once a later speed change shows in the status, no metric sample
+    /// was recorded and no view was published.
+    #[test]
+    fn framing_reads_are_queries() {
+        use bevy::ecs::system::RunSystemOnce;
+        use simulation_core::Speed;
+        use std::time::{Duration, Instant};
+        let sim = crate::sim::tests::lab("wireworld-circuits");
+        let runner = LabRunner(crate::session::spawn_runner(sim, Speed::TicksPerSecond(1.0)));
+        let fence = |speed: Speed| {
+            runner.0.send(Control::SetSpeed(speed));
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while runner.0.status().speed != speed {
+                assert!(Instant::now() < deadline, "the runner did not answer");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        };
+        let mut world = bevy::ecs::world::World::new();
+        world.insert_resource(runner.clone());
+        world.init_resource::<WorldInput>();
+        world.init_resource::<AccumulatedMouseScroll>();
+        world.init_resource::<ButtonInput<MouseButton>>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.init_resource::<FitQuery>();
+        world.init_resource::<ViewSettings>();
+        world.init_resource::<OverlayInset>();
+        world.init_resource::<CameraFit>();
+        world.resource_mut::<CameraFit>().refit();
+        world.spawn((LabCamera, GridCameraController::default()));
+        fence(Speed::TicksPerSecond(3.0));
+        runner.0.drain_metrics();
+        let seq = runner.0.latest_view().map(|v| v.seq);
+        world.run_system_once(frame_world).expect("frame_world runs");
+        fence(Speed::TicksPerSecond(5.0));
+        assert!(runner.0.drain_metrics().is_empty(), "the read recorded a metric sample");
+        assert_eq!(runner.0.latest_view().map(|v| v.seq), seq, "the read published a view");
+        world.run_system_once(frame_world).expect("frame_world runs");
+        assert!(world.resource::<CameraFit>().target.is_some(), "the extent was read");
     }
 
     /// Pan keys pressed with Ctrl, Cmd or Alt are shortcuts (Ctrl+arrows
