@@ -12,11 +12,13 @@ use cellular_automata::{RulePreset, Symmetry, WolframCommand};
 use egui_plot::{AxisHints, GridMark, Line, Plot, PlotPoints};
 use interface::format::{format_compact, format_count};
 use interface::theme::with_alpha;
-use interface::widgets::{badge, gradient_bar, legend_row, swatch};
+use interface::widgets::legend::gradient_bar_with_mid;
+use interface::widgets::{badge, legend_row, swatch};
 use interface::{ActiveSession, MetricsHistory, ModeRegistry, Palette, SessionStatus, ThemeSettings};
 use patterns::{GenerationsRule, LifeRule};
 use rendering::WorldInput;
-use rendering::grid::{VisibleCells, age_ramp_position};
+use rendering::grid::VisibleCells;
+use rendering::grid::style::{AGE_LEGEND_AGES, age_ramp_position};
 use simulation_core::{Control, ParamSet, ParamValue, Topology};
 
 use crate::family::{self, Family, Rgb, color32};
@@ -1552,12 +1554,6 @@ fn legend_entries(info: &LabInfo) -> Vec<(Rgb, String)> {
     }
 }
 
-/// Ages (generations) of the Age legend's stops. Powers of two are evenly
-/// spaced on the logarithmic scale of the shader ([`age_ramp_position`];
-/// 255 is almost 2⁸), so the evenly spaced stops follow it and 16 sits in
-/// the middle.
-const AGE_LEGEND_AGES: [u8; 9] = [1, 2, 4, 8, 16, 32, 64, 128, 255];
-
 /// Colour ramp of a colouring that reads the age or activity channel.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RampLegend {
@@ -1597,20 +1593,6 @@ pub fn ramp_legend(info: &LabInfo, settings: &ViewSettings) -> Option<RampLegend
         })
         .collect();
     Some(RampLegend { stops, low, mid, high })
-}
-
-/// [`gradient_bar`] of a ramp legend, with its middle label centred under
-/// the bar on the row of the end labels.
-fn ramp_bar(ui: &mut Ui, ramp: &RampLegend, width: f32) {
-    let rect = ui.scope(|ui| gradient_bar(ui, &ramp.stops, width, ramp.low, ramp.high)).response.rect;
-    if let Some(mid) = ramp.mid {
-        let color = ui.visuals().text_color();
-        let galley = ui.painter().layout_no_wrap(mid.to_owned(), egui::TextStyle::Small.resolve(ui.style()), color);
-        // The end labels are centred in a row at least `interact_size.y` tall.
-        let row = ui.spacing().interact_size.y.max(galley.size().y);
-        let centre = egui::pos2(rect.min.x + width / 2.0, rect.max.y - row / 2.0);
-        ui.painter().galley(centre - galley.size() / 2.0, galley, color);
-    }
 }
 
 /// What a zoomed-out texel (`k` × `k` cells) shows, or `None` at one texel per cell.
@@ -1722,7 +1704,7 @@ pub(crate) fn overlay_panel(
                 }
             });
             if let Some(ramp) = ramp_legend(info, &settings) {
-                ramp_bar(ui, &ramp, 200.0);
+                gradient_bar_with_mid(ui, &ramp.stops, 200.0, ramp.low, ramp.mid, ramp.high);
             }
             let k = view.grid.cells_per_texel;
             if let Some(note) = zoom_note(info, &settings, k) {

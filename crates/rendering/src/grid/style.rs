@@ -115,6 +115,13 @@ pub fn age_ramp_position(age: u8) -> f32 {
     AGE_RAMP_MIN + (1.0 - AGE_RAMP_MIN) * generations.log2() / 255f32.log2()
 }
 
+/// Ages (generations) of the evenly spaced stops of an Age legend, from the
+/// newborn to the oldest tracked age. Powers of two are evenly spaced on the
+/// logarithmic scale of [`age_ramp_position`] (255 is almost 2⁸), so a bar
+/// with the ramp colours of these ages follows the shader, and 16, the
+/// middle entry, sits in its middle.
+pub const AGE_LEGEND_AGES: [u8; 9] = [1, 2, 4, 8, 16, 32, 64, 128, 255];
+
 /// Appearance of one grid surface. Changing it updates the material uniforms
 /// only; the uploaded frame stays untouched.
 #[derive(Component, Clone, Debug, PartialEq)]
@@ -353,6 +360,17 @@ mod tests {
         // Ages 1 to 20 cover more than half of the ramp from its minimum.
         assert!(age_ramp_position(20) - AGE_RAMP_MIN > 0.5 * (1.0 - AGE_RAMP_MIN));
         assert!((1..=255).map(age_ramp_position).collect::<Vec<_>>().windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn age_legend_stops_are_evenly_spaced_on_the_age_scale() {
+        let positions = AGE_LEGEND_AGES.map(age_ramp_position);
+        let n = positions.len() - 1;
+        for (i, position) in positions.into_iter().enumerate() {
+            let even = AGE_RAMP_MIN + (1.0 - AGE_RAMP_MIN) * i as f32 / n as f32;
+            assert!((position - even).abs() < 1e-3, "age {}: {position} instead of {even}", AGE_LEGEND_AGES[i]);
+        }
+        assert_eq!((AGE_LEGEND_AGES[0], AGE_LEGEND_AGES[n / 2], AGE_LEGEND_AGES[n]), (1, 16, 255));
     }
 
     #[test]

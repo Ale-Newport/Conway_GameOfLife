@@ -5,7 +5,8 @@
 //! per mode ([`crate::mode::ModeCard::accent`]); the light theme darkens it
 //! to at least 3:1 contrast against the panels and the high-contrast theme
 //! brightens it to at least 7:1. Selected text is the accent shaded to 4.5:1
-//! on the selection fill (7:1 in high contrast).
+//! on the selection fill and links are the accent shaded to 4.5:1 on the
+//! panels and the stripes of striped grids (7:1 in high contrast).
 
 use bevy::prelude::*;
 use bevy_egui::egui::{self, Color32, CornerRadius, FontId, Margin, Shadow, Stroke, TextStyle};
@@ -308,16 +309,20 @@ fn visuals(p: &Palette) -> egui::Visuals {
     // Opaque: bevy_egui blends in linear light (sRGB target), where a
     // translucent accent over the light panel washes out to grey.
     let selection_fill = mix(p.panel, p.accent, 0.35);
-    // Selected text and icons (and the focused text-edit outline): the accent,
-    // darkened in the light theme and lightened in the dark ones until it
-    // reads on the selection fill (WCAG 4.5:1, 7:1 in high contrast).
-    let selection_ink = shade_for_contrast(
-        p.accent,
-        selection_fill,
-        if p.dark { Color32::WHITE } else { Color32::BLACK },
-        0.1,
-        if hc { 7.0 } else { 4.5 },
-    );
+    // Stripes of striped grids: a shade closer to the text than the panel.
+    let faint_bg = mix(p.panel, p.surface, 0.5);
+    // Text in the accent colour: the accent, darkened in the light theme and
+    // lightened in the dark ones until it reads on `background` (WCAG 4.5:1,
+    // 7:1 in high contrast).
+    let accent_text = |background| {
+        let target = if p.dark { Color32::WHITE } else { Color32::BLACK };
+        shade_for_contrast(p.accent, background, target, 0.1, if hc { 7.0 } else { 4.5 })
+    };
+    // Selected text and icons (and the focused text-edit outline) on the selection fill.
+    let selection_ink = accent_text(selection_fill);
+    // Links (and the Markdown emphasis tinted from them) on the stripes, where
+    // they read slightly worse than on the panel.
+    let link = accent_text(faint_bg);
     let shadow_alpha = if p.dark { 110 } else { 40 };
     egui::Visuals {
         dark_mode: p.dark,
@@ -325,8 +330,8 @@ fn visuals(p: &Palette) -> egui::Visuals {
         weak_text_color: Some(p.text_muted),
         widgets,
         selection: egui::style::Selection { bg_fill: selection_fill, stroke: Stroke::new(1.0, selection_ink) },
-        hyperlink_color: p.accent,
-        faint_bg_color: mix(p.panel, p.surface, 0.5),
+        hyperlink_color: link,
+        faint_bg_color: faint_bg,
         extreme_bg_color: if p.dark { mix(p.background, Color32::BLACK, 0.3) } else { Color32::WHITE },
         code_bg_color: p.surface_hi,
         warn_fg_color: p.warning,
@@ -465,6 +470,46 @@ mod tests {
                 // The same colour outlines the focused text edit (WCAG 3:1 for UI components).
                 let ratio = contrast_ratio(selection.stroke.color, p.panel);
                 assert!(ratio >= 3.0, "{kind:?} {mode:?}: focus outline at {ratio:.2}:1");
+            }
+        }
+    }
+
+    #[test]
+    fn links_are_readable_in_every_theme_and_accent() {
+        use egui::epaint::Shape;
+        let ctx = egui::Context::default();
+        for kind in ThemeKind::ALL {
+            let min_text = if kind == ThemeKind::HighContrast { 7.0 } else { 4.5 };
+            for mode in crate::mode::AppMode::ALL {
+                let p = Palette::new(kind, mode.default_accent());
+                apply_palette(&ctx, &p);
+                let visuals = ctx.global_style().visuals.clone();
+                let link = visuals.hyperlink_color;
+                // Panels and windows, and the stripes of striped grids (the About window's libraries).
+                for background in [p.panel, visuals.faint_bg_color] {
+                    let ratio = contrast_ratio(link, background);
+                    assert!(ratio >= min_text, "{kind:?} {mode:?}: link at {ratio:.2}:1 on {}", hex(background));
+                }
+                let (hue, accent_hue) = (chroma_and_hue(link).1, chroma_and_hue(p.accent).1);
+                let gap = (hue - accent_hue).abs();
+                assert!(gap.min(360.0 - gap) <= 15.0, "{kind:?} {mode:?}: the link is not the accent's hue");
+                // Links paint in that colour, although the theme overrides the text colour.
+                let output = crate::run_headless_ui(&ctx, |ui| {
+                    ui.add(egui::Link::new("Person #3"));
+                    ui.hyperlink_to("website", "https://bevy.org");
+                });
+                let painted: Vec<Color32> = output
+                    .shapes
+                    .iter()
+                    .filter_map(|clipped| match &clipped.shape {
+                        Shape::Text(text) => {
+                            let color = text.galley.job.sections[0].format.color;
+                            Some(if color == Color32::PLACEHOLDER { text.fallback_color } else { color })
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(painted, [link, link], "{kind:?} {mode:?}");
             }
         }
     }

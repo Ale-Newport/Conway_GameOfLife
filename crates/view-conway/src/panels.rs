@@ -8,8 +8,9 @@ use bevy_egui::egui::{self, Color32, RichText, Sense, Stroke, Ui, vec2};
 use cellular_automata::{EngineChoice, EngineKind, PasteMode, Symmetry};
 use egui_plot::{AxisHints, Line, Plot, PlotPoints};
 use interface::theme::with_alpha;
+use interface::widgets::legend::gradient_bar_with_mid;
 use interface::widgets::metrics::plot_points;
-use interface::widgets::{PlotWindow, badge, gradient_bar, legend_chip, legend_row};
+use interface::widgets::{PlotWindow, badge, legend_chip, legend_row};
 use interface::{MetricsHistory, ModeRegistry, Palette, SessionStatus, ThemeSettings};
 use rendering::WorldInput;
 use rendering::grid::VisibleCells;
@@ -986,7 +987,7 @@ pub(crate) fn overlay_panel(
                 return;
             }
             ui.label(muted(format!("{} · {}", world_summary(info.world), engine_name(info.engine)), &palette));
-            overlay_legend(ui, &palette, &settings);
+            overlay_legend(ui, &settings);
             let cpp = visible.cells_per_pixel;
             if cpp > 0.0 {
                 let zoom = if cpp <= 1.0 {
@@ -1019,7 +1020,7 @@ pub(crate) fn overlay_panel(
     }
 }
 
-fn overlay_legend(ui: &mut Ui, palette: &Palette, settings: &ViewSettings) {
+fn overlay_legend(ui: &mut Ui, settings: &ViewSettings) {
     match legend(settings) {
         Legend::States { alive, dead } => {
             ui.horizontal(|ui| {
@@ -1027,12 +1028,11 @@ fn overlay_legend(ui: &mut Ui, palette: &Palette, settings: &ViewSettings) {
                 legend_chip(ui, dead, "dead");
             });
         }
-        Legend::Ramp { stops, low, high, alive } => {
+        Legend::Ramp { stops, low, mid, high, alive } => {
             if let Some(alive) = alive {
                 legend_chip(ui, alive, "alive");
             }
-            gradient_bar(ui, &stops, 230.0, low, high);
-            let _ = palette;
+            gradient_bar_with_mid(ui, &stops, 230.0, low, mid, high);
         }
     }
 }

@@ -364,6 +364,15 @@ sliders) are painted with an opaque mix of the panel and the accent (35 %)
 in every theme: bevy_egui blends in linear light, where a translucent accent
 over the light panel would wash out to grey (a unit test checks the colour
 as composited on screen).
+Text in the accent colour is the accent shaded (darkened in the light
+theme, lightened in the dark ones) until it reads as text, at least 4.5:1
+(7:1 in high contrast): selected text and icons (selected labels and
+buttons, text selections, the focused text-edit outline) on the selection
+fill, and links on the panel and on the stripes of striped grids. Links are
+egui's link widgets (`ui.link`, `ui.hyperlink_to`, as in the About window),
+which paint in `Visuals::hyperlink_color`, and Markdown emphasis is the text
+colour tinted toward it; draw clickable text with them rather than with
+`Palette::accent`. Unit tests check every theme and mode accent.
 
 ## 4. Desktop application
 

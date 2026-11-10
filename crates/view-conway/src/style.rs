@@ -5,7 +5,7 @@
 
 use bevy::prelude::*;
 use bevy_egui::egui::Color32;
-use rendering::grid::age_ramp_position;
+use rendering::grid::style::{AGE_LEGEND_AGES, age_ramp_position};
 use rendering::palette::{Colormap, GridPalette};
 use rendering::{GridAppearance, GridStyle};
 use serde::{Deserialize, Serialize};
@@ -276,12 +276,6 @@ pub fn ramp_stops(map: Colormap, n: usize) -> Vec<Color32> {
     map.stops(n.max(2)).into_iter().map(egui_color).collect()
 }
 
-/// Ages (generations) of the Age legend's stops. Powers of two are evenly
-/// spaced on the logarithmic scale of [`age_ramp_position`] (255 is almost
-/// 2⁸), so the evenly spaced stops follow the shader and 16 sits in the
-/// middle.
-const AGE_LEGEND_AGES: [u8; 9] = [1, 2, 4, 8, 16, 32, 64, 128, 255];
-
 /// Legend colours of the Age style: the colours the shader gives cells of
 /// the ages in [`AGE_LEGEND_AGES`].
 fn age_stops(map: Colormap) -> Vec<Color32> {
@@ -304,6 +298,8 @@ pub enum Legend {
         stops: Vec<Color32>,
         /// Label of the low end.
         low: &'static str,
+        /// Label under the middle of the ramp.
+        mid: Option<&'static str>,
         /// Label of the high end.
         high: &'static str,
         /// Optional live-cell chip drawn over the ramp (trails).
@@ -317,12 +313,20 @@ pub fn legend(settings: &ViewSettings) -> Legend {
     let map = settings.style.ramp();
     let stops = if settings.style == RenderStyle::Age { age_stops(map) } else { ramp_stops(map, 12) };
     match settings.style {
-        RenderStyle::Age => Legend::Ramp { stops, low: "1 generation", high: "255+ (log scale)", alive: None },
-        RenderStyle::Trails => {
-            Legend::Ramp { stops, low: "16 ticks ago", high: "changed this tick", alive: Some(color32(alive)) }
+        RenderStyle::Age => {
+            Legend::Ramp { stops, low: "1 generation", mid: Some("16"), high: "255+ (log scale)", alive: None }
         }
-        RenderStyle::Heat => Legend::Ramp { stops, low: "no change", high: "changed this tick", alive: None },
-        RenderStyle::Density => Legend::Ramp { stops, low: "0 % alive", high: "100 % alive", alive: None },
+        RenderStyle::Trails => Legend::Ramp {
+            stops,
+            low: "16 ticks ago",
+            mid: None,
+            high: "changed this tick",
+            alive: Some(color32(alive)),
+        },
+        RenderStyle::Heat => {
+            Legend::Ramp { stops, low: "no change", mid: None, high: "changed this tick", alive: None }
+        }
+        RenderStyle::Density => Legend::Ramp { stops, low: "0 % alive", mid: None, high: "100 % alive", alive: None },
         _ => Legend::States { alive: color32(alive), dead: color32(dead) },
     }
 }
@@ -377,8 +381,9 @@ mod tests {
         let s = ViewSettings::default();
         assert_eq!(legend(&s), Legend::States { alive: color32([90, 169, 255]), dead: color32([12, 16, 23]) });
         match legend(&ViewSettings { style: RenderStyle::Trails, ..default() }) {
-            Legend::Ramp { stops, alive, .. } => {
+            Legend::Ramp { stops, mid, alive, .. } => {
                 assert_eq!(stops.len(), 12);
+                assert_eq!(mid, None, "a linear ramp needs no middle label");
                 assert!(alive.is_some());
             }
             other => panic!("unexpected legend {other:?}"),
@@ -391,10 +396,13 @@ mod tests {
     #[test]
     fn age_legend_matches_the_shader_scale() {
         let settings = ViewSettings { style: RenderStyle::Age, ..default() };
-        let Legend::Ramp { stops, .. } = legend(&settings) else { panic!("the Age style has a ramp legend") };
+        let Legend::Ramp { stops, low, mid, high, .. } = legend(&settings) else {
+            panic!("the Age style has a ramp legend")
+        };
         let shader = |age: u8| egui_color(appearance(&settings).ramp.sample(age_ramp_position(age)));
         let ends = [stops[0], stops[stops.len() / 2], stops[stops.len() - 1]];
         assert_eq!(ends, [shader(1), shader(16), shader(255)], "1, 16 and 255 generations: start, middle, end");
+        assert_eq!((low, mid, high), ("1 generation", Some("16"), "255+ (log scale)"), "the labels name them");
         // Between stops the bar interpolates linearly, which bends a little
         // less than the colormap.
         for age in [2, 3, 7, 40, 100, 200] {
