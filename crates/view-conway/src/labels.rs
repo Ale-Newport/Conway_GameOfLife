@@ -1,0 +1,310 @@
+//! Text helpers: exact (possibly huge) numbers, explanations of topologies and
+//! engines derived from the model's own selection rules, and fallbacks for
+//! characters egui's built-in fonts cannot draw.
+
+use cellular_automata::engine::{
+    AUTO_DENSE_MAX_CELLS, AUTO_HASHLIFE_MIN_POPULATION, AUTO_HASHLIFE_MIN_REGULARITY, AUTO_HASHLIFE_MIN_STEP,
+    MAX_DENSE_CELLS, MAX_DENSE_WINDOW_CELLS,
+};
+use cellular_automata::{EngineChoice, EngineKind, World};
+use simulation_core::Topology;
+
+/// Live cells above which the user interface refuses engine switches away
+/// from Hashlife: a switch exports every live cell one by one into the new
+/// engine, which for astronomically large Hashlife patterns would exhaust
+/// memory.
+pub const MAX_TRANSFER_CELLS: u128 = 1 << 24;
+
+/// Integer with thousands separators (`1,099,511,627,776`).
+pub fn thousands(value: u128) -> String {
+    let digits = value.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Power-of-two reading of a large count: `2^40` when exact, `≈ 2^40.3`
+/// otherwise; `None` below 2^16, where the plain number is readable.
+pub fn power_of_two_hint(value: u128) -> Option<String> {
+    if value < 1 << 16 {
+        return None;
+    }
+    if value.is_power_of_two() {
+        return Some(format!("2^{}", value.trailing_zeros()));
+    }
+    Some(format!("≈ 2^{:.1}", (value as f64).log2()))
+}
+
+/// A fraction as a percentage with three significant digits (`4.65 %`,
+/// `0.00253 %`); exactly `0 %` for zero.
+pub fn percent(fraction: f64) -> String {
+    let p = fraction * 100.0;
+    if p == 0.0 || !p.is_finite() {
+        return "0 %".into();
+    }
+    let digits = (2 - p.abs().log10().floor() as i32).clamp(0, 12) as usize;
+    format!("{p:.digits$} %")
+}
+
+/// Short topology name.
+pub fn topology_name(topology: Topology) -> &'static str {
+    match topology {
+        Topology::Bounded => "Bounded plane",
+        Topology::Torus => "Torus",
+        Topology::KleinBottle => "Klein bottle",
+        Topology::CrossSurface => "Cross-surface",
+        Topology::Infinite => "Infinite plane",
+    }
+}
+
+/// One-sentence description of how a topology joins the edges (matches
+/// `LifeSim`'s rules text and `Topology::wrap`).
+pub fn topology_blurb(topology: Topology) -> &'static str {
+    match topology {
+        Topology::Bounded => "Cells outside the W × H rectangle are permanently dead; gliders die at the walls.",
+        Topology::Torus => "Opposite edges are joined: what leaves on one side comes back on the other.",
+        Topology::KleinBottle => {
+            "Left and right edges are joined; crossing the top or bottom edge also mirrors x (x becomes W - 1 - x)."
+        }
+        Topology::CrossSurface => {
+            "Crossing the top or bottom edge mirrors x, crossing the left or right edge mirrors y (projective plane)."
+        }
+        Topology::Infinite => "Unbounded in every direction with 64-bit coordinates; W × H is only the home region.",
+    }
+}
+
+/// World summary: `512 × 512 torus` or `infinite plane (home 256 × 192)`.
+pub fn world_summary(world: World) -> String {
+    match world.topology {
+        Topology::Infinite => format!("Infinite plane · home {} × {}", world.width, world.height),
+        t => format!("{} × {} {}", world.width, world.height, topology_name(t).to_lowercase()),
+    }
+}
+
+/// Short engine name.
+pub fn engine_name(kind: EngineKind) -> &'static str {
+    match kind {
+        EngineKind::Dense => "Dense",
+        EngineKind::Bit => "Bit-packed",
+        EngineKind::Sparse => "Sparse tiles",
+        EngineKind::Hashlife => "Hashlife",
+    }
+}
+
+/// What an engine does (from `docs/models/cellular-automata.md` §2).
+pub fn engine_blurb(kind: EngineKind) -> &'static str {
+    match kind {
+        EngineKind::Dense => {
+            "One byte per cell with a ghost ring, stepped through a lookup table into a second buffer."
+        }
+        EngineKind::Bit => {
+            "64 cells per machine word, neighbours counted with bitwise full adders on parallel row bands."
+        }
+        EngineKind::Sparse => {
+            "64 × 64 bit tiles in a hash map; only tiles that changed in the last generation (and their neighbours) \
+             are recomputed."
+        }
+        EngineKind::Hashlife => {
+            "Gosper's quadtree with hash-consed nodes and memoised results: identical squares are stored and \
+             computed once, and a tick of 2^k generations is one memoised jump."
+        }
+    }
+}
+
+/// Engine choice label.
+pub fn choice_name(choice: EngineChoice) -> &'static str {
+    match choice.fixed() {
+        None => "Automatic",
+        Some(kind) => engine_name(kind),
+    }
+}
+
+/// Why the automatic choice runs `kind` on `world` with `generations` per
+/// tick, following `cellular_automata::select_engine`.
+pub fn auto_reason(world: World, kind: EngineKind, generations: u64) -> String {
+    let cells = world.cell_count();
+    let pow2 = generations.is_power_of_two();
+    let note =
+        "The choice is re-evaluated on reset, when a pattern is loaded and when the generations per tick change.";
+    let reason = match (world.is_finite(), kind) {
+        (true, EngineKind::Dense) => format!(
+            "Finite world of {} cells, at most {} (128 × 128): the byte-per-cell engine has the least overhead.",
+            thousands(u128::from(cells)),
+            thousands(u128::from(AUTO_DENSE_MAX_CELLS))
+        ),
+        (true, EngineKind::Bit) => format!(
+            "Finite world of {} cells, more than {} (128 × 128): packing 64 cells per word is fastest.",
+            thousands(u128::from(cells)),
+            thousands(u128::from(AUTO_DENSE_MAX_CELLS))
+        ),
+        (false, EngineKind::Hashlife) if pow2 && generations >= AUTO_HASHLIFE_MIN_STEP => format!(
+            "Infinite plane with {generations} generations per tick, a power of two of at least \
+             {AUTO_HASHLIFE_MIN_STEP}: Hashlife advances each tick in one memoised jump."
+        ),
+        (false, EngineKind::Hashlife) => format!(
+            "Infinite plane with a large, regular pattern (at the last selection: at least {} live cells and a tile \
+             regularity of at least {AUTO_HASHLIFE_MIN_REGULARITY}): Hashlife shares the repeated structure.",
+            thousands(u128::from(AUTO_HASHLIFE_MIN_POPULATION))
+        ),
+        (false, EngineKind::Sparse) => format!(
+            "Infinite plane with {generations} generation(s) per tick (below {AUTO_HASHLIFE_MIN_STEP} or not a \
+             power of two) and no large regular pattern: sparse tiles cost only where cells change."
+        ),
+        _ => "The automatic choice has not been re-evaluated since the world changed.".to_string(),
+    };
+    format!("{reason} {note}")
+}
+
+/// Why the automatic engine choice must not be re-run now, or `None`. To
+/// measure regularity, `LifeSim`'s automatic choice lists every live cell
+/// once the population reaches 65,536; out of a huge Hashlife quadtree that
+/// list would exhaust memory. It is re-run when *Automatic* is selected and,
+/// while it is selected, when the generations per tick change.
+pub fn reselection_blocked(running: EngineKind, population: u128) -> Option<String> {
+    (running == EngineKind::Hashlife && population > MAX_TRANSFER_CELLS).then(|| {
+        format!(
+            "The automatic choice would list all {} live cells one by one to measure the pattern's regularity.",
+            thousands(population)
+        )
+    })
+}
+
+/// Why `choice` cannot be selected now, or `None` when it can. Mirrors the
+/// model's own checks (`EngineKind::check`, Hashlife's power-of-two ticks)
+/// and adds the user interface's transfer guards ([`MAX_TRANSFER_CELLS`]).
+pub fn choice_unavailable(
+    choice: EngineChoice,
+    world: World,
+    generations: u64,
+    running: EngineKind,
+    population: u128,
+    bbox_area: Option<u128>,
+) -> Option<String> {
+    let Some(kind) = choice.fixed() else { return reselection_blocked(running, population) };
+    let finite = world.is_finite();
+    match kind {
+        EngineKind::Bit if !finite => return Some("The bit-packed engine runs finite worlds only.".into()),
+        EngineKind::Sparse | EngineKind::Hashlife if finite => {
+            return Some(format!("{} runs the infinite plane only.", engine_name(kind)));
+        }
+        EngineKind::Dense if finite && world.cell_count() > MAX_DENSE_CELLS => {
+            return Some(format!(
+                "The dense engine accepts at most {} cells; this world has {}.",
+                thousands(u128::from(MAX_DENSE_CELLS)),
+                thousands(u128::from(world.cell_count()))
+            ));
+        }
+        EngineKind::Dense if !finite && bbox_area.is_some_and(|a| a > u128::from(MAX_DENSE_WINDOW_CELLS)) => {
+            return Some(format!(
+                "The live cells span more than the dense window's {} cells.",
+                thousands(u128::from(MAX_DENSE_WINDOW_CELLS))
+            ));
+        }
+        EngineKind::Hashlife if !generations.is_power_of_two() => {
+            return Some(format!("Hashlife advances in powers of two; {generations} generations per tick is not one."));
+        }
+        _ => {}
+    }
+    if running == EngineKind::Hashlife && kind != EngineKind::Hashlife && population > MAX_TRANSFER_CELLS {
+        return Some(format!(
+            "Switching would copy {} live cells one by one out of Hashlife's compressed quadtree.",
+            thousands(population)
+        ));
+    }
+    None
+}
+
+/// Replacements for characters of the model's texts that egui's built-in
+/// fonts cannot draw (they would render as boxes).
+const GLYPH_FALLBACKS: &[(char, &str)] = &[('∈', "in"), ('↦', "->"), ('→', "->"), ('−', "-")];
+
+/// `text` with every character egui cannot draw replaced.
+pub fn displayable(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match GLYPH_FALLBACKS.iter().find(|(x, _)| *x == c) {
+            Some((_, replacement)) => out.push_str(replacement),
+            None => out.push(c),
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn world(topology: Topology, w: u32, h: u32) -> World {
+        World::new(topology, w, h).expect("valid world")
+    }
+
+    #[test]
+    fn huge_numbers_are_exact() {
+        assert_eq!(thousands(0), "0");
+        assert_eq!(thousands(999), "999");
+        assert_eq!(thousands(1_000), "1,000");
+        assert_eq!(thousands(1 << 40), "1,099,511,627,776");
+        assert_eq!(thousands(u128::from(u64::MAX)), "18,446,744,073,709,551,615");
+        assert_eq!(power_of_two_hint(1000), None);
+        assert_eq!(power_of_two_hint(1 << 40).as_deref(), Some("2^40"));
+        assert_eq!(power_of_two_hint(3 << 20).as_deref(), Some("≈ 2^21.6"));
+        assert_eq!(percent(0.04651), "4.65 %");
+        assert_eq!(percent(0.5), "50.0 %");
+        assert_eq!(percent(1.0), "100 %");
+        assert_eq!(percent(0.0000253), "0.00253 %");
+        assert_eq!(percent(0.0), "0 %");
+    }
+
+    #[test]
+    fn auto_reasons_follow_the_selection_rules() {
+        let small = world(Topology::Torus, 128, 128);
+        assert!(auto_reason(small, EngineKind::Dense, 1).contains("16,384 cells, at most 16,384"));
+        let large = world(Topology::Torus, 512, 512);
+        assert!(auto_reason(large, EngineKind::Bit, 1).contains("262,144 cells, more than"));
+        let inf = world(Topology::Infinite, 256, 256);
+        assert!(auto_reason(inf, EngineKind::Hashlife, 64).contains("64 generations per tick"));
+        assert!(auto_reason(inf, EngineKind::Hashlife, 1).contains("regular pattern"));
+        assert!(auto_reason(inf, EngineKind::Sparse, 1).contains("sparse tiles"));
+        assert!(auto_reason(inf, EngineKind::Bit, 1).contains("not been re-evaluated"));
+    }
+
+    #[test]
+    fn unavailable_engines_are_explained() {
+        let torus = world(Topology::Torus, 64, 64);
+        let inf = world(Topology::Infinite, 64, 64);
+        let none = |c, w, g| choice_unavailable(c, w, g, EngineKind::Dense, 10, Some(100));
+        assert!(none(EngineChoice::Auto, torus, 3).is_none());
+        assert!(none(EngineChoice::Bit, inf, 1).is_some());
+        assert!(none(EngineChoice::Sparse, torus, 1).is_some());
+        assert!(none(EngineChoice::Hashlife, inf, 3).unwrap().contains("powers of two"));
+        assert!(none(EngineChoice::Hashlife, inf, 4).is_none());
+        assert!(none(EngineChoice::Dense, inf, 1).is_none());
+        let huge = choice_unavailable(EngineChoice::Dense, inf, 1, EngineKind::Sparse, 10, Some(1 << 30));
+        assert!(huge.unwrap().contains("dense window"));
+        let leave = choice_unavailable(EngineChoice::Sparse, inf, 1, EngineKind::Hashlife, 1 << 30, None);
+        assert!(leave.unwrap().contains("copy"));
+        let stay = choice_unavailable(EngineChoice::Hashlife, inf, 1, EngineKind::Hashlife, 1 << 30, None);
+        assert!(stay.is_none());
+        let auto = choice_unavailable(EngineChoice::Auto, inf, 1, EngineKind::Hashlife, 1 << 30, None);
+        assert!(auto.unwrap().contains("regularity"));
+        assert!(choice_unavailable(EngineChoice::Auto, inf, 1, EngineKind::Hashlife, 1 << 20, None).is_none());
+        assert!(reselection_blocked(EngineKind::Sparse, 1 << 30).is_none());
+    }
+
+    #[test]
+    fn summaries_and_glyphs() {
+        assert_eq!(world_summary(world(Topology::Torus, 512, 256)), "512 × 256 torus");
+        assert_eq!(world_summary(world(Topology::Infinite, 256, 192)), "Infinite plane · home 256 × 192");
+        assert_eq!(displayable("n ∈ B, x ↦ W−1−x"), "n in B, x -> W-1-x");
+        for kind in EngineKind::ALL {
+            assert!(!engine_blurb(kind).is_empty() && !engine_name(kind).is_empty());
+        }
+        assert_eq!(choice_name(EngineChoice::Auto), "Automatic");
+        assert_eq!(choice_name(EngineChoice::Hashlife), "Hashlife");
+    }
+}
