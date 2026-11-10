@@ -1,5 +1,7 @@
 //! `HashlifeEngine`: the [`LifeEngine`] adapter over `hashlife::Universe`.
 
+use std::ops::Range;
+
 use hashlife::{MAX_STEP_EXPONENT, Rule, Universe};
 use patterns::LifeRule;
 use simulation_core::Topology;
@@ -18,14 +20,13 @@ use crate::view::TexelGrid;
 /// returns `None`. The `hashlife` crate keeps the population cached per
 /// quadtree node, so [`LifeEngine::population`] is constant time.
 ///
-/// Views use cached node populations for texels whose block lies inside the
-/// requested rectangle; texels on its border, whose blocks are only partly
-/// inside, are counted from the live cells of the border strips alone (no
-/// cell outside the request is read) as long as the strips hold at most
-/// [`BORDER_CELL_BUDGET`] live cells. Beyond that budget — only reachable by
-/// unaligned views cutting through enormous populations — a border texel is
-/// estimated as its whole block's cached population times the fraction of
-/// the block inside the request, so a view never enumerates more cells.
+/// Views and rectangle counts never list cells: texels whose block lies
+/// inside the requested rectangle add cached node populations
+/// (`Universe::density_grid`), and every other count — the border texels of
+/// unaligned views, whose blocks are only partly inside, and
+/// [`LifeEngine::count_in_rect`] — is `Universe::population_in_rect`, exact
+/// for any population at a cost bounded by the quadtree nodes crossing the
+/// rectangle's border.
 #[derive(Clone, Debug)]
 pub struct HashlifeEngine {
     universe: Universe,
@@ -71,173 +72,7 @@ impl HashlifeEngine {
         self.universe = universe;
         Ok(())
     }
-
-    /// Adds the live cells of `rect` inside the aligned square of side
-    /// `2^level` at `(x, y)`, which holds `population` live cells (a cached
-    /// quadtree population, saturated at `u32::MAX` by
-    /// `Universe::density_grid`), to `count`, stopping once it reaches
-    /// `limit`. A square inside `rect` adds its population; a square crossing
-    /// the border lists its overlap when it holds at most
-    /// [`LIST_UP_TO`] cells (every 8×8 leaf does) and otherwise descends into
-    /// its four children, whose populations one 2×2 density grid gives. So
-    /// only non-empty squares crossing the border are visited, plus, below
-    /// `limit`, the squares inside `rect` holding more than `u32::MAX` cells.
-    fn count_square(
-        &self,
-        rect: &CellRect,
-        (x, y): (i128, i128),
-        level: u32,
-        population: u32,
-        limit: u64,
-        count: &mut u64,
-    ) {
-        let last = (1i128 << level) - 1;
-        let (x0, y0) = (x.max(rect.x0.into()), y.max(rect.y0.into()));
-        let (x1, y1) = ((x + last).min(rect.x1.into()), (y + last).min(rect.y1.into()));
-        if population == 0 || *count >= limit || x0 > x1 || y0 > y1 {
-            return;
-        }
-        let inside = (x0, y0, x1, y1) == (x, y, x + last, y + last);
-        // A saturated population stands for at least u32::MAX cells.
-        if inside && (population < u32::MAX || count.saturating_add(u64::from(u32::MAX)) >= limit) {
-            *count += u64::from(population);
-            return;
-        }
-        // The overlap lies inside the i64 plane.
-        if population <= LIST_UP_TO {
-            let cells = self.universe.cells_in_rect(x0 as i64, y0 as i64, x1 as i64, y1 as i64, LIST_UP_TO as usize);
-            *count += cells.len() as u64;
-            return;
-        }
-        // An 8×8 leaf holds at most LIST_UP_TO cells, so `level > 3` here and
-        // a 2×2 grid of half-size squares is always a valid density grid.
-        let Ok(children) = self.universe.density_grid(x as i64, y as i64, 2, 2, level - 1) else {
-            return;
-        };
-        let half = 1i128 << (level - 1);
-        for (i, &child) in children.iter().enumerate() {
-            let corner = (x + half * (i % 2) as i128, y + half * (i / 2) as i128);
-            self.count_square(rect, corner, level - 1, child, limit, count);
-        }
-    }
-
-    fn bin(cells: &[(i64, i64)], grid: &TexelGrid, out: &mut [u32]) {
-        for &(x, y) in cells {
-            out[grid.index(x, y)] += 1;
-        }
-    }
-
-    /// [`LifeEngine::count_live`] with an explicit budget of live cells the
-    /// partly covered border strips may enumerate (see
-    /// [`BORDER_CELL_BUDGET`]).
-    fn count_live_with_budget(&self, grid: &TexelGrid, out: &mut [u32], mut budget: usize) {
-        let Some(clip) = grid.clip else {
-            return;
-        };
-        let k = 1i128 << grid.log2_k;
-        // Full texel columns: blocks [ox + i·k, ox + (i+1)·k) inside the clip.
-        let full = |origin: i64, lo: i64, hi: i64, len: u32| -> (i128, i128) {
-            let first = (i128::from(lo) - i128::from(origin) + k - 1).div_euclid(k);
-            let last = ((i128::from(hi) + 1 - i128::from(origin)).div_euclid(k) - 1).min(i128::from(len) - 1);
-            (first, last)
-        };
-        let (i0, i1) = full(grid.origin_x, clip.x0, clip.x1, grid.width);
-        let (j0, j1) = full(grid.origin_y, clip.y0, clip.y1, grid.height);
-        if i0 > i1 || j0 > j1 {
-            self.count_partial(clip, grid, out, &mut budget);
-            return;
-        }
-        let (cols, rows) = ((i1 - i0 + 1) as usize, (j1 - j0 + 1) as usize);
-        let x0 = (i128::from(grid.origin_x) + i0 * k) as i64;
-        let y0 = (i128::from(grid.origin_y) + j0 * k) as i64;
-        // The interior is at most the view budget, well under the density limit.
-        if let Ok(counts) = self.universe.density_grid(x0, y0, cols, rows, grid.log2_k) {
-            let width = grid.width as usize;
-            for r in 0..rows {
-                let base = (j0 as usize + r) * width + i0 as usize;
-                for (o, &c) in out[base..base + cols].iter_mut().zip(&counts[r * cols..(r + 1) * cols]) {
-                    *o = o.saturating_add(c);
-                }
-            }
-        }
-        // Border strips: the parts of the clip outside the full texels.
-        let inner_x0 = x0;
-        let inner_x1 = (i128::from(x0) + cols as i128 * k - 1) as i64;
-        let inner_y0 = y0;
-        let inner_y1 = (i128::from(y0) + rows as i128 * k - 1) as i64;
-        let mut strips = Vec::new();
-        if clip.x0 < inner_x0 {
-            strips.push(CellRect { x0: clip.x0, y0: clip.y0, x1: inner_x0 - 1, y1: clip.y1 });
-        }
-        if clip.x1 > inner_x1 {
-            strips.push(CellRect { x0: inner_x1 + 1, y0: clip.y0, x1: clip.x1, y1: clip.y1 });
-        }
-        if clip.y0 < inner_y0 {
-            strips.push(CellRect { x0: inner_x0, y0: clip.y0, x1: inner_x1, y1: inner_y0 - 1 });
-        }
-        if clip.y1 > inner_y1 {
-            strips.push(CellRect { x0: inner_x0, y0: inner_y1 + 1, x1: inner_x1, y1: clip.y1 });
-        }
-        for strip in strips {
-            self.count_partial(strip, grid, out, &mut budget);
-        }
-    }
-
-    /// Counts the live cells of `rect` (inside the clip, covering only partly
-    /// covered texels) exactly by enumerating them while the budget lasts;
-    /// beyond it, estimates every texel the rectangle touches as its whole
-    /// aligned block's cached population times the covered fraction of the
-    /// block.
-    fn count_partial(&self, rect: CellRect, grid: &TexelGrid, out: &mut [u32], budget: &mut usize) {
-        let cells = self.universe.cells_in_rect(rect.x0, rect.y0, rect.x1, rect.y1, budget.saturating_add(1));
-        if cells.len() <= *budget {
-            *budget -= cells.len();
-            Self::bin(&cells, grid, out);
-            return;
-        }
-        *budget = 0;
-        let (c0, c1) = (grid.column(rect.x0), grid.column(rect.x1));
-        let (r0, r1) = (grid.row(rect.y0), grid.row(rect.y1));
-        let (cols, rows) = (c1 - c0 + 1, r1 - r0 + 1);
-        let k = 1i128 << grid.log2_k;
-        let bx = (i128::from(grid.origin_x) + c0 as i128 * k) as i64;
-        let by = (i128::from(grid.origin_y) + r0 as i128 * k) as i64;
-        // One texel row or column (two texels thick at most when the clip has
-        // no full texel): far below the density-grid limit.
-        let Ok(blocks) = self.universe.density_grid(bx, by, cols, rows, grid.log2_k) else {
-            return;
-        };
-        let span = |origin: i64, t: usize, lo: i64, hi: i64| -> u128 {
-            let start = i128::from(origin) + t as i128 * k;
-            let (a, b) = (start.max(i128::from(lo)), (start + k - 1).min(i128::from(hi)));
-            if a > b { 0 } else { (b - a + 1) as u128 }
-        };
-        let area = (k * k) as u128;
-        let width = grid.width as usize;
-        for r in 0..rows {
-            let h = span(grid.origin_y, r0 + r, rect.y0, rect.y1);
-            for c in 0..cols {
-                let covered = span(grid.origin_x, c0 + c, rect.x0, rect.x1) * h;
-                let estimate = (u128::from(blocks[r * cols + c]) * covered + area / 2) / area;
-                let slot = &mut out[(r0 + r) * width + c0 + c];
-                *slot = slot.saturating_add(u32::try_from(estimate).unwrap_or(u32::MAX));
-            }
-        }
-    }
 }
-
-/// Live cells the partly covered border texels of one view may enumerate.
-/// Texels fully inside a request are counted exactly from cached quadtree
-/// populations; border texels (only when the request is not aligned to the
-/// texel grid) are counted exactly by enumerating their cells up to this
-/// budget, and estimated from their whole aligned block's cached population
-/// beyond it, so a view never enumerates more than this many cells.
-pub const BORDER_CELL_BUDGET: usize = 1 << 21;
-
-/// Squares crossing the border of a counted rectangle that hold at most
-/// this many live cells (every 8×8 quadtree leaf does) are counted by listing
-/// their overlap with the rectangle (see [`HashlifeEngine::count_square`]).
-const LIST_UP_TO: u32 = 64;
 
 impl LifeEngine for HashlifeEngine {
     fn kind(&self) -> EngineKind {
@@ -295,14 +130,8 @@ impl LifeEngine for HashlifeEngine {
     }
 
     fn count_in_rect(&self, rect: CellRect, limit: u64) -> u64 {
-        // The whole plane is the aligned square of side 2^64 at (i64::MIN, i64::MIN).
-        let corner = i64::MIN;
-        let Ok(plane) = self.universe.density_grid(corner, corner, 1, 1, 64) else {
-            return 0;
-        };
-        let mut count = 0;
-        self.count_square(&rect, (corner.into(), corner.into()), 64, plane[0], limit, &mut count);
-        count.min(limit)
+        let count = self.universe.population_in_rect(rect.x0, rect.y0, rect.x1, rect.y1);
+        u64::try_from(count).map_or(limit, |count| count.min(limit))
     }
 
     fn step(&mut self) -> Result<Option<GenStats>, CaError> {
@@ -332,7 +161,49 @@ impl LifeEngine for HashlifeEngine {
     }
 
     fn count_live(&self, grid: &TexelGrid, out: &mut [u32]) {
-        self.count_live_with_budget(grid, out, BORDER_CELL_BUDGET);
+        let Some(clip) = grid.clip else {
+            return;
+        };
+        let k = 1i128 << grid.log2_k;
+        // Texels whose whole block lies inside the clip, along one axis.
+        let full = |origin: i64, lo: i64, hi: i64, len: u32| -> Range<usize> {
+            let first = (i128::from(lo) - i128::from(origin) + k - 1).div_euclid(k).min(i128::from(len));
+            let end = (i128::from(hi) + 1 - i128::from(origin)).div_euclid(k).clamp(first, i128::from(len));
+            first as usize..end as usize
+        };
+        let cols = full(grid.origin_x, clip.x0, clip.x1, grid.width);
+        let rows = full(grid.origin_y, clip.y0, clip.y1, grid.height);
+        let width = grid.width as usize;
+        let block_start = |origin: i64, t: usize| i128::from(origin) + t as i128 * k;
+        if !cols.is_empty() && !rows.is_empty() {
+            // Both corners lie in the clip, so in the i64 plane; the interior is
+            // at most the view budget, far below the density-grid limit.
+            let (x0, y0) =
+                (block_start(grid.origin_x, cols.start) as i64, block_start(grid.origin_y, rows.start) as i64);
+            if let Ok(counts) = self.universe.density_grid(x0, y0, cols.len(), rows.len(), grid.log2_k) {
+                for (r, row) in rows.clone().zip(counts.chunks(cols.len())) {
+                    for (o, &c) in out[r * width + cols.start..r * width + cols.end].iter_mut().zip(row) {
+                        *o = o.saturating_add(c);
+                    }
+                }
+            }
+        }
+        // Border texels: the part of their block inside the clip.
+        for r in 0..grid.height as usize {
+            let skip = if rows.contains(&r) { cols.clone() } else { 0..0 };
+            let y = block_start(grid.origin_y, r);
+            for c in (0..skip.start).chain(skip.end..width) {
+                let x = block_start(grid.origin_x, c);
+                let (x0, x1) = (x.max(clip.x0.into()), (x + k - 1).min(clip.x1.into()));
+                let (y0, y1) = (y.max(clip.y0.into()), (y + k - 1).min(clip.y1.into()));
+                if x0 <= x1 && y0 <= y1 {
+                    // A non-empty overlap with the clip lies in the i64 plane.
+                    let count = self.universe.population_in_rect(x0 as i64, y0 as i64, x1 as i64, y1 as i64);
+                    let slot = &mut out[r * width + c];
+                    *slot = slot.saturating_add(u32::try_from(count).unwrap_or(u32::MAX));
+                }
+            }
+        }
     }
 
     fn memory_bytes(&self) -> usize {
@@ -352,6 +223,26 @@ impl LifeEngine for HashlifeEngine {
 mod tests {
     use super::*;
     use crate::view::GridViewRequest;
+
+    fn bin(cells: &[(i64, i64)], grid: &TexelGrid, out: &mut [u32]) {
+        for &(x, y) in cells {
+            out[grid.index(x, y)] += 1;
+        }
+    }
+
+    /// An engine holding a full `2^level × 2^level` square, built from a
+    /// macrocell file (one node per level). Golly's origin puts it at
+    /// `[-2^(level-1), 2^(level-1)) × [-2^(level-1) + 1, 2^(level-1) + 1)`.
+    fn full_square(level: u32) -> HashlifeEngine {
+        let mut text = String::from("[M2]\n");
+        text.push_str(&"********$".repeat(8));
+        for level in 4..=level {
+            text.push_str(&format!("\n{level} {i} {i} {i} {i}", i = level - 3));
+        }
+        let mut e = HashlifeEngine::new(LifeRule::conway()).unwrap();
+        e.set_universe(hashlife::macrocell::read(&text).unwrap()).unwrap();
+        e
+    }
 
     #[test]
     fn rejects_b0_and_runs_big_steps() {
@@ -374,33 +265,35 @@ mod tests {
         let mut fast = vec![0u32; grid.len()];
         e.count_live(&grid, &mut fast);
         let mut slow = vec![0u32; grid.len()];
-        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap()), &grid, &mut slow);
+        bin(&e.cells_in_rect(grid.clip.unwrap()), &grid, &mut slow);
         assert_eq!(fast, slow);
     }
 
     #[test]
-    fn border_texels_beyond_the_budget_are_estimated_from_block_populations() {
-        // A full 200×200 square: every block of the view below lies inside it,
-        // so the proportional estimate of a border texel is exact.
-        let mut e = HashlifeEngine::new(LifeRule::conway()).unwrap();
-        let square: Vec<(i64, i64)> = (-100..100).flat_map(|y| (-100..100).map(move |x| (x, y))).collect();
-        e.set_cells(&square, true);
-        let req = GridViewRequest { x0: -45, y0: -37, x1: 61, y1: 29, max_width: 9, max_height: 9 };
+    fn border_texels_are_exact_for_any_population() {
+        // A full 2^14 × 2^14 square (2^28 live cells) and a view inside it at
+        // 2^10 cells per texel: its unaligned border strips hold millions of
+        // live cells, and the top row of blocks has one empty row (the square
+        // starts one row below a block boundary), so a texel estimated from
+        // its block's population would be wrong there.
+        let e = full_square(14);
+        let s = e.bounding_box().unwrap();
+        assert_eq!((s.x0, s.y0, s.width(), s.height()), (-(1 << 13), 1 - (1 << 13), 1 << 14, 1 << 14));
+        let req = GridViewRequest {
+            x0: s.x0 + 300,
+            y0: s.y0 + 191,
+            x1: s.x1 - 77,
+            y1: s.y1 - 500,
+            max_width: 16,
+            max_height: 16,
+        };
         let grid = TexelGrid::plan(&req, None);
-        let mut exact = vec![0u32; grid.len()];
-        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap()), &grid, &mut exact);
-        for budget in [0, 50, 1 << 20] {
-            let mut got = vec![0u32; grid.len()];
-            e.count_live_with_budget(&grid, &mut got, budget);
-            assert_eq!(got, exact, "budget {budget}");
-        }
-        // A sparse pattern: the estimate stays within the covered cells.
-        let mut sparse = HashlifeEngine::new(LifeRule::conway()).unwrap();
-        sparse.set_cells(&[(-47, 0), (-40, 3), (60, 60)], true);
+        assert_eq!(grid.log2_k, 10);
         let mut got = vec![0u32; grid.len()];
-        sparse.count_live_with_budget(&grid, &mut got, 0);
-        let coverage = grid.coverage();
-        assert!(got.iter().zip(&coverage).all(|(&n, &c)| u64::from(n) <= c));
+        e.count_live(&grid, &mut got);
+        // Every requested cell is alive: each texel counts its covered cells.
+        let covered: Vec<u32> = grid.coverage().into_iter().map(|c| c as u32).collect();
+        assert_eq!(got, covered);
     }
 
     #[test]
@@ -436,19 +329,16 @@ mod tests {
             }
         }
         assert_eq!(e.count_in_rect(plane, u64::MAX), e.population());
-        // A full 2^17 × 2^17 square (2^34 cells, built from a macrocell file):
-        // the density grid saturates its blocks of 2^32 cells and more.
-        let mut text = String::from("[M2]\n");
-        text.push_str(&"********$".repeat(8));
-        for level in 4..=17 {
-            text.push_str(&format!("\n{level} {i} {i} {i} {i}", i = level - 3));
-        }
-        e.set_universe(hashlife::macrocell::read(&text).unwrap()).unwrap();
+        // A full 2^33 × 2^33 square: 2^66 live cells, more than a u64 holds.
+        // Its blocks hold more than u32::MAX cells and every border runs
+        // through 2^30 leaves, so only cached populations and the per-node
+        // memo of the universe keep this instantaneous.
+        let e = full_square(33);
         let square = e.bounding_box().unwrap();
-        assert_eq!((square.width(), square.height()), (1 << 17, 1 << 17));
-        assert_eq!(e.count_in_rect(plane, u64::MAX), 1 << 34, "saturated blocks are split until exact");
-        let part = CellRect::new(square.x0 + 3, square.y0 - 9, square.x1, square.y0 + (1 << 16));
-        assert_eq!(e.count_in_rect(part, u64::MAX), ((1 << 17) - 3) * ((1 << 16) + 1));
-        assert_eq!(e.count_in_rect(part, 1000), 1000, "a saturated block reaches the limit at once");
+        assert_eq!((square.width(), square.height()), (1 << 33, 1 << 33));
+        assert_eq!(e.count_in_rect(plane, u64::MAX), u64::MAX, "2^66 cells saturate the count");
+        let part = CellRect::new(square.x0 + 3, square.y0 - 9, square.x1 - 7, square.y0 + (1 << 30) + 4);
+        assert_eq!(e.count_in_rect(part, u64::MAX), ((1 << 33) - 10) * ((1 << 30) + 5));
+        assert_eq!(e.count_in_rect(part, 1000), 1000);
     }
 }

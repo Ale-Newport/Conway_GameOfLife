@@ -28,7 +28,7 @@ pub(crate) mod swar;
 
 pub use bit::BitEngine;
 pub use dense::DenseEngine;
-pub use hashlife_engine::{BORDER_CELL_BUDGET, HashlifeEngine};
+pub use hashlife_engine::HashlifeEngine;
 pub(crate) use padded::{Lut, Padded, StepCounts};
 pub use sparse::SparseEngine;
 
@@ -230,8 +230,8 @@ pub trait LifeEngine: Send + Sync {
     /// `limit = u64::MAX` gives the exact count). The dense engine scans
     /// bytes, the bit engine popcounts words, the sparse engine adds whole
     /// tiles' populations and popcounts the tiles cut by the border, and
-    /// Hashlife adds cached quadtree populations, descending only into
-    /// squares crossing the border.
+    /// Hashlife counts exactly with `Universe::population_in_rect` (cached
+    /// quadtree populations, descending only into nodes crossing the border).
     fn count_in_rect(&self, rect: CellRect, limit: u64) -> u64;
     /// Advances one generation. Returns its births and deaths, or `None`
     /// when the engine does not count them (Hashlife).

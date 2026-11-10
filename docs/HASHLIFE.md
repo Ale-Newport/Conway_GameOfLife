@@ -16,7 +16,7 @@ performance. The model-level page (parameters, rules text, how to test) is
 | `leaf` | 8×8 leaves as `u64`, bit-parallel (SWAR) base case for any outer-totalistic rule |
 | `step` | the memoised recursion (full speed and slow steps) with GC pins |
 | `universe` | public `Universe`: editing, `step_pow2`, `advance`, root management, GC API |
-| `query` | cell iterator, exact bounding box, `cells_in_rect`, level-of-detail `density_grid`, exact `u128` population |
+| `query` | cell iterator, exact bounding box, `cells_in_rect`, level-of-detail `density_grid`, exact `u128` populations of the plane and of rectangles (`population_in_rect`) |
 | `macrocell` | Golly `.mc` reader and writer, with Golly's exact coordinates |
 | `rule` | `Rule` (masks, `B3/S23` / `23/3` parsing, canonical display) |
 | `sim` | `HashlifeSim`, the `simulation_core::Simulation` wrapper (`life.hashlife`) |
@@ -166,7 +166,7 @@ within the `i64` plane: a level-64 root covers all of it.
 | Field | Type | Meaning |
 |---|---|---|
 | `children` | `[u32; 4]` | `nw, ne, sw, se` indices; a leaf stores its `u64` bitmap in `children[0..2]` |
-| `population` | `u64` | live cells, saturating at `u64::MAX` (exact up to level 31); `Universe::population_exact()` gives a `u128` through a memoised walk of saturated nodes |
+| `population` | `u64` | live cells, saturating at `u64::MAX` (exact up to level 31); `Universe::population_exact()` and `population_in_rect()` give `u128` counts, summing saturated nodes from their children (memoised) |
 | `result` | `u32` | memoised result index or `NONE = u32::MAX` |
 | `level` | `u8` | 3 (leaf) to 64; 0 marks a free slot |
 | `result_exp` | `u8` | the `e` of the memoised result |
@@ -226,12 +226,32 @@ per-tile populations (§6).
 | `bounding_box()` | per side: prefer the near child pair, memoised per node | O(distinct nodes on the frontier) |
 | `cells_in_rect(.., limit)` | clipped DFS, stops at `limit`, sorted row-major | O(result + visited nodes) |
 | `density_grid(x0, y0, w, h, k)` | a node inside one `2^k` pixel adds its cached population; otherwise recurse | O(visible non-empty nodes of level ≥ k) when `x0, y0` are multiples of `2^k` |
+| `population_in_rect(x0, y0, x1, y1)` | a node inside the rectangle adds its cached population; a node crossing its border is split, memoised per (node, edges crossing it) | O(non-empty nodes crossing the border), and O(distinct nodes) |
+| `population_exact()` | `population_in_rect` of the whole plane | O(saturated nodes) |
 
 `density_grid` is the renderer's level of detail. Zoomed out to `2^k` cells
 per pixel, a viewport of `w × h` pixels touches at most about `w·h` nodes of
 level `k`, whatever the population. Unaligned origins are also exact, but
 they descend to leaves where nodes straddle pixel borders. Counts saturate at
 `u32::MAX`.
+
+`population_in_rect` is the exact count of one rectangle, as a `u128`
+(saturating only for a completely full plane), without listing a cell or
+going through `u32` pixels. Nodes inside the rectangle add their cached
+population (a saturated one, above `u64::MAX` cells, is summed from its
+children); empty nodes and nodes outside add nothing; only non-empty nodes
+crossing the border are split, down to 8×8 leaves that are masked and
+popcounted. That is at most four nodes per level for nodes larger than the
+rectangle, and about `2(w + h) / 2^j` nodes of each smaller level `j` along a
+`w × h` border. Every node below the root lies at a multiple of its side, so
+the edges of the rectangle cut every copy of a node at the same offsets: the
+count of a split node depends only on the node and on which of the four
+edges cross it, and is memoised under that key (for nodes no larger than the
+rectangle; larger ones are at most four per level anyway). A border through
+a periodic or hash-consed region therefore costs as much as its distinct
+structure: a rectangle cutting a full 2^33 × 2^33 square (2^66 live cells,
+2^30 leaves along each edge) is counted at once (the unit test doing four
+such counts takes milliseconds in a debug build).
 
 ---
 
@@ -370,6 +390,17 @@ committed. Run them with
   the naive stepper's. A second test parses the canonical text of all 2^17
   rules back to the same rule and steps 200 random rules one generation at a
   time.
+* **Rectangle populations** (`tests/engine/patterns.rs`): 40 random
+  universes — evolved soups, a random 8/16/32-cell tile repeated on an
+  aligned 6×6 grid (identical nodes cut by different edges of one
+  rectangle), plus soups across the origin, the 2^40 and 2^62 node
+  boundaries and at three corners of the `i64` plane, sometimes with cells
+  at the plane's corners — each queried with 60 rectangles whose corners lie
+  near live cells, near the origin, at or near `i64::MIN`/`i64::MAX` or
+  anywhere (one in ten reversed, counting nothing), against a brute-force
+  count; the whole plane gives the population. Unit tests (`query::tests`)
+  count exactly over a full 2^33 × 2^33 square (2^66 cells, saturated
+  nodes), on an empty universe and at the `i64` extremes.
 * **Patterns** (`tests/engine/patterns.rs`):
   * a glider moves `(1000, 1000)` after `advance(4000)`, and `(2^38, 2^38)`
     after `step_pow2(40)`;
@@ -412,6 +443,8 @@ committed. Run them with
   fails the kernel test, the six-rule agreement test and both randomised
   tests. Skipping the remapping of children or results in compaction fails
   the store test (and, for children, the memory and randomised tests).
+  Memoising rectangle counts per node alone, without the crossing edges,
+  fails the rectangle property test and the 2^33-square unit test.
 
 ---
 

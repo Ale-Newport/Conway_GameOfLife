@@ -3,10 +3,10 @@
 use patterns::LifeRule;
 use simulation_core::{ApplyPolicy, ParamSet, ParamSpec, ParamValue, SimError, Topology};
 
-use super::{LifeSim, MAX_GENERATIONS_PER_TICK, RulePreset};
-use crate::engine::{EngineChoice, EngineKind};
+use super::{LifeSim, MAX_GENERATIONS_PER_TICK, MAX_TRACKED_CELLS, RulePreset};
+use crate::engine::{EngineChoice, EngineKind, MAX_SWITCH_CELLS};
 use crate::error::CaError;
-use crate::geometry::{MAX_WORLD_SIDE, World};
+use crate::geometry::{MAX_EDIT_CELLS, MAX_WORLD_SIDE, World};
 
 /// Topology choices (machine name, label).
 const TOPOLOGIES: [(&str, &str); 5] = [
@@ -31,6 +31,16 @@ pub(crate) fn topology_name(topology: Topology) -> &'static str {
 /// Parses a topology machine name.
 pub(crate) fn parse_topology(name: &str) -> Option<Topology> {
     Topology::ALL.into_iter().find(|&t| topology_name(t) == name)
+}
+
+/// Description of a `track_*` parameter: `what` it records, then the limits
+/// of tracking.
+fn tracking_description(what: &str) -> String {
+    format!(
+        "{what} Tracking lists every live cell to start, so it stays off above {MAX_TRACKED_CELLS} live cells and \
+         turns off when a reset or a pattern load brings more, or an edit leaves more than {MAX_EDIT_CELLS} in its \
+         region."
+    )
 }
 
 /// Parameter specs (defaults are the defaults of a new model).
@@ -75,22 +85,29 @@ pub(super) fn specs() -> Vec<ParamSpec> {
         )
         .group("Engine")
         .apply(ApplyPolicy::Immediate)
-        .describe(
+        .describe(&format!(
             "Simulation engine. All engines compute the same generations; switching keeps every cell. \
              Automatic: Dense for small finite worlds, Bit for large ones, Sparse on the infinite plane, \
-             Hashlife for large power-of-two steps or large regular patterns.",
-        ),
+             Hashlife for large power-of-two steps or large regular patterns. A switch copies every live cell, \
+             so it is refused above {MAX_SWITCH_CELLS} live cells (the automatic choice then keeps the running \
+             engine)."
+        )),
         ParamSpec::int("generations_per_tick", "Generations per tick", 1, MAX_GENERATIONS_PER_TICK as i64, 1)
             .group("Engine")
             .apply(ApplyPolicy::NextTick)
             .describe("Generations advanced by one tick. Must be a power of two while Hashlife runs."),
         ParamSpec::boolean("track_ages", "Track ages", false).group("Display").apply(ApplyPolicy::Immediate).describe(
-            "Record how many generations each live cell has been alive (view channel G). Updated every generation.",
+            &tracking_description(
+                "Record how many generations each live cell has been alive (view channel G). Updated every \
+                 generation.",
+            ),
         ),
         ParamSpec::boolean("track_activity", "Track activity", false)
             .group("Display")
             .apply(ApplyPolicy::Immediate)
-            .describe("Record cells that changed during the last tick (view channel B = 255), fading by 16 per tick."),
+            .describe(&tracking_description(
+                "Record cells that changed during the last tick (view channel B = 255), fading by 16 per tick.",
+            )),
     ]
 }
 
@@ -194,8 +211,7 @@ pub(super) fn set(sim: &mut LifeSim, key: &str, value: ParamValue) -> Result<App
             let on = value.as_bool().unwrap_or(false);
             let (ages, activity) =
                 if key == "track_ages" { (on, sim.tracker.activity_on()) } else { (sim.tracker.ages_on(), on) };
-            let engine = &sim.engine;
-            sim.tracker.configure(ages, activity, || engine.export_cells());
+            sim.set_tracking(ages, activity).map_err(invalid)?;
         }
         _ => return Err(SimError::UnknownParameter(key.into())),
     }

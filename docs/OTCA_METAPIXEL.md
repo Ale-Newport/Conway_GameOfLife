@@ -156,6 +156,30 @@ average 16–35), which also added `micro_view_galaxy_1024`.
 | `micro_view_galaxy_1024` | cell texture of the whole galaxy construction (30 730² cells) in a 1024² budget: 32 cells per texel, 962×962 texels | 6.21 ms [4.97, 7.05] | — |
 | `accelerated_step_256x256` | one accelerated step of a 256×256 grid | 1.16 ms [1.12, 1.21] | 0.683 ms |
 
+**Exact border texels of the micro view** (2026-11-10). Border texels of
+unaligned requests used to describe their whole aligned block, counting
+cells outside the request; they now count only the requested cells
+(`Universe::population_in_rect`, see `docs/models/metapixel.md` §5).
+`micro_view_galaxy_1024` above (borders outside the construction) measured
+5.0 and 5.2 ms before, 4.6 and 4.1 ms after (two alternated runs, load
+average 18–26). Requests whose borders cut through tiles were timed with a
+throw-away probe test that is not kept (release build, best of 15 batches of
+10 views, the two builds alternated twice at load average ≈ 30; the galaxy
+at `t = P`, the 64×64 construction of `build_64x64_random` at `t = 0`, each
+request with a 1024-texel budget):
+
+| Request | Texels (cells per texel) | Before | After |
+|---|---|---|---|
+| galaxy, whole (`-5..=30724`) | 962² (32) | 3.76, 3.81 ms | 4.13, 4.15 ms |
+| galaxy, inner (`3005..=26997`) | 751² (32) | 2.73, 2.76 ms | 3.07, 3.09 ms |
+| galaxy, inner zoomed (`10001..=14003`) | 1001² (4) | 1.54, 1.60 ms | 1.99, 2.00 ms |
+| 64×64, whole (`-7..=131075`) | 514² (256) | 2.22, 2.27 ms | 2.60, 2.61 ms |
+| 64×64, inner (`20001..=110003`) | 704² (128) | 3.81, 3.84 ms | 5.11, 5.11 ms |
+
+The extra cost is one descent per border texel (at most 2 × (width +
+height) of them): 0.1–0.5 µs each, bounded by the nodes crossing the
+request's border and independent of the population.
+
 For comparison, the research note measured Golly's HashLife (`bgolly`) at
 0.10 s for the first metagen of a 3×3 grid with a cold cache; our cold
 3×3 metagen including construction and readout takes 76–79 ms. With a warm

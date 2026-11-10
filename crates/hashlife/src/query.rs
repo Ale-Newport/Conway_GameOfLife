@@ -1,5 +1,6 @@
 //! Read-only queries: live-cell iteration, exact bounding box, rectangle
-//! extraction, level-of-detail density grids and exact population.
+//! extraction, level-of-detail density grids and exact populations (of the
+//! plane and of rectangles).
 //!
 //! All of them descend the quadtree and skip empty nodes, so their cost is
 //! proportional to the number of distinct visited nodes, not to the area.
@@ -343,19 +344,84 @@ impl Universe {
     /// completely full 2^64 × 2^64 plane). [`Universe::population`] is the
     /// constant-time `u64` version, which saturates above `u64::MAX`.
     pub fn population_exact(&self) -> u128 {
-        fn exact(store: &NodeStore, n: u32, memo: &mut HashMap<u32, u128>) -> u128 {
-            let node = store.node(n);
-            if node.population < u64::MAX {
-                return u128::from(node.population);
-            }
-            if let Some(&known) = memo.get(&n) {
-                return known;
-            }
-            let total = node.children.iter().fold(0u128, |acc, &c| acc.saturating_add(exact(store, c, memo)));
-            memo.insert(n, total);
-            total
+        self.population_in_rect(i64::MIN, i64::MIN, i64::MAX, i64::MAX)
+    }
+
+    /// Exact number of live cells in the inclusive rectangle `[x0, x1] ×
+    /// [y0, y1]` (0 if `x0 > x1` or `y0 > y1`), as a `u128` saturating only
+    /// for a completely full plane, like [`Universe::population_exact`].
+    ///
+    /// No cell is listed: a quadtree node inside the rectangle adds its
+    /// cached population (or, above `u64::MAX` cells, its children's), a
+    /// node outside it or empty adds nothing, and only the non-empty nodes
+    /// crossing the rectangle's border are split, down to 8×8 leaves that
+    /// are masked and popcounted. The count of a split node no larger than
+    /// the rectangle is memoised per node and set of rectangle edges
+    /// crossing it: every copy of a node is aligned to its side, so the
+    /// edges cut all copies at the same offsets. For a `w × h` rectangle the
+    /// cost is therefore at most four nodes per level for nodes larger than
+    /// the rectangle, plus O(non-empty nodes crossing the border) — about
+    /// `2(w + h) / 2^j` of each smaller level `j` — and also at most
+    /// O(distinct nodes): a border through a periodic region costs as much
+    /// as its distinct structure, whatever its length or population.
+    pub fn population_in_rect(&self, x0: i64, y0: i64, x1: i64, y1: i64) -> u128 {
+        if x0 > x1 || y0 > y1 {
+            return 0;
         }
-        exact(self.store(), self.root(), &mut HashMap::new())
+        let rect = Rect::new(x0, y0, x1, y1);
+        let memo_side = (rect.x1 - rect.x0).max(rect.y1 - rect.y0) + 1;
+        let mut counter = RectCounter { store: self.store(), rect, memo_side, memo: HashMap::new() };
+        let origin = -half_side(self.level());
+        counter.count(self.root(), origin, origin)
+    }
+}
+
+/// Counts the live cells of a rectangle; see [`Universe::population_in_rect`].
+struct RectCounter<'a> {
+    store: &'a NodeStore,
+    rect: Rect,
+    /// Side of the largest nodes whose counts are memoised. Larger nodes
+    /// meet the rectangle at most four per level, so they are not.
+    memo_side: i128,
+    /// Count of a node split by the edges of `rect` that cross it (bits:
+    /// left, right, top, bottom; none for a node inside `rect` whose cached
+    /// population saturates).
+    memo: HashMap<(u32, u8), u128>,
+}
+
+impl RectCounter<'_> {
+    fn count(&mut self, n: u32, nx: i128, ny: i128) -> u128 {
+        let node = self.store.node(n);
+        let size = 1i128 << node.level;
+        let rect = &self.rect;
+        if node.population == 0 || !rect.intersects(nx, ny, size) {
+            return 0;
+        }
+        let edges = u8::from(nx < rect.x0)
+            | u8::from(nx + size - 1 > rect.x1) << 1
+            | u8::from(ny < rect.y0) << 2
+            | u8::from(ny + size - 1 > rect.y1) << 3;
+        if edges == 0 && node.population < u64::MAX {
+            return u128::from(node.population);
+        }
+        if node.level == LEAF_LEVEL {
+            return u128::from((node.leaf_bits() & rect.leaf_mask(nx, ny)).count_ones());
+        }
+        // Every node but the root (the only node of its level) lies at a
+        // multiple of its side, so its count depends only on it and `edges`.
+        let memoised = size <= self.memo_side;
+        if memoised && let Some(&known) = self.memo.get(&(n, edges)) {
+            return known;
+        }
+        let half = size / 2;
+        let [nw, ne, sw, se] = node.children;
+        let total = [(nw, nx, ny), (ne, nx + half, ny), (sw, nx, ny + half), (se, nx + half, ny + half)]
+            .into_iter()
+            .fold(0u128, |acc, (c, x, y)| acc.saturating_add(self.count(c, x, y)));
+        if memoised {
+            self.memo.insert((n, edges), total);
+        }
+        total
     }
 }
 
@@ -386,6 +452,12 @@ mod tests {
         assert_eq!(u.population(), u64::MAX, "u64 population saturates");
         assert_eq!(u.population_exact(), 1u128 << 66);
         assert_eq!(u.bounding_box(), Some((0, 0, (1 << 33) - 1, (1 << 33) - 1)));
+        // Rectangles over the saturated nodes are exact too.
+        let side = 1i64 << 33;
+        assert_eq!(u.population_in_rect(i64::MIN, i64::MIN, i64::MAX, i64::MAX), 1 << 66);
+        assert_eq!(u.population_in_rect(-5, -5, side, side / 2 - 1), 1 << 65);
+        assert_eq!(u.population_in_rect(1, 0, side + 9, side - 1), (1 << 66) - (1 << 33));
+        assert_eq!(u.population_in_rect(3, 7, side - 2, side - 4), (side as u128 - 4) * (side as u128 - 10));
     }
 
     #[test]
@@ -394,6 +466,7 @@ mod tests {
         assert_eq!(u.cells().count(), 0);
         assert_eq!(u.bounding_box(), None);
         assert!(u.cells_in_rect(-10, -10, 10, 10, 100).is_empty());
+        assert_eq!(u.population_in_rect(i64::MIN, i64::MIN, i64::MAX, i64::MAX), 0);
         assert_eq!(u.density_grid(-8, -8, 4, 4, 2).unwrap(), vec![0; 16]);
         assert!(u.density_grid(0, 0, 1 << 14, 1 << 14, 0).is_err());
         assert!(u.density_grid(0, 0, 1, 1, 65).is_err());
@@ -411,6 +484,11 @@ mod tests {
         assert_eq!(cells, expected);
         assert_eq!(u.bounding_box(), Some((i64::MIN, i64::MIN, i64::MAX, i64::MAX)));
         assert_eq!(u.cells_in_rect(i64::MIN, i64::MIN, i64::MAX, i64::MAX, 10).len(), 4);
+        assert_eq!(u.population_in_rect(i64::MIN, i64::MIN, i64::MAX, i64::MAX), 4);
+        assert_eq!(u.population_in_rect(i64::MIN, 0, 0, i64::MAX), 2, "(MIN, MAX) and (0, 0)");
+        assert_eq!(u.population_in_rect(i64::MAX, i64::MAX, i64::MAX, i64::MAX), 1);
+        assert_eq!(u.population_in_rect(i64::MIN + 1, i64::MIN, i64::MAX, i64::MAX - 1), 1, "only (0, 0)");
+        assert_eq!(u.population_in_rect(1, 1, 0, 0), 0, "reversed bounds");
         let grid = u.density_grid(i64::MIN, i64::MIN, 2, 2, 63).unwrap();
         assert_eq!(grid, vec![1, 0, 1, 2]);
     }

@@ -16,7 +16,7 @@ mod tracking;
 pub use commands::{LifeCommand, MirrorAxis, PasteMode};
 pub use config::{InitItem, LifeConfig, PatternLibrary, PatternSource, RulePreset, place_pattern};
 pub(crate) use params::{parse_topology, topology_name};
-pub use tracking::TRAIL_DECAY;
+pub use tracking::{MAX_TRACKED_CELLS, TRAIL_DECAY};
 
 use patterns::{LifeRule, Pattern};
 use serde::{Deserialize, Serialize};
@@ -104,6 +104,8 @@ pub struct LifeSim {
     generation: u64,
     rng: SimRng,
     tracker: Tracker,
+    /// Why tracking turned off by itself (see [`LifeSim::tracking_off_reason`]).
+    tracking_off: Option<String>,
     last_stats: Option<GenStats>,
     reset_point: Option<ResetPoint>,
     halted: Option<String>,
@@ -154,12 +156,14 @@ impl LifeSim {
             generation: 0,
             rng: SimRng::seed_from_u64(seed),
             tracker: Tracker::default(),
+            tracking_off: None,
             last_stats: None,
             reset_point: None,
             halted: None,
         };
         sim.rebuild()?;
-        sim.tracker.configure(config.track_ages, config.track_activity, || sim.engine.export_cells());
+        // Above MAX_TRACKED_CELLS tracking stays off; tracking_off_reason says why.
+        let _ = sim.set_tracking(config.track_ages, config.track_activity);
         Ok(sim)
     }
 
@@ -249,6 +253,16 @@ impl LifeSim {
     /// the 64-bit plane).
     pub fn halt_reason(&self) -> Option<&str> {
         self.halted.as_deref()
+    }
+
+    /// Why age and activity tracking turned off (or stayed off) by itself,
+    /// for the user interface to show: it would have listed more than
+    /// [`MAX_TRACKED_CELLS`] live cells to start (when turned on, or after a
+    /// reset or a pattern load) or more than [`MAX_EDIT_CELLS`] to merge an
+    /// edit. Cleared when the `track_*` parameters are set or a snapshot is
+    /// restored.
+    pub fn tracking_off_reason(&self) -> Option<&str> {
+        self.tracking_off.as_deref()
     }
 
     /// Copies the live cells of `rect` into a pattern whose coordinates are
@@ -417,9 +431,58 @@ impl LifeSim {
         self.halted = None;
         self.reset_point = None;
         self.reselect()?;
-        let live = if self.tracker.enabled() { self.engine.export_cells() } else { Vec::new() };
-        self.tracker.restart(live);
+        self.restart_tracking();
         Ok(())
+    }
+
+    /// Turns tracking off, keeping `reason` for [`LifeSim::tracking_off_reason`].
+    fn stop_tracking(&mut self, reason: String) {
+        self.tracker.configure(false, false, Vec::new);
+        self.tracking_off = Some(reason);
+    }
+
+    /// Checks that tracking may list every live cell: at most
+    /// [`MAX_TRACKED_CELLS`] of them (the exact population, read before
+    /// anything is listed). Otherwise tracking turns off.
+    ///
+    /// # Errors
+    /// [`CaError::LimitExceeded`] with the reason, also kept for
+    /// [`LifeSim::tracking_off_reason`].
+    fn check_tracking(&mut self) -> Result<(), CaError> {
+        let population = self.engine.population();
+        if population <= MAX_TRACKED_CELLS {
+            return Ok(());
+        }
+        let reason = format!(
+            "age and activity tracking list every live cell to start, at most {MAX_TRACKED_CELLS}; the pattern has \
+             {population} live cells"
+        );
+        self.stop_tracking(reason.clone());
+        Err(CaError::LimitExceeded(reason))
+    }
+
+    /// Turns the tracking channels on or off (see [`Tracker::configure`]).
+    ///
+    /// # Errors
+    /// See [`LifeSim::check_tracking`]: tracking does not start above
+    /// [`MAX_TRACKED_CELLS`] live cells.
+    fn set_tracking(&mut self, ages: bool, activity: bool) -> Result<(), CaError> {
+        if (ages || activity) && !self.tracker.enabled() {
+            self.check_tracking()?;
+        }
+        let engine = &self.engine;
+        self.tracker.configure(ages, activity, || engine.export_cells());
+        self.tracking_off = None;
+        Ok(())
+    }
+
+    /// Restarts tracking from the live cells (all age 1, no trail) after the
+    /// pattern was replaced; above [`MAX_TRACKED_CELLS`] tracking turns off
+    /// instead (see [`LifeSim::check_tracking`]).
+    fn restart_tracking(&mut self) {
+        if self.tracker.enabled() && self.check_tracking().is_ok() {
+            self.tracker.restart(self.engine.export_cells());
+        }
     }
 
     /// Applies NextTick parameter changes.
@@ -515,8 +578,8 @@ impl LifeSim {
     /// Bookkeeping after an edit of `rect` (`None` = anywhere). The tracker
     /// merges the live cells of the edited region, listed only when it holds
     /// at most [`MAX_EDIT_CELLS`] of them (counted first): above that limit
-    /// tracking stops (the `track_*` parameters turn off) instead of listing
-    /// them.
+    /// tracking stops (the `track_*` parameters turn off, and
+    /// [`LifeSim::tracking_off_reason`] says why) instead of listing them.
     fn after_edit(&mut self, rect: Option<CellRect>) {
         if self.generation == 0 {
             self.reset_point = None;
@@ -528,7 +591,10 @@ impl LifeSim {
             };
             if let Some(r) = region {
                 if self.engine.count_in_rect(r, MAX_EDIT_CELLS + 1) > MAX_EDIT_CELLS {
-                    self.tracker.configure(false, false, Vec::new);
+                    self.stop_tracking(format!(
+                        "age and activity tracking merge at most {MAX_EDIT_CELLS} live cells of an edited region; the \
+                         last edit left more"
+                    ));
                 } else {
                     self.tracker.edit(r, self.engine.cells_in_rect(r));
                 }

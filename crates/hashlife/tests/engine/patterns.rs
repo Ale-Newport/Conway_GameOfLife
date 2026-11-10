@@ -1,6 +1,7 @@
 //! Known pattern behaviour and query correctness.
 
 use hashlife::Universe;
+use simulation_core::SimRng;
 
 use crate::common::{CellSet, GLIDER, GOSPER_GUN, LIFE, cells_of, naive_run, soup, translated, universe_with};
 
@@ -143,6 +144,75 @@ fn density_grid_matches_bucketed_counts_and_sums_to_the_population() {
     }
     // Zoomed far out, everything lands in one pixel.
     assert_eq!(universe.density_grid(-(1 << 20), -(1 << 20), 1, 1, 21).unwrap(), vec![cells.len() as u32]);
+}
+
+/// One coordinate of a random rectangle corner: near a live cell, near the
+/// origin, at or near the ends of the `i64` range, or anywhere.
+fn random_coordinate(rng: &mut SimRng, cells: &[i64]) -> i64 {
+    match rng.below(4) {
+        0 if !cells.is_empty() => cells[rng.index(cells.len())].saturating_add(rng.range_i64(-9, 10)),
+        1 => rng.range_i64(-40, 40),
+        2 => *rng.choose(&[i64::MIN, i64::MAX, i64::MIN + 17, i64::MAX - 17, 1 << 40, -(1 << 40)]).expect("non-empty"),
+        _ => rng.next_u64() as i64,
+    }
+}
+
+#[test]
+fn rectangle_populations_match_brute_force_counts() {
+    let mut rng = SimRng::seed_from_u64(0x00C0_FFEE_7EC7);
+    // Top-left corners of 24×24 soups: across the origin, across the 2^40
+    // and 2^62 node boundaries, and in three corners of the i64 plane.
+    let corners = [
+        (-12, -12),
+        (-(1 << 40) - 11, (1 << 40) - 13),
+        (-(1 << 62) - 9, 3),
+        (i64::MIN, i64::MIN),
+        (i64::MAX - 24, i64::MIN + 5),
+        (i64::MAX - 24, i64::MAX - 24),
+    ];
+    for trial in 0..40u64 {
+        // Half of the universes start from an evolved soup, whose ash
+        // repeats small nodes all over it, half from a random tile repeated
+        // on an aligned 6×6 grid: identical quadtree nodes that one rectangle
+        // cuts with different edges.
+        let mut cells = if trial % 2 == 0 {
+            naive_run(&soup(trial, -30, -20, 60, 40, 0.4), LIFE.0, LIFE.1, rng.below(80))
+        } else {
+            let side = 8 << rng.below(3);
+            let tile = soup(rng.next_u64(), 0, 0, side, side, rng.range_f64(0.2, 0.7));
+            (0..36)
+                .flat_map(|i| {
+                    let (dx, dy) = ((i % 6 - 3) * side, (i / 6 - 3) * side);
+                    tile.iter().map(move |&(x, y)| (x + dx, y + dy))
+                })
+                .collect()
+        };
+        for _ in 0..1 + rng.below(3) {
+            let (x0, y0) = corners[rng.index(corners.len())];
+            cells.extend(soup(rng.next_u64(), x0, y0, 24, 24, rng.range_f64(0.2, 0.7)));
+        }
+        if rng.chance(0.5) {
+            cells.extend([(i64::MIN, i64::MAX), (i64::MAX, i64::MAX), (i64::MAX, i64::MIN)]);
+        }
+        let universe = universe_with(&cells, LIFE.0, LIFE.1);
+        let xs: Vec<i64> = cells.iter().map(|c| c.0).collect();
+        let ys: Vec<i64> = cells.iter().map(|c| c.1).collect();
+        for query in 0..60 {
+            let (mut x0, mut x1) = (random_coordinate(&mut rng, &xs), random_coordinate(&mut rng, &xs));
+            let (mut y0, mut y1) = (random_coordinate(&mut rng, &ys), random_coordinate(&mut rng, &ys));
+            // Mostly ordered corners; reversed ones must count nothing.
+            if rng.chance(0.9) {
+                (x0, x1, y0, y1) = (x0.min(x1), x0.max(x1), y0.min(y1), y0.max(y1));
+            }
+            let expected = cells.iter().filter(|&&(x, y)| x0 <= x && x <= x1 && y0 <= y && y <= y1).count();
+            assert_eq!(
+                universe.population_in_rect(x0, y0, x1, y1),
+                expected as u128,
+                "trial {trial}, query {query}: [{x0}, {x1}] × [{y0}, {y1}]"
+            );
+        }
+        assert_eq!(universe.population_in_rect(i64::MIN, i64::MIN, i64::MAX, i64::MAX), cells.len() as u128);
+    }
 }
 
 #[test]

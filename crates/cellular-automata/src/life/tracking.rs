@@ -29,6 +29,12 @@ use crate::view::TexelGrid;
 /// Activity lost per tick.
 pub const TRAIL_DECAY: u8 = 16;
 
+/// Most live cells tracking lists when it starts or restarts from the whole
+/// pattern (turning it on, a reset, a pattern load): 16 bytes each in the
+/// list, 17 in the tracker. Above it tracking stays or turns off and
+/// `LifeSim::tracking_off_reason` says why.
+pub const MAX_TRACKED_CELLS: u64 = 1 << 26;
+
 type Cell = (i64, i64);
 
 #[inline]

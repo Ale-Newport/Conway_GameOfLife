@@ -49,19 +49,20 @@ pub struct GridViewRequest {
 /// * `rgba`: `width × height × 4` bytes, row 0 at the top. **R** = state
 ///   (1 if the texel holds a live cell, else 0); **G** = age (not tracked
 ///   by Hashlife: 0); **B** = activity (not tracked: 0); **A** = density,
-///   `round(255 × live / cells)` for LOD texels and 255/0 for exact texels.
+///   `round(255 × live / covered)` where `covered` is the number of
+///   requested cells of the texel (255/0 for exact texels).
 ///
 /// The texels cover the requested rectangle exactly when it is aligned and
 /// otherwise its aligned cover (at most `cells_per_texel − 1` extra cells on
-/// each side). Every texel, border texels included, describes its **whole**
-/// aligned `cells_per_texel²` block ("fraction of live cells in the
-/// aggregated block"): Hashlife adds the cached populations of the quadtree
-/// nodes inside the cover and descends only into nodes that straddle a
-/// texel edge, so no cell is iterated and the cost is O(visible nodes).
-/// (Clipping border texels to the request, as the dense engines of
-/// `cellular-automata` do, would need per-cell strips through those blocks
-/// — up to `cells_per_texel` node visits per border texel.) Exact texels
-/// (`cells_per_texel = 1`) cover exactly the requested cells.
+/// each side), and every texel describes only the **requested** cells of
+/// its block, as in the grid views of `cellular-automata`: no cell outside
+/// the request is counted. Texels whose whole block is requested add the
+/// cached populations of the quadtree nodes inside it
+/// (`Universe::density_grid`, O(visible nodes)); the border texels of an
+/// unaligned request count the requested part of their block with
+/// `Universe::population_in_rect`, whose cost is bounded by the quadtree
+/// nodes crossing that part's border (memoised per distinct node), never
+/// by the population. No cell is iterated.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GridView {
     /// Cell x of texel (0, 0).
@@ -321,19 +322,38 @@ pub fn grid_view(universe: &Universe, request: &GridViewRequest) -> GridView {
         .density_grid(origin_x, origin_y, width as usize, height as usize, k)
         // Unreachable: at most 8192² texels, below Hashlife's pixel limit.
         .unwrap_or_else(|_| vec![0; width as usize * height as usize]);
-    let cells_per_texel = 1u32 << k;
-    let area = (1u64 << k) as f64 * (1u64 << k) as f64;
+    // The requested cells of every texel column (and row), and whether they
+    // are its whole block (all but the first and last of an unaligned request).
+    let size = 1i128 << k;
+    let covered = |origin: i64, len: u32, lo: i64, hi: i64| -> Vec<(i64, i64, bool)> {
+        (0..i128::from(len))
+            .map(|t| {
+                let start = i128::from(origin) + t * size;
+                let (a, b) = (start.max(i128::from(lo)), (start + size - 1).min(i128::from(hi)));
+                // Requested cells lie in the i64 plane.
+                (a as i64, b as i64, b - a + 1 == size)
+            })
+            .collect()
+    };
+    let columns = covered(origin_x, width, x0, x1);
+    let rows = covered(origin_y, height, y0, y1);
+    let area = (size * size) as f64;
     let mut rgba = Vec::with_capacity(counts.len() * 4);
-    for &count in &counts {
-        let alive = count > 0;
-        let density = if k == 0 {
-            if alive { 255 } else { 0 }
-        } else {
-            (255.0 * f64::from(count) / area).round().clamp(0.0, 255.0) as u8
-        };
-        rgba.extend_from_slice(&[u8::from(alive), 0, 0, density]);
+    for (&(cy0, cy1, whole_row), row) in rows.iter().zip(counts.chunks(width as usize)) {
+        for (&(cx0, cx1, whole_column), &block) in columns.iter().zip(row) {
+            let (live, cells) = if whole_row && whole_column {
+                (f64::from(block), area)
+            } else {
+                // A border texel: only the requested part of its block (none
+                // of an empty block).
+                let live = if block == 0 { 0 } else { universe.population_in_rect(cx0, cy0, cx1, cy1) };
+                (live as f64, ((cx1 - cx0 + 1) as u64 * (cy1 - cy0 + 1) as u64) as f64)
+            };
+            let density = (255.0 * live / cells).round().clamp(0.0, 255.0) as u8;
+            rgba.extend_from_slice(&[u8::from(live > 0.0), 0, 0, density]);
+        }
     }
-    GridView { origin_x, origin_y, width, height, cells_per_texel, rgba }
+    GridView { origin_x, origin_y, width, height, cells_per_texel: 1 << k, rgba }
 }
 
 /// Scale indicators for a micro view built for `request`.
@@ -378,6 +398,33 @@ mod tests {
         assert_eq!(&lod.rgba[i..i + 4], &[1, 0, 0, 12]);
         let total: u32 = lod.rgba.chunks(4).map(|t| u32::from(t[0])).sum();
         assert_eq!(total, 2, "two occupied texels");
+    }
+
+    #[test]
+    fn border_texels_count_only_the_requested_cells() {
+        let mut universe = Universe::conway();
+        let cells: Vec<(i64, i64)> = (0..400).map(|i| (i * 37 % 131 - 20, i * 59 % 127 - 15)).collect();
+        universe.insert_cells(cells.iter().copied());
+        let requests = [
+            GridViewRequest { x0: -5, y0: -7, x1: 100, y1: 98, max_width: 16, max_height: 16 },
+            GridViewRequest { x0: 60, y0: 2, x1: 3, y1: 1, max_width: 4, max_height: 4 },
+            GridViewRequest { x0: -13, y0: -11, x1: 9, y1: 13, max_width: 64, max_height: 64 },
+        ];
+        for request in requests {
+            let view = grid_view(&universe, &request);
+            let (x0, x1) = (request.x0.min(request.x1), request.x0.max(request.x1));
+            let (y0, y1) = (request.y0.min(request.y1), request.y0.max(request.y1));
+            let k = i64::from(view.cells_per_texel);
+            for (i, texel) in view.rgba.chunks(4).enumerate() {
+                let (tx, ty) = ((i % view.width as usize) as i64, (i / view.width as usize) as i64);
+                let (bx, by) = (view.origin_x + tx * k, view.origin_y + ty * k);
+                let (cx0, cx1) = (bx.max(x0), (bx + k - 1).min(x1));
+                let (cy0, cy1) = (by.max(y0), (by + k - 1).min(y1));
+                let live = cells.iter().filter(|&&(x, y)| (cx0..=cx1).contains(&x) && (cy0..=cy1).contains(&y)).count();
+                let density = (255.0 * live as f64 / ((cx1 - cx0 + 1) * (cy1 - cy0 + 1)) as f64).round() as u8;
+                assert_eq!(texel, [u8::from(live > 0), 0, 0, density], "{request:?}, texel ({tx}, {ty})");
+            }
+        }
     }
 
     #[test]

@@ -432,8 +432,7 @@ impl LifeSim {
         self.last_stats = None;
         self.reset_point = None;
         self.reselect()?;
-        let live = if self.tracker.enabled() { self.engine.export_cells() } else { Vec::new() };
-        self.tracker.restart(live);
+        self.restart_tracking();
         Ok(())
     }
 }

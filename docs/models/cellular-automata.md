@@ -40,9 +40,9 @@ benchmark. No new third-party crate.
 | `engine::{LifeEngine, EngineKind, EngineChoice, GenStats}` | engine trait, the four implementations' kinds, automatic/fixed choice, births/deaths of a generation |
 | `DenseEngine`, `BitEngine`, `SparseEngine`, `HashlifeEngine` | the engines |
 | `create_engine`, `switch_engine`, `select_engine`, `SelectionInput`, `tile_regularity`, `engine::AUTO_REGULARITY_MAX_POPULATION`, `engine::MAX_SWITCH_CELLS` | construction, exact state transfer (refused, never lossy, when the target cannot hold every cell or the pattern has more than 2^26 live cells), automatic choice |
-| `LifeEngine::reserve`, `DenseEngine::window_fits`, `engine::BORDER_CELL_BUDGET`, `LifeEngine::count_in_rect` | capacity checks before writes; bounded view cost on Hashlife; exact live-cell counts of rectangles (up to a limit) without listing a cell |
+| `LifeEngine::reserve`, `DenseEngine::window_fits`, `LifeEngine::count_in_rect` | capacity checks before writes; exact live-cell counts of rectangles (up to a limit) without listing a cell |
 | `engine::reference::reference_step` | naive reference stepper (used by the property tests) |
-| `LifeSim`, `LifeConfig`, `LifeMode`, `LifeCommand`, `PasteMode`, `MirrorAxis`, `RulePreset`, `InitItem`, `PatternSource`, `PatternLibrary`, `place_pattern` | the Life model, its configuration, commands and pattern resolution; `LifeSim::copy_region` is the copy query and `LifeSim::cut_region` the cut (copy + clear), both refused above `MAX_EDIT_CELLS` live cells |
+| `LifeSim`, `LifeConfig`, `LifeMode`, `LifeCommand`, `PasteMode`, `MirrorAxis`, `RulePreset`, `InitItem`, `PatternSource`, `PatternLibrary`, `place_pattern` | the Life model, its configuration, commands and pattern resolution; `LifeSim::copy_region` is the copy query and `LifeSim::cut_region` the cut (copy + clear), both refused above `MAX_EDIT_CELLS` live cells; `LifeSim::tracking_off_reason` says why tracking turned off by itself (`life::MAX_TRACKED_CELLS`, §4.4) |
 | `GenerationsSim`/`GenerationsConfig`, `WireworldSim`/`WireworldConfig`, `PaintCommand`, `StateInit` | multi-state models and their shared painting commands (`halt_reason` reports a reset that could not be carried out) |
 | `LangtonsAntSim`, `AntConfig`, `AntCommand`, `Ant`, `Heading`, `TurmiteRule`, `AntView` | ants; `LangtonsAntSim::world` is the running world (the parameters describe the next reset) |
 | `WolframSim`, `WolframConfig`, `WolframCommand`, `Boundary`, `EcaStart`, `wolfram::eca_step` | elementary CA; `WolframSim::{width, boundary, first_row}` describe the running diagram (rows `first_row()..=tick()` are kept) |
@@ -119,16 +119,15 @@ live cells of a rectangle, exact up to `limit` (the smaller of the two;
 `u64::MAX` gives the exact count), without listing any: the dense engine
 scans the clipped bytes, the bit engine popcounts masked words, the sparse
 engine adds the cached population of every tile inside the rectangle and
-popcounts the tiles its border cuts, and the Hashlife adapter adds cached
-quadtree populations (read through `Universe::density_grid`), descending
-only into non-empty squares that cross the border and listing the overlap of
-squares of at most 64 cells. The universe reports node populations through
-`u32` density pixels, so a square inside the rectangle that holds more than
-`u32::MAX` cells is split further — only while the count is still below
-`limit`; callers pass their maximum plus one, which keeps the cost
-proportional to the squares crossing the border for any population. Both
-users of `cells_in_rect` in `LifeSim` count first: the region tools (§4.3)
-and the tracker after an edit (§4.4).
+popcounts the tiles its border cuts, and the Hashlife adapter asks the
+universe's native `Universe::population_in_rect` (exact `u128`, then capped
+at `limit`): quadtree nodes inside the rectangle add their cached
+population, and only the non-empty nodes crossing its border are split,
+memoised per node and crossing edges — so the cost is bounded by the nodes
+along the border (and by the distinct nodes, for periodic content), never
+by the population or by the `u32` texel counts of `density_grid` (see
+`docs/HASHLIFE.md` §3). Both users of `cells_in_rect` in `LifeSim` count
+first: the region tools (§4.3) and the tracker after an edit (§4.4).
 
 **Engine switching** (`switch_engine`, the `engine` parameter) exports the
 live cells and loads them into the new engine: the state is transferred
@@ -272,12 +271,34 @@ tick afterwards (the trail decays once at the first generation of every
 tick), matching the view contract "255 when the cell changed this tick". Edits
 are merged for the edited region without ageing anything: the region's live
 cells are counted first and listed only when there are at most 2^26
-(`MAX_EDIT_CELLS`); an edit that leaves more inside its region (a fill of a
-large world, for example) is applied and stops tracking — `track_ages` and
-`track_activity` turn off — instead of listing them. Cost O(live cells +
-trail) per generation on every engine; enabling tracking starts every live
-cell at age 1. Views read the tracker only inside the request (rows found by
-binary search, then the requested columns).
+(`MAX_EDIT_CELLS`). Cost O(live cells + trail) per generation on every
+engine; enabling tracking starts every live cell at age 1. Views read the
+tracker only inside the request (rows found by binary search, then the
+requested columns).
+
+**Tracking limits.** Starting tracking lists every live cell (16 bytes each,
+17 in the tracker), so it is bounded by the exact population, read before
+anything is listed: at most `MAX_TRACKED_CELLS` = 2^26. The policy is the
+same everywhere — **tracking turns off (or stays off) by itself, and
+`LifeSim::tracking_off_reason()` gives a user-readable reason** (the limit
+and the population) for the interface to show; nothing else is refused:
+
+* turning `track_ages` / `track_activity` on, or building a model whose
+  configuration asks for tracking, above the limit leaves tracking off
+  (`set_param` also returns the reason as its error, since the requested
+  value did not take effect);
+* a reset (from the reset point or rebuilding the scenario after a world
+  change) or a pattern load (`LoadPattern`, `ImportText` with `replace`)
+  that brings more live cells is carried out with tracking off;
+* an edit that leaves more than `MAX_EDIT_CELLS` live cells inside its
+  region (a fill of a large world, for example) is applied and turns
+  tracking off instead of listing them.
+
+Both `track_*` parameters turn off with it. Setting either parameter or
+restoring a snapshot clears the reason. The parameters' descriptions state
+the limit. Once running, tracking lists the live cells every generation
+(the cost above); a pattern that grows past the limit while tracked is not
+stopped.
 
 ## 5. The CA Laboratory models
 
@@ -350,13 +371,13 @@ cells_per_texel, rgba }`:
   sparse engine visits only tiles intersecting it, the age/activity tracker
   visits only its entries inside the rectangle, and the Hashlife adapter
   uses cached quadtree populations (`density_grid`) for texels fully inside
-  the request and enumerates only the live cells of the partly covered border
-  strips — at most `BORDER_CELL_BUDGET` = 2^21 per view. Beyond that budget
-  (only for requests not aligned to the texel grid that cut through
-  gigantic populations, e.g. a zoomed-out breeder after 10^7 generations) a
-  border texel is *estimated* as its whole aligned block's cached population
-  times the covered fraction of the block, so a view never enumerates more
-  cells (see §9).
+  the request and counts the requested part of every border texel of an
+  unaligned request exactly with `Universe::population_in_rect`, without
+  listing a cell. Its cost is one descent per border texel (at most
+  2 × (width + height) of them) through the nodes crossing the request's
+  border, independent of the population: on a zoomed-out Breeder 1 with
+  3.7·10^11 live cells it is faster than the former listing of the border
+  strips (§11).
 * Channels: R = cell state (most frequent non-zero state of the block for
   level-of-detail texels, ties to the lowest state; for Life 1 if any cell is
   alive); G = age (mean age of the block's live cells; 0 when not tracked);
@@ -441,13 +462,12 @@ K3,3 once inputs and output are on the outside).
   Golly's shifted tori, tubes, spheres and vertically twisted Klein bottles
   are not offered. Views show the fundamental domain only (no tiling).
 * Births/deaths are not reported for Hashlife jumps without tracking.
-* Hashlife views: border texels of unaligned requests whose partly covered
-  strips hold more than 2^21 live cells are estimated from block populations
-  (proportional to the covered area), not counted exactly.
 * Ant trails keep at most the 2^20 most recent flips.
 * Tracking costs O(live cells) per generation and stores 17 bytes per live
-  cell; Hashlife with tracking steps one generation at a time. An edit whose
-  region holds more than 2^26 live cells stops tracking (§4.4).
+  cell; Hashlife with tracking steps one generation at a time. It does not
+  start (or restart after a reset or pattern load) above 2^26 live cells,
+  and an edit whose region holds more than 2^26 live cells stops it, with a
+  reason (§4.4); growth past 2^26 while tracked does not stop it.
 * Engine switches copy at most 2^26 live cells; above that the running
   engine is kept (refused for a fixed choice, kept by the automatic one).
 * Hashlife texel counts saturate at `u32::MAX` per texel (only for blocks of
@@ -526,7 +546,16 @@ CARGO_TARGET_DIR=target/agents/cellular-automata cargo clippy -p cellular-automa
   generations per tick the automatic choice keeps a sparse pattern of more
   than 2^26 cells instead of moving it to Hashlife; filling the whole torus
   with tracking on is applied and stops tracking without listing the cells,
-  while a smaller region keeps it. Peak memory of the refusal test
+  while a smaller region keeps it. The descriptions of the `engine` and
+  `track_*` parameters state these limits. Tracking limits (§4.4): turning tracking
+  on for the gun is refused with the limit and the population, allocating
+  less than 16 MiB; a model configured with tracking and built on a full
+  8,192 × 8,193 rectangle starts without it, allocating no more than
+  without tracking (plus 16 MiB); a reset to such a reset point (a
+  macrocell on Hashlife) and a rebuild after a world change (sparse engine)
+  turn tracking off the same way, with `tracking_off_reason` naming the
+  limit (without the check: 1.15–2.2 GB allocated, or an abort for the gun).
+  Peak memory of the refusal test
   (`/usr/bin/time -l`, maximum resident set size): 3.24 GB when the refusal
   listed 2^26 + 1 cells first, 13 MB with the count.
 * **`tests/generations.rs`**: Brian's Brain 1 → 2 → 0 and no surviving cells,
@@ -557,11 +586,14 @@ CARGO_TARGET_DIR=target/agents/cellular-automata cargo clippy -p cellular-automa
   error or a valid state, never a panic.
 * Unit tests (`src/`): SWAR kernel against scalar counts for many rules,
   shifts and bit reversal, the dense window and its refusal of far-apart
-  cells, Hashlife border-texel budget (exact up to the budget, proportional
-  estimate beyond, exact for uniform blocks) and `advance(2^62)`, Hashlife
+  cells, Hashlife border texels of an unaligned view inside a full 2^14 ×
+  2^14 square (exact although the border strips hold millions of cells and
+  the top block row is not uniform) and `advance(2^62)`, Hashlife
   rectangle counts against listings (cells at the `i64` extremes, the whole
-  plane) and on a full 2^17 × 2^17 square whose blocks saturate the `u32`
-  density pixels (exact without a limit, immediate with one), the
+  plane) and on a full 2^33 × 2^33 square (2^66 live cells: the count
+  saturates at `u64::MAX`, and a rectangle whose border runs through 2^30
+  leaves is counted exactly at once — the former density-grid descent did
+  not finish in minutes), the
   topology images of rectangles (`World::images`) against cell-by-cell
   mapping on all finite topologies, streamed fills equal to listed fills,
   shapes refused at the edge of the 64-bit plane, tracker per-tick decay and
@@ -603,6 +635,29 @@ patterns 2^41 cells apart cost the same as if they were adjacent. Hashlife
 reaches generation 2^20 of a gun in about half a millisecond because the
 glider stream is made of a few repeated quadtree nodes, which is why the
 automatic choice uses it for large power-of-two steps.
+
+**Hashlife views** (`hashlife_breeder_2^24_view`): the texel counts
+(`LifeEngine::count_live`, what `LifeSim::view` spends its time on) of
+1920 × 1080-texel requests on Breeder 1 after 2^24 generations (a triangle of
+glider streams 8.4·10^6 cells wide, 3.7·10^11 live cells), before and after
+border texels became exact (`Universe::population_in_rect` per border texel
+instead of listing the border strips up to 2^21 cells and estimating beyond).
+Same machine, 2026-11-10, load average 5–8, the two builds alternated twice
+(medians of both runs):
+
+| View | Texels | Before (listing + estimate) | After (exact) |
+|---|---|---|---|
+| `fit`: the whole pattern with the desktop view's margin (borders in empty space) | 1281 × 769 at 2^13 cells | 2.71, 2.69 ms | 3.05, 3.22 ms |
+| `inside_2^11`: a window inside the triangle, every border through glider streams | 1466 × 831 at 2^11 cells | 66.9, 67.6 ms (estimated borders) | 39.5, 39.3 ms |
+| `inside_2^7`: a closer window inside the triangle | 1564 × 861 at 2^7 cells | 28.7, 29.8 ms | 18.4, 18.0 ms |
+
+Exact border texels cost one descent from the root per border texel
+(≈ 0.1 µs each when the border lies in empty space, the +0.4 ms of `fit`)
+and are faster than listing whenever the border crosses live cells: the
+per-node memo of `population_in_rect` counts repeated glider-stream nodes
+once instead of listing their cells. An earlier pair of runs at load average
+22–39 gave the same picture (fit 2.96 → 3.00–3.24 ms, inside 74.7–75.6 →
+42.2–43.2 ms and 31.4–32.2 → 19.8–20.1 ms).
 
 ## 12. References
 

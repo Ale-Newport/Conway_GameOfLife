@@ -136,8 +136,7 @@ impl ResetPoint {
         sim.generation = 0;
         sim.last_stats = None;
         sim.halted = None;
-        let live = if sim.tracker.enabled() { sim.engine.export_cells() } else { Vec::new() };
-        sim.tracker.restart(live);
+        sim.restart_tracking();
         Ok(())
     }
 }
@@ -222,6 +221,7 @@ pub(super) fn load(sim: &mut LifeSim, snapshot: &Snapshot) -> Result<(), SimErro
     sim.generation = state.generation;
     sim.rng = state.rng;
     sim.tracker = state.tracker;
+    sim.tracking_off = None;
     sim.last_stats = state.last_stats;
     sim.reset_point = state.reset_point;
     sim.halted = state.halted;

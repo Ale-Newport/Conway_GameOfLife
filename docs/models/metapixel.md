@@ -89,17 +89,19 @@ nothing changes.
   `[x0, x1] × [y0, y1]` and a texel budget. The model picks the smallest
   power-of-two `cells_per_texel` whose texel-aligned cover fits, snaps the
   origin to multiples of it, and fills the shared grid contract `GridView
-  { origin_x, origin_y, width, height, cells_per_texel, rgba }` from
-  `Universe::density_grid` (O(visible quadtree nodes)): R = 1 if the texel
-  holds a live cell, G = 0 and B = 0 (age and activity are not tracked by
-  Hashlife), A = live fraction × 255 (255/0 for exact texels). Every texel
-  describes its whole aligned block, border texels included: their values
-  are summed from cached quadtree populations, so no cell is iterated, but
-  a border texel of an unaligned request may count live cells up to
-  `cells_per_texel − 1` cells outside the request (the dense engines of
-  `cellular-automata` clip border texels instead; doing that here would
-  cost up to `cells_per_texel` node visits per border texel). `ScaleInfo`
-  gives cells per texel, texels per tile and the tiles visible.
+  { origin_x, origin_y, width, height, cells_per_texel, rgba }`: R = 1 if
+  the texel holds a live cell, G = 0 and B = 0 (age and activity are not
+  tracked by Hashlife), A = 255 × live cells / requested cells of the texel
+  (255/0 for exact texels). As in `cellular-automata`, every texel describes
+  only the requested cells of its block, and no cell is iterated: texels
+  whose whole block is requested come from `Universe::density_grid`
+  (cached quadtree populations, O(visible nodes)); the border texels of an
+  unaligned request count the requested part of their block exactly with
+  `Universe::population_in_rect` (skipped for an empty block), one descent
+  per border texel through the nodes crossing that part's border. Measured
+  cost: +0.3 to +1.3 ms per view on 1024-texel requests of the galaxy and
+  of a 64×64 construction (`docs/OTCA_METAPIXEL.md` §6). `ScaleInfo` gives
+  cells per texel, texels per tile and the tiles visible.
 * **Macro** (`macro_grid: true`): per tile the exact reading of the latest
   readout (`None` before `t = P`), the accelerated prediction for the same
   metagen, a mismatch flag and the tile's current physical population; with

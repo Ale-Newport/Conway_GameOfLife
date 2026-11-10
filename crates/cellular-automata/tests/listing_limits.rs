@@ -1,7 +1,9 @@
 //! Operations that list live cells one by one stay within their limits
 //! without listing anything to find out: the region tools count the region
 //! first, engine switches check the population, and the age/activity tracker
-//! counts an edited region before merging it. A counting global allocator
+//! counts an edited region before merging it and the population before
+//! listing every live cell to start (turning it on, building the model, a
+//! reset). A counting global allocator
 //! measures what each refusal allocates; it also refuses any single
 //! allocation above 4 GiB, so a regression aborts instead of exhausting the
 //! machine. The tests of this binary run one at a time.
@@ -12,7 +14,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use cellular_automata::engine::MAX_SWITCH_CELLS;
 use cellular_automata::geometry::MAX_EDIT_CELLS;
-use cellular_automata::life::{LifeConfig, LifeMode, PatternLibrary, PatternSource};
+use cellular_automata::life::{LifeConfig, LifeMode, MAX_TRACKED_CELLS, PatternLibrary, PatternSource};
 use cellular_automata::{
     CellRect, EngineChoice, EngineKind, HashlifeEngine, InitItem, LifeCommand, LifeEngine, LifeSim, MirrorAxis,
     Rotation, Symmetry, switch_engine,
@@ -168,6 +170,30 @@ fn limit_exceeded(result: Result<(), SimError>, limit: u64) -> bool {
     matches!(result, Err(SimError::LimitExceeded(m)) if m.contains(&limit.to_string()))
 }
 
+/// The `track_ages` and `track_activity` parameters.
+fn tracked(s: &LifeSim) -> [Option<bool>; 2] {
+    ["track_ages", "track_activity"].map(|k| s.params().get(k).and_then(ParamValue::as_bool))
+}
+
+/// The description of parameter `key`, as the user interface shows it.
+fn description(s: &LifeSim, key: &str) -> String {
+    s.descriptor().params.into_iter().find(|p| p.key == key).expect("known parameter").description
+}
+
+/// A full 8,192 × 8,193 rectangle on the infinite plane (2^26 + 8,192 live
+/// cells, filled as the scenario starts) on `engine`, tracked with `track`.
+fn full_rectangle(engine: EngineChoice, track: bool) -> LifeConfig {
+    let region = Some(CellRect::new(0, 0, 8191, 8192));
+    LifeConfig {
+        topology: Topology::Infinite,
+        init: vec![InitItem::Random { region, density: 1.0, symmetry: Symmetry::None }],
+        engine,
+        track_ages: track,
+        track_activity: track,
+        ..LifeConfig::default()
+    }
+}
+
 #[test]
 fn region_tools_refuse_more_live_cells_than_the_edit_limit_without_listing_them() {
     let _serial = serial();
@@ -201,6 +227,7 @@ fn region_tools_refuse_more_live_cells_than_the_edit_limit_without_listing_them(
 fn engine_switches_refuse_more_live_cells_than_the_switch_limit_without_listing_them() {
     let _serial = serial();
     let mut s = huge_gun();
+    assert!(description(&s, "engine").contains(&MAX_SWITCH_CELLS.to_string()), "the user interface states the limit");
     let population = s.population();
     for engine in ["sparse", "dense"] {
         let (result, bytes) = peak(|| s.set_param("engine", ParamValue::Text(engine.into())));
@@ -242,17 +269,81 @@ fn engine_switches_refuse_more_live_cells_than_the_switch_limit_without_listing_
 #[test]
 fn tracking_stops_instead_of_listing_an_edited_region_above_the_edit_limit() {
     let _serial = serial();
-    let tracked =
-        |s: &LifeSim| ["track_ages", "track_activity"].map(|k| s.params().get(k).and_then(ParamValue::as_bool));
     let mut s = torus(8192, 8193, true);
     let (result, bytes) = peak(|| s.apply(fill(None)));
     result.unwrap();
     assert_eq!(s.population(), MAX_EDIT_CELLS + 8192, "the edit is applied");
     assert!(bytes < SMALL, "the fill allocated {bytes} bytes");
     assert_eq!(tracked(&s), [Some(false); 2], "tracking stopped");
+    assert!(s.tracking_off_reason().is_some_and(|r| r.contains(&MAX_EDIT_CELLS.to_string())));
     // Edits of regions within the limit keep tracking.
     let mut t = torus(256, 256, true);
     t.apply(fill(Some(CellRect::new(0, 0, 255, 99)))).unwrap();
     assert_eq!(tracked(&t), [Some(true); 2]);
     assert_eq!((t.population(), t.age(5, 5), t.activity(5, 5)), (256 * 100, 1, 255));
+    assert_eq!(t.tracking_off_reason(), None);
+}
+
+#[test]
+fn tracking_does_not_start_above_the_tracking_limit_without_listing() {
+    let _serial = serial();
+    // Turning tracking on would list the gun's 1.8 × 10^11 live cells.
+    let mut gun = huge_gun();
+    let population = gun.population().to_string();
+    for key in ["track_ages", "track_activity"] {
+        let text = description(&gun, key);
+        let limits = [format!("above {MAX_TRACKED_CELLS} live cells"), format!("more than {MAX_EDIT_CELLS} in")];
+        assert!(limits.iter().all(|limit| text.contains(limit.as_str())), "{text}");
+        let (result, bytes) = peak(|| gun.set_param(key, ParamValue::Bool(true)).map(|_| ()));
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains(&MAX_TRACKED_CELLS.to_string()) && message.contains(&population), "{message}");
+        assert!(bytes < SMALL, "turning {key} on allocated {bytes} bytes to refuse");
+        assert_eq!(tracked(&gun), [Some(false); 2]);
+        assert!(gun.tracking_off_reason().is_some_and(|r| message.ends_with(r)));
+    }
+    gun.set_param("track_ages", ParamValue::Bool(false)).unwrap();
+    assert_eq!(gun.tracking_off_reason(), None, "setting a tracking parameter clears the reason");
+    // A model configured with tracking and built with more live cells starts
+    // without it, allocating no more than without tracking.
+    let (untracked, plain) = peak(|| sim(full_rectangle(EngineChoice::Sparse, false)));
+    drop(untracked);
+    let (s, bytes) = peak(|| sim(full_rectangle(EngineChoice::Sparse, true)));
+    assert_eq!(s.population(), MAX_TRACKED_CELLS + 8192);
+    assert!(bytes < plain + SMALL, "building with tracking allocated {bytes} bytes, {plain} without");
+    assert_eq!(tracked(&s), [Some(false); 2]);
+    assert!(s.tracking_off_reason().is_some_and(|r| r.contains(&MAX_TRACKED_CELLS.to_string())));
+}
+
+#[test]
+fn resets_stop_tracking_above_the_tracking_limit_without_listing() {
+    let _serial = serial();
+    // Return to a reset point of 2^26 + 8,192 live cells (a macrocell file on
+    // Hashlife): one generation empties the rectangle but for a frame of
+    // births around it, which tracking can list.
+    let mut s = sim(full_rectangle(EngineChoice::Hashlife, false));
+    s.step();
+    assert!(s.population() < 1 << 16);
+    s.set_param("track_ages", ParamValue::Bool(true)).unwrap();
+    s.set_param("track_activity", ParamValue::Bool(true)).unwrap();
+    let (_, bytes) = peak(|| s.reset());
+    assert_eq!((s.tick(), s.population(), s.halt_reason()), (0, MAX_TRACKED_CELLS + 8192, None));
+    assert!(bytes < SMALL, "the reset allocated {bytes} bytes");
+    assert_eq!(tracked(&s), [Some(false); 2]);
+    assert!(s.tracking_off_reason().is_some_and(|r| r.contains(&MAX_TRACKED_CELLS.to_string())));
+    // After a world change the reset rebuilds the scenario instead (a
+    // streamed random fill, here on the sparse engine): compared with the
+    // same rebuild untracked.
+    let mut s = sim(full_rectangle(EngineChoice::Sparse, false));
+    let rebuild = |s: &mut LifeSim, width: i64, track: bool| {
+        s.apply(LifeCommand::Clear).unwrap();
+        s.set_param("track_ages", ParamValue::Bool(track)).unwrap();
+        s.set_param("width", ParamValue::Int(width)).unwrap();
+        peak(|| s.reset()).1
+    };
+    let plain = rebuild(&mut s, 300, false);
+    let bytes = rebuild(&mut s, 301, true);
+    assert_eq!((s.world().width, s.population(), s.halt_reason()), (301, MAX_TRACKED_CELLS + 8192, None));
+    assert!(bytes < plain + SMALL, "the tracked rebuild allocated {bytes} bytes, {plain} without");
+    assert_eq!(tracked(&s), [Some(false); 2]);
+    assert!(s.tracking_off_reason().is_some_and(|r| r.contains(&MAX_TRACKED_CELLS.to_string())));
 }

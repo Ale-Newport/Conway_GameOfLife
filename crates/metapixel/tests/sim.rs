@@ -127,16 +127,22 @@ fn micro_view_follows_the_grid_view_contract() {
     assert_eq!((micro.origin_x % 16, micro.origin_y % 16), (0, 0));
     assert!(micro.origin_x <= -5 && micro.origin_x + 16 > -5);
     assert_eq!(micro.rgba.len(), (micro.width * micro.height * 4) as usize);
-    // Every texel encodes the exact block population of Hashlife's density grid.
-    let counts = sim
-        .universe()
-        .density_grid(micro.origin_x, micro.origin_y, micro.width as usize, micro.height as usize, 4)
-        .unwrap();
-    for (texel, &count) in micro.rgba.chunks(4).zip(&counts) {
-        let density = (255.0 * f64::from(count) / 256.0).round() as u8;
-        assert_eq!(texel, [u8::from(count > 0), 0, 0, density]);
+    // Every texel encodes the exact population of its block clipped to the
+    // request: border texels count only cells inside the requested rectangle.
+    let (w, cpt) = (micro.width as i64, micro.cells_per_texel as i64);
+    let mut total = 0u128;
+    for (i, texel) in micro.rgba.chunks(4).enumerate() {
+        let (bx, by) = (micro.origin_x + (i as i64 % w) * cpt, micro.origin_y + (i as i64 / w) * cpt);
+        let (cx0, cy0) = (bx.max(whole.x0), by.max(whole.y0));
+        let (cx1, cy1) = ((bx + cpt - 1).min(whole.x1), (by + cpt - 1).min(whole.y1));
+        let count = sim.universe().population_in_rect(cx0, cy0, cx1, cy1);
+        total += count;
+        // Density is relative to the requested cells the texel covers.
+        let covered = ((cx1 - cx0 + 1) * (cy1 - cy0 + 1)) as f64;
+        let density = (255.0 * count as f64 / covered).round() as u8;
+        assert_eq!(texel, [u8::from(count > 0), 0, 0, density], "texel {i}");
     }
-    assert_eq!(counts.iter().map(|&c| u64::from(c)).sum::<u64>(), sim.universe().population());
+    assert_eq!(total, u128::from(sim.universe().population()));
     let scale = view.scale.unwrap();
     assert_eq!((scale.tiles_visible_x, scale.tiles_visible_y), (3, 3));
     assert_eq!(scale.texels_per_tile, 128.0);
