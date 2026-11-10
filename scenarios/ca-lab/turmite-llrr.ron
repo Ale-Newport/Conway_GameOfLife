@@ -1,0 +1,14 @@
+(
+    id: "turmite-llrr",
+    name: "Turmite LLRR (cardioid)",
+    description: "A four-colour ant (rule LLRR) that grows a symmetric, cardioid-shaped figure instead of a highway; the coloured pattern is mirror-symmetric again and again.",
+    seed: 1,
+    model: Ant(
+        rule: "LLRR",
+        topology: infinite,
+        steps_per_tick: 50,
+        track_activity: true,
+        ants: [(x: 0, y: 0, heading: north)],
+    ),
+    reference: "Gale, Propp, Sutherland, Troubetzkoy, 'Further Travels with My Ant', Math. Intelligencer 17 (1995)",
+)

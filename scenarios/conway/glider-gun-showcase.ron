@@ -1,0 +1,17 @@
+// Two Gosper glider guns, one mirrored, whose glider streams diverge.
+(
+    id: "glider-gun-showcase",
+    name: "Glider gun showcase",
+    description: "Bill Gosper's 1970 glider gun, the first pattern shown to grow forever, next to its mirror image. Each gun emits one glider every 30 generations; the right gun fires towards the bottom right and its mirror image towards the bottom left, so the two streams never meet. Engine: automatic (sparse tiles on the infinite plane).",
+    seed: 1,
+    model: Classic(
+        topology: infinite,
+        width: 256,
+        height: 192,
+        init: [
+            Pattern(source: Library("gosper-glider-gun"), x: 50, y: 10),
+            Pattern(source: Library("gosper-glider-gun"), x: -86, y: 10, mirror: true),
+        ],
+    ),
+    reference: "Gosper glider gun (embedded in the patterns crate); period 30 and one glider per period are asserted by tests/catalog.rs",
+)

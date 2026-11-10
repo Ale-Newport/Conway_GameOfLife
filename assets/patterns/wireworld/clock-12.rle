@@ -1,0 +1,7 @@
+#N Wireworld clock, period 12
+#O Emergence Lab (own layout, verified by simulation)
+#C A 12-cell corner-cut ring with one electron; pulses reach the end of the
+#C output wire (x = 10, y = 2) at generations 7, 19, 31, ...
+#C License: MIT OR Apache-2.0 (original Emergence Lab data); see PROVENANCE.md.
+x = 11, y = 5, rule = WireWorld
+.CBA$C3.C$C3.7C$C3.C$.3C!

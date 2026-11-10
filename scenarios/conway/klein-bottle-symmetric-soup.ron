@@ -1,0 +1,13 @@
+(
+    id: "klein-bottle-symmetric-soup",
+    name: "Symmetric soup on a Klein bottle",
+    description: "A soup with all eight symmetries of the square on a 256×256 Klein bottle. Life itself preserves every symmetry, but the Klein bottle's twisted edge (crossing the top or bottom mirrors x) does not respect them all, so the symmetry is broken from the edges inwards.",
+    seed: 8,
+    model: Classic(
+        topology: klein_bottle,
+        width: 256,
+        height: 256,
+        track_activity: true,
+        init: [Random(density: 0.4, symmetry: rotate8)],
+    ),
+)

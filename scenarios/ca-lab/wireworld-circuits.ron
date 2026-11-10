@@ -1,0 +1,20 @@
+(
+    id: "wireworld-circuits",
+    name: "Wireworld circuits",
+    description: "Building blocks of Wireworld electronics: a diode, clocks of period 8 and 12, and OR, XOR and AND gates, each with its input electrons already on the wires.",
+    seed: 1,
+    model: Wireworld(
+        topology: bounded,
+        width: 64,
+        height: 72,
+        init: [
+            Pattern(source: Library("wireworld/diode"), x: 2, y: 2),
+            Pattern(source: Library("wireworld/clock-8"), x: 2, y: 8),
+            Pattern(source: Library("wireworld/clock-12"), x: 2, y: 14),
+            Pattern(source: Library("wireworld/or-gate"), x: 2, y: 22),
+            Pattern(source: Library("wireworld/xor-gate"), x: 2, y: 30),
+            Pattern(source: Library("wireworld/and-gate-mcintosh"), x: 2, y: 44),
+        ],
+    ),
+    reference: "assets/patterns/wireworld/PROVENANCE.md; truth tables and periods asserted by tests/wireworld.rs",
+)

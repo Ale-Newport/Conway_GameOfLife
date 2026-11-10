@@ -1,0 +1,19 @@
+#N Wireworld AND gate (H. V. McIntosh)
+#O Harold V. McIntosh
+#C AND gate: signals enter at the top-left ends of the two input wires (heads
+#C at (14, 0) and (10, 2)); their AND leaves at the bottom right. With both
+#C electrons, one pulse reaches (33, 7) at generation 23; with one or none,
+#C nothing does.
+#C Source: Golly 5.1, Patterns/WireWorld/gate-AND.mcl (first of the five
+#C instances in that file), converted from MCell to RLE by Emergence Lab.
+#C License: GPL-2.0-or-later (Golly pattern collection); see PROVENANCE.md.
+#C ---- original Golly header follows ----
+#C AND
+#C A little ingenuity produces the following AND gate;
+#C the signals enter at the top corners, their AND exits
+#C at the bottom right hand corner.
+#C This literal construction shows too many cells; the circuit
+#C can be rearranged into other forms.
+#C Harold V. McIntosh
+x = 34, y = 8, rule = WireWorld
+14.A5C$20.C$10.A5C5.3C$16.C.C.C3.C$17.3C4.C$18.C.C.C.C$21.3C$22.C.10C!

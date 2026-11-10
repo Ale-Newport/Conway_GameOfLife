@@ -1,0 +1,15 @@
+(
+    id: "breeder-hashlife",
+    name: "Breeder 1 (Hashlife)",
+    description: "Bill Gosper's breeder: a puffer train laying glider guns, so the population grows quadratically. Runs 64 generations per tick with Hashlife, which exploits the repeated guns.",
+    seed: 1,
+    model: Classic(
+        topology: infinite,
+        width: 1024,
+        height: 512,
+        engine: hashlife,
+        generations_per_tick: 64,
+        init: [Pattern(source: Library("breeder-1"), x: 0, y: 0)],
+    ),
+    reference: "breeder-1 in assets/patterns/catalog.toml (Golly data, GPL); quadratic growth checked by tests/catalog.rs; needs the asset catalog",
+)

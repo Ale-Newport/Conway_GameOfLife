@@ -1,0 +1,17 @@
+(
+    id: "two-by-two",
+    name: "2×2",
+    description: "2×2 (B36/S125): patterns made of 2×2 blocks keep evolving as 2×2 blocks (on a lattice that shifts by one cell every generation). The 6-cell c/8 diagonal glider travels next to a random soup.",
+    seed: 17,
+    model: LifeLike(
+        preset: two_by_two,
+        topology: infinite,
+        width: 256,
+        height: 256,
+        init: [
+            Pattern(source: Text("x = 5, y = 4, rule = B36/S125\n3bo$obo2$2b3o!"), x: 200, y: 40),
+            Random(region: (x0: 40, y0: 120, x1: 103, y1: 183), density: 0.35),
+        ],
+    ),
+    reference: "docs/research/automata-catalog.md §2.6 (c/8 glider RLE, LifeWiki); period 8 and displacement (−1, +1) asserted by tests/life_rules.rs",
+)

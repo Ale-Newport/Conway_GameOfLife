@@ -1,0 +1,14 @@
+(
+    id: "life-without-death",
+    name: "Life without Death",
+    description: "Life without Death (B3/S012345678), also called Inkspot or Flakes: cells are born as in Life and never die, so the population never decreases. A sparse soup grows into ink blots and ladders.",
+    seed: 11,
+    model: LifeLike(
+        preset: life_without_death,
+        topology: torus,
+        width: 256,
+        height: 256,
+        track_ages: true,
+        init: [Random(density: 0.04)],
+    ),
+)

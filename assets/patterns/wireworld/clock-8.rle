@@ -1,0 +1,8 @@
+#N Wireworld clock, period 8
+#O Emergence Lab (own layout, verified by simulation)
+#C An 8-cell ring holding one electron emits a pulse into the output wire
+#C every 8 generations: the head reaches the far end (x = 12) at generations
+#C 10, 18, 26, ...
+#C License: MIT OR Apache-2.0 (original Emergence Lab data); see PROVENANCE.md.
+x = 13, y = 3, rule = WireWorld
+.BAC$C3.9C$.3C!

@@ -1,0 +1,13 @@
+(
+    id: "maze",
+    name: "Maze",
+    description: "Maze (B3/S12345): births as in Life, but cells survive with 1 to 5 neighbours. A random patch grows into a labyrinth of corridors and walls.",
+    seed: 13,
+    model: LifeLike(
+        preset: maze,
+        topology: torus,
+        width: 256,
+        height: 256,
+        init: [Random(region: (x0: 96, y0: 96, x1: 159, y1: 159), density: 0.3)],
+    ),
+)

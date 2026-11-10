@@ -1,0 +1,8 @@
+(
+    id: "wolfram-rule-110",
+    name: "Rule 110",
+    description: "Elementary rule 110, proved Turing-complete by Matthew Cook (2004). From a single cell the right edge stays fixed while the left edge advances one cell per step, leaving a triangle of interacting gliders.",
+    seed: 1,
+    model: Wolfram(rule: 110, width: 1025, boundary: fixed0, start: single_cell, history: 4096),
+    reference: "Cook, Complex Systems 15 (2004)",
+)

@@ -1,0 +1,8 @@
+(
+    id: "wolfram-rule-90",
+    name: "Rule 90 (Sierpiński triangle)",
+    description: "Elementary rule 90 (new cell = left XOR right) from a single cell draws Pascal's triangle modulo 2, the Sierpiński triangle: row n has 2^popcount(n) live cells.",
+    seed: 1,
+    model: Wolfram(rule: 90, width: 1025, boundary: fixed0, start: single_cell, history: 4096),
+    reference: "Pascal's triangle mod 2 asserted exactly by tests/wolfram.rs",
+)

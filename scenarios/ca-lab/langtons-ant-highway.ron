@@ -1,0 +1,14 @@
+(
+    id: "langtons-ant-highway",
+    name: "Langton's ant",
+    description: "Chris Langton's ant (rule RL): on a white cell turn right, on a black cell turn left, flip the cell, step forward. After about 10,000 chaotic steps it starts building a diagonal 'highway' that repeats every 104 steps (exactly from step 9977 on).",
+    seed: 1,
+    model: Ant(
+        rule: "RL",
+        topology: infinite,
+        steps_per_tick: 10,
+        track_activity: true,
+        ants: [(x: 0, y: 0, heading: north)],
+    ),
+    reference: "OEIS A255938; highway onset asserted by tests/ant.rs",
+)

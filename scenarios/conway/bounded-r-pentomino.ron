@@ -1,0 +1,13 @@
+(
+    id: "bounded-r-pentomino",
+    name: "R-pentomino in a box",
+    description: "The R-pentomino in the middle of a 128×128 bounded plane. Outside the box every cell is permanently dead, so gliders die at the walls and the evolution differs from the unbounded one (which settles at generation 1103 with 116 cells).",
+    seed: 1,
+    model: Classic(
+        topology: bounded,
+        width: 128,
+        height: 128,
+        track_ages: true,
+        init: [Pattern(source: Library("r-pentomino"), x: 63, y: 63)],
+    ),
+)

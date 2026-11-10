@@ -1,0 +1,8 @@
+(
+    id: "wolfram-rule-30",
+    name: "Rule 30",
+    description: "Elementary rule 30 (new cell = left XOR (centre OR right)) from a single cell: a chaotic triangle whose centre column was used as a random number generator in Mathematica.",
+    seed: 1,
+    model: Wolfram(rule: 30, width: 1025, boundary: fixed0, start: single_cell, history: 4096),
+    reference: "Wolfram (1983, 1986); centre column = OEIS A051023, asserted by tests/wolfram.rs",
+)

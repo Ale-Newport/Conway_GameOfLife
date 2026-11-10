@@ -1,0 +1,20 @@
+// Puffers leave trails of debris behind them while travelling forever.
+(
+    id: "infinite-puffer-world",
+    name: "Infinite puffer world",
+    description: "Four puffers on the infinite plane, run 16 generations per tick so the automatic choice picks Hashlife: Puffer 1 (c/2, period 128), the puffer train (c/2, period 140 with its exhaust), blinker puffer 1 (c/2, period 8) and Noah's ark (c/12 diagonal, period 1344). Their debris trails grow without bound.",
+    seed: 1,
+    model: Classic(
+        topology: infinite,
+        width: 1024,
+        height: 1024,
+        generations_per_tick: 16,
+        init: [
+            Pattern(source: Library("puffer-1"), x: 0, y: 0),
+            Pattern(source: Library("puffer-train"), x: 400, y: 0),
+            Pattern(source: Library("blinker-puffer-1"), x: 800, y: 0),
+            Pattern(source: Library("noahs-ark"), x: 1600, y: 1600),
+        ],
+    ),
+    reference: "Periods and displacements from assets/patterns/catalog.toml (verified by tests/catalog.rs); needs the asset catalog",
+)

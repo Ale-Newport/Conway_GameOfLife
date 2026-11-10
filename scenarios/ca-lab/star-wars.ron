@@ -1,0 +1,13 @@
+(
+    id: "star-wars",
+    name: "Star Wars",
+    description: "Mirek Wójtowicz's Star Wars (Generations 345/2/4): births on two firing neighbours, survival on 3 to 5, two dying states. A random soup builds long-lived structures that shoot dying debris.",
+    seed: 31,
+    model: Generations(
+        rule: "345/2/4",
+        topology: torus,
+        width: 256,
+        height: 256,
+        init: [Random(density: 0.3)],
+    ),
+)

@@ -1,0 +1,17 @@
+(
+    id: "morley-jellyfish",
+    name: "Morley: jellyfish and puffer",
+    description: "Morley (B368/S245, MCell's 'Move'). The 6-cell jellyfish is the smallest c/7 diagonal spaceship; the 6-cell column next to it is the predecessor of Alan Hensel's 13c/170 puffer, which grows forever.",
+    seed: 1,
+    model: LifeLike(
+        preset: morley,
+        topology: infinite,
+        width: 256,
+        height: 256,
+        init: [
+            Pattern(source: Text("x = 3, y = 3, rule = B368/S245\n3o$b2o$2bo!"), x: 60, y: 60),
+            Pattern(source: Text("x = 2, y = 6, rule = B368/S245\no$bo$bo$bo$bo$o!"), x: 180, y: 120),
+        ],
+    ),
+    reference: "docs/research/automata-catalog.md §2.10 (LifeWiki); jellyfish period 7 / displacement (−1, +1) asserted by tests/life_rules.rs",
+)

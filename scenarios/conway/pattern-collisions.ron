@@ -1,0 +1,19 @@
+// Interactions whose outcomes are verified by tests/catalog.rs.
+(
+    id: "pattern-collisions",
+    name: "Pattern collisions",
+    description: "Four classic interactions side by side: three gliders that synthesise a lightweight spaceship, eater 1 absorbing a glider, the Snark reflecting a glider by 90 degrees, and the buckaroo turning a glider around. Each object is restored after the collision.",
+    seed: 1,
+    model: Classic(
+        topology: infinite,
+        width: 512,
+        height: 256,
+        init: [
+            Pattern(source: Library("lwss-synthesis"), x: 0, y: 0),
+            Pattern(source: Library("eater-1"), x: 120, y: 0),
+            Pattern(source: Library("snark"), x: 240, y: 0),
+            Pattern(source: Library("buckaroo"), x: 400, y: 0),
+        ],
+    ),
+    reference: "assets/patterns/catalog.toml (eaters and reflectors ship with one demonstration glider); needs the asset catalog",
+)

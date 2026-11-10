@@ -1,0 +1,15 @@
+// HighLife replicator: Nathan Thompson, 1994 (cell data restated as a fact, see the reference).
+(
+    id: "highlife-replicator",
+    name: "HighLife replicator",
+    description: "HighLife (B36/S23) differs from Life only by birth on 6 neighbours, which makes this 12-cell replicator possible. Every 12 generations each copy duplicates along the diagonal; copies meeting in the middle annihilate, so after 12·n generations the copies sit exactly where Wolfram rule 90 puts its live cells after n steps (2^k copies at generation 12·(2^k − 1)).",
+    seed: 1,
+    model: LifeLike(
+        preset: highlife,
+        topology: infinite,
+        width: 256,
+        height: 256,
+        init: [Pattern(source: Text("x = 5, y = 5, rule = B36/S23\n2b3o$bo2bo$o3bo$o2bo$3o!"), x: 120, y: 120)],
+    ),
+    reference: "docs/research/automata-catalog.md §2.2 (replicator RLE, LifeWiki / Wikipedia); the rule-90 superposition is asserted by tests/life_rules.rs",
+)

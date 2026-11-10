@@ -1,0 +1,28 @@
+[package]
+name = "cellular-automata"
+description = "Cellular automata engines (dense, bit-packed, sparse chunked, Hashlife adapter) and models: Life-like, Generations, Brian's Brain, Wireworld, Langton's ant, Wolfram ECA."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+simulation-core.workspace = true
+patterns.workspace = true
+hashlife.workspace = true
+serde.workspace = true
+ron.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "engines"
+harness = false
+
+[lints]
+workspace = true

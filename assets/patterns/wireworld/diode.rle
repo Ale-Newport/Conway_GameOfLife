@@ -1,0 +1,8 @@
+#N Wireworld diode
+#O Emergence Lab (own layout, verified by simulation)
+#C Passes electrons from left to right only. The electron injected at the left
+#C reaches the right end (x = 10) at generation 9; an electron sent from the
+#C right is absorbed by the diode and never reaches x = 0.
+#C License: MIT OR Apache-2.0 (original Emergence Lab data); see PROVENANCE.md.
+x = 11, y = 3, rule = WireWorld
+3.2C$BA2C.6C$3.2C!

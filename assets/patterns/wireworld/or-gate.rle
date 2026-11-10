@@ -1,0 +1,9 @@
+#N Wireworld OR gate
+#O Emergence Lab (own layout, verified by simulation)
+#C Inputs enter from the left on rows 0 and 4; the output leaves on row 2.
+#C Either input or both produce exactly one pulse at (11, 2), at generation 10;
+#C no electron leaks back into the other input. Both inputs carry an electron
+#C in this file.
+#C License: MIT OR Apache-2.0 (original Emergence Lab data); see PROVENANCE.md.
+x = 12, y = 5, rule = WireWorld
+BA3C$5.C$4.8C$5.C$BA3C!

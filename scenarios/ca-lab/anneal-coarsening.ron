@@ -1,0 +1,14 @@
+(
+    id: "anneal-coarsening",
+    name: "Anneal (twisted majority)",
+    description: "Anneal (B4678/S35678), Vichniac's twisted majority vote: a 50 % random soup separates into live and dead domains whose boundaries straighten over time, like a cooling metal. The rule is symmetric under swapping live and dead cells.",
+    seed: 23,
+    model: LifeLike(
+        preset: anneal,
+        topology: torus,
+        width: 256,
+        height: 256,
+        init: [Random(density: 0.5)],
+    ),
+    reference: "Vichniac (1984); CelLab 'Vote' (docs/research/automata-catalog.md §2.11)",
+)

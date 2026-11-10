@@ -6652,6 +6652,150 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "view-ca-lab"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "cellular-automata",
+ "egui_plot",
+ "interface",
+ "patterns",
+ "rendering",
+ "serde",
+ "simulation-core",
+]
+
+[[package]]
+name = "view-civilization"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "bevy_panorbit_camera",
+ "civilization",
+ "egui_plot",
+ "interface",
+ "organism-engine",
+ "organism-render",
+ "rendering",
+ "serde",
+ "simulation-core",
+]
+
+[[package]]
+name = "view-continuous"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "continuous",
+ "egui_plot",
+ "interface",
+ "rendering",
+ "serde",
+ "simulation-core",
+]
+
+[[package]]
+name = "view-conway"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "cellular-automata",
+ "egui_plot",
+ "interface",
+ "patterns",
+ "persistence",
+ "rendering",
+ "serde",
+ "simulation-core",
+]
+
+[[package]]
+name = "view-custom-life"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "egui_plot",
+ "interface",
+ "persistence",
+ "rendering",
+ "ron",
+ "rule-engine",
+ "serde",
+ "simulation-core",
+]
+
+[[package]]
+name = "view-ecosystem"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "bevy_panorbit_camera",
+ "ecosystem",
+ "egui_plot",
+ "interface",
+ "organism-engine",
+ "organism-render",
+ "physics-world",
+ "rendering",
+ "serde",
+ "simulation-core",
+]
+
+[[package]]
+name = "view-evolution"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "bevy_panorbit_camera",
+ "egui_plot",
+ "evolution",
+ "interface",
+ "organism-engine",
+ "organism-render",
+ "rendering",
+ "serde",
+ "simulation-core",
+]
+
+[[package]]
+name = "view-metapixel"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "egui_plot",
+ "hashlife",
+ "interface",
+ "metapixel",
+ "patterns",
+ "rendering",
+ "serde",
+ "simulation-core",
+]
+
+[[package]]
+name = "view-voxel"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "bevy_panorbit_camera",
+ "egui_plot",
+ "interface",
+ "rendering",
+ "serde",
+ "simulation-core",
+ "voxel-life",
+]
+
+[[package]]
 name = "voxel-life"
 version = "0.1.0"
 dependencies = [

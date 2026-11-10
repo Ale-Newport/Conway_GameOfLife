@@ -1,0 +1,20 @@
+(
+    id: "turmite-four-ants",
+    name: "Four Langton's ants",
+    description: "Four RL ants starting back to back on a 256×256 torus. They move one after the other every step and interact only through the colours they leave behind.",
+    seed: 1,
+    model: Ant(
+        rule: "RL",
+        topology: torus,
+        width: 256,
+        height: 256,
+        steps_per_tick: 20,
+        track_activity: true,
+        ants: [
+            (x: 127, y: 127, heading: north),
+            (x: 128, y: 127, heading: east),
+            (x: 128, y: 128, heading: south),
+            (x: 127, y: 128, heading: west),
+        ],
+    ),
+)

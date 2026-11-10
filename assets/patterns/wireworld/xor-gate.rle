@@ -1,0 +1,9 @@
+#N Wireworld XOR gate
+#O Emergence Lab (own layout of the classic ring XOR described by McIntosh and Dewdney)
+#C Inputs come down from the top and up from the bottom (column 1); the output
+#C leaves to the right on row 4. Exactly one input gives one pulse at (11, 4)
+#C at generation 11; two simultaneous inputs annihilate. Both inputs carry an
+#C electron in this file.
+#C License: MIT OR Apache-2.0 (original Emergence Lab data); see PROVENANCE.md.
+x = 12, y = 9, rule = WireWorld
+.B$.A$.C$4C$C.10C$4C$.C$.A$.B!

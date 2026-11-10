@@ -1,0 +1,15 @@
+(
+    id: "brians-brain",
+    name: "Brian's Brain",
+    description: "Brian Silverman's Brian's Brain (Generations /2/3): a ready cell fires when exactly two neighbours fire, a firing cell becomes refractory, a refractory cell becomes ready. No cell fires twice in a row, so the activity never settles: a sparse soup turns into a sea of colliding spaceships.",
+    seed: 29,
+    model: Generations(
+        rule: "Brian's Brain",
+        topology: torus,
+        width: 256,
+        height: 256,
+        track_activity: true,
+        init: [Random(density: 0.1), Pattern(source: Text("x = 2, y = 2, rule = /2/3\nBA$BA!"), x: 20, y: 20)],
+    ),
+    reference: "Golly Generations semantics (docs/research/automata-catalog.md §3); the domino spaceship BA$BA! is asserted by tests/generations.rs",
+)

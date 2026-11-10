@@ -1,0 +1,14 @@
+(
+    id: "replicator-rule",
+    name: "Replicator rule",
+    description: "Replicator (B1357/S1357): the next state of a cell is the parity (XOR) of its eight neighbours, so the rule is linear and every pattern replicates. After 2^k generations an R-pentomino has become eight separate copies.",
+    seed: 1,
+    model: LifeLike(
+        preset: replicator,
+        topology: infinite,
+        width: 256,
+        height: 256,
+        init: [Pattern(source: Library("r-pentomino"), x: 126, y: 126)],
+    ),
+    reference: "docs/research/automata-catalog.md §2.8; the eight copies are asserted by tests/life_rules.rs",
+)

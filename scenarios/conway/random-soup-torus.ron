@@ -1,0 +1,14 @@
+(
+    id: "random-soup-torus",
+    name: "Random soup on a torus",
+    description: "A 512×512 torus filled with a 35 % random soup. The soup burns down to ash of blocks, blinkers, beehives and gliders that wrap around the edges forever. Activity trails and ages are tracked every generation.",
+    seed: 2024,
+    model: Classic(
+        topology: torus,
+        width: 512,
+        height: 512,
+        track_ages: true,
+        track_activity: true,
+        init: [Random(density: 0.35)],
+    ),
+)

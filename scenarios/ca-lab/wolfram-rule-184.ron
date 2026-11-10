@@ -1,0 +1,8 @@
+(
+    id: "wolfram-rule-184",
+    name: "Rule 184 (traffic)",
+    description: "Elementary rule 184 on a ring is a traffic model: a 1 (car) moves right when the cell ahead is empty. The number of cars never changes; at density 0.3 jams dissolve into free flow.",
+    seed: 37,
+    model: Wolfram(rule: 184, width: 1024, boundary: periodic, start: random, density: 0.3, history: 4096),
+    reference: "Conservation of the number of 1s asserted by tests/wolfram.rs",
+)

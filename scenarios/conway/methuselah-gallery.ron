@@ -1,0 +1,22 @@
+// Six methuselahs, far enough apart that their ash does not collide early.
+(
+    id: "methuselah-gallery",
+    name: "Methuselah gallery",
+    description: "Small patterns that take hundreds or thousands of generations to settle: the R-pentomino (stable at generation 1103 with 116 cells), the acorn (5206, 633 cells), diehard (vanishes at generation 130), the pi-heptomino (173, 55), the B-heptomino (148, 28) and the thunderbird (243, 46). They are placed 1000 cells apart. Ages are tracked, so long-lived ash shows up in the age channel.",
+    seed: 1,
+    model: Classic(
+        topology: infinite,
+        width: 2200,
+        height: 1200,
+        track_ages: true,
+        init: [
+            Pattern(source: Library("r-pentomino"), x: 100, y: 100),
+            Pattern(source: Library("acorn"), x: 1100, y: 100),
+            Pattern(source: Library("diehard"), x: 2100, y: 100),
+            Pattern(source: Library("pi-heptomino"), x: 100, y: 1100),
+            Pattern(source: Library("b-heptomino"), x: 1100, y: 1100),
+            Pattern(source: Library("thunderbird"), x: 2100, y: 1100),
+        ],
+    ),
+    reference: "Stabilisation times and final populations from assets/patterns/catalog.toml, verified by tests/catalog.rs; pi-heptomino, B-heptomino and thunderbird need the asset catalog",
+)

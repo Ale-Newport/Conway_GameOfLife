@@ -1,0 +1,15 @@
+(
+    id: "seeds",
+    name: "Seeds",
+    description: "Seeds (B2/S): a cell is born with exactly two live neighbours and no cell ever survives, so nothing is alive in two consecutive generations. A small random patch explodes into fast-moving debris that fills the torus.",
+    seed: 3,
+    model: LifeLike(
+        preset: seeds,
+        topology: torus,
+        width: 256,
+        height: 256,
+        track_activity: true,
+        init: [Random(region: (x0: 120, y0: 120, x1: 135, y1: 135), density: 0.25)],
+    ),
+    reference: "Seeds was studied by Brian Silverman and named by Mirek Wójtowicz (docs/research/automata-catalog.md §2.3)",
+)

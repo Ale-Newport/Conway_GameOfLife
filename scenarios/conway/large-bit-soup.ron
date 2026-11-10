@@ -1,0 +1,12 @@
+(
+    id: "large-bit-soup",
+    name: "Large soup (bit-packed engine)",
+    description: "A 2048×2048 torus with a 30 % random soup: four million cells, run by the bit-packed SWAR engine (64 cells per machine word, parallel row bands).",
+    seed: 7,
+    model: Classic(
+        topology: torus,
+        width: 2048,
+        height: 2048,
+        init: [Random(density: 0.3)],
+    ),
+)

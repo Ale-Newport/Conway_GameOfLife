@@ -1,0 +1,18 @@
+// Day & Night rocket (170 cells, period 40, speed c/2), cell data from the research catalogue.
+(
+    id: "day-and-night-rocket",
+    name: "Day & Night rocket",
+    description: "Day & Night (B3678/S34678) is symmetric under swapping live and dead cells: dead islands in a live sea behave exactly like live islands in a dead sea. The rocket, its first known spaceship, moves 20 cells to the left every 40 generations. A random island sits far to its right.",
+    seed: 5,
+    model: LifeLike(
+        preset: day_and_night,
+        topology: infinite,
+        width: 400,
+        height: 128,
+        init: [
+            Pattern(source: Text("x = 43, y = 13, rule = B3678/S34678\n7b2o$8bo$4bo3bo3b2o$3b2ob8o9b2o$2b11obo3b2ob6o13b2o$b13o2b11o7bo4b3o$26o10b5obo$b13o2b11o7bo4b3o$2b11obo3b2ob6o13b2o$3b2ob8o9b2o$4bo3bo3b2o$8bo$7b2o!"), x: 200, y: 50),
+            Random(region: (x0: 300, y0: 20, x1: 363, y1: 83), density: 0.55),
+        ],
+    ),
+    reference: "docs/research/automata-catalog.md §2.4 (rocket RLE, LifeWiki); period 40 and displacement (−20, 0) asserted by tests/life_rules.rs",
+)
