@@ -8,10 +8,10 @@
 //!   the daily tree update; divide by 240 for the mean cost of a tick;
 //! * `wolf_sheep_grass_tick` — one tick of the NetLogo rules (51 × 51,
 //!   200–250 animals after 200 ticks);
-//! * `agents/1000` and `agents/10000` — one ordinary tick of a 160 × 160
-//!   grassland (3.2 km side, rivers and lakes) holding 1,000 or 10,000
-//!   individual animals of five species (rabbits, deer, sheep, foxes,
-//!   wolves) after a 50-tick warm-up;
+//! * `agents/1000`, `agents/10000` and `agents/100000` — one ordinary tick
+//!   of a 160 × 160 grassland (3.2 km side, rivers and lakes) holding 1,000,
+//!   10,000 or 100,000 individual animals of five species (rabbits, deer,
+//!   sheep, foxes, wolves) after a 50-tick warm-up;
 //! * `fields/100k` and `fields/10M` — one simulated hour (10 ticks, one
 //!   field update) of a 100 × 100 grassland without individual animals
 //!   whose beetles, worms, spiders and butterflies number 10⁵ or 10⁷ in
@@ -73,8 +73,8 @@ fn crowd(animals: u32) -> EcosystemSim {
         setup("wolf", share(0.05)),
     ];
     let mut params = ParamSet::new();
-    params.set("max_population_per_species", ParamValue::Int(50_000));
-    params.set("max_population_total", ParamValue::Int(100_000));
+    params.set("max_population_per_species", ParamValue::Int(100_000));
+    params.set("max_population_total", ParamValue::Int(200_000));
     config.params = params;
     EcosystemSim::new(config, 3, SpeciesCatalog::builtin().expect("species")).expect("valid configuration")
 }
@@ -112,7 +112,7 @@ fn bench_steps(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("agents");
     group.sample_size(10);
-    for n in [1_000u32, 10_000] {
+    for n in [1_000u32, 10_000, 100_000] {
         // Tick 51: an ordinary tick (no hour or day starts).
         let (mut sim, snap) = prepared(crowd(n), 51);
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
