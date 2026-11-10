@@ -23,7 +23,10 @@ use rendering::WorldInputPlugin;
 // ---- BEGIN MODE REGISTRATION ------------------------------------------
 fn register_modes(app: &mut App) {
     app.add_plugins((
+        view_conway::ConwayViewPlugin,
         view_custom_life::CustomLifeViewPlugin,
+        view_metapixel::MetapixelViewPlugin,
+        view_ca_lab::CaLabViewPlugin,
         view_evolution::EvolutionViewPlugin,
         view_continuous::ContinuousViewPlugin,
         view_voxel::VoxelViewPlugin,

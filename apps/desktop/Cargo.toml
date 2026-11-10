@@ -22,6 +22,9 @@ view-voxel.workspace = true
 view-evolution.workspace = true
 view-civilization.workspace = true
 view-custom-life.workspace = true
+view-conway.workspace = true
+view-ca-lab.workspace = true
+view-metapixel.workspace = true
 
 [lints]
 workspace = true
