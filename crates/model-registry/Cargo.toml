@@ -1,0 +1,28 @@
+[package]
+name = "model-registry"
+description = "Catalogue of all models and scenarios with factories producing runnable simulations."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+simulation-core.workspace = true
+patterns.workspace = true
+cellular-automata.workspace = true
+hashlife.workspace = true
+metapixel.workspace = true
+continuous.workspace = true
+voxel-life.workspace = true
+physics-world.workspace = true
+ecosystem.workspace = true
+rule-engine.workspace = true
+evolution.workspace = true
+civilization.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

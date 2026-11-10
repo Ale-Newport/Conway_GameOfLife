@@ -1,0 +1,29 @@
+[package]
+name = "simulation-cli"
+description = "Headless command-line runner for Emergence Lab experiments, comparisons, validation and benchmarks."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "emergence-cli"
+path = "src/main.rs"
+
+[dependencies]
+simulation-core.workspace = true
+model-registry.workspace = true
+analytics.workspace = true
+persistence.workspace = true
+patterns.workspace = true
+hashlife.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
