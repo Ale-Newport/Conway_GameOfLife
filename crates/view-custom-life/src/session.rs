@@ -1,0 +1,894 @@
+//! Runner lifecycle, the session wrapper, scenarios and data read from the
+//! simulation thread.
+//!
+//! **Why a wrapper.** `simulation_core::Runner` captures the model
+//! descriptor when it is spawned, but the custom-life descriptor is
+//! generated from the running definition (rules text, parameters, metrics).
+//! [`CustomSession`] implements `SessionControl` by delegating to the
+//! runner and serves a descriptor that follows the running system, so the
+//! shell's Parameters, Rules and Metrics tabs always describe what is
+//! simulated. Descriptors live in an append-only set of write-once slots,
+//! which lets `descriptor()` hand out plain references without locks;
+//! should the slots ever run out, the session is rebuilt from a snapshot.
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+
+use bevy::prelude::*;
+use interface::{ActiveSession, MetricsHistory, ModeScenarios, ScenarioEntry, ScenarioList, ScenarioSelected, Toasts};
+use rule_engine::def::LifeSystem;
+use rule_engine::scenarios::{self, Scenario};
+use rule_engine::sim::entity::Entity;
+use rule_engine::{CustomLifeCommand, CustomLifeSim, CustomLifeView, CustomLifeViewRequest};
+use simulation_core::{
+    Control, HistoryConfig, Metrics, ModelDescriptor, ParamValue, Runner, RunnerConfig, RunnerStatus, SessionControl,
+    SimError, Simulation, Snapshot, Speed,
+};
+
+use crate::MODE;
+use crate::editor::ClEditor;
+use crate::state::ClUi;
+
+/// Write-once descriptor slots per session.
+pub const DESCRIPTOR_SLOTS: usize = 1024;
+
+/// Samples per axis requested for field grids.
+pub const FIELD_RESOLUTION: u32 = 256;
+
+/// Seconds between two reads of the running definition.
+pub const INFO_PERIOD: f32 = 0.5;
+
+/// Seconds between two reads of the selected entity.
+pub const INSPECT_PERIOD: f32 = 0.2;
+
+/// What [`CustomSession::update_descriptor`] did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DescriptorUpdate {
+    /// The new descriptor is now served.
+    Updated,
+    /// It describes the same model (only parameter defaults differ).
+    Unchanged,
+    /// No slot is left: rebuild the session.
+    Full,
+}
+
+/// Whether two descriptors describe the same model shape. Parameter
+/// defaults are ignored: they mirror the current values, which the shell
+/// reads from the runner status anyway.
+pub fn same_shape(a: &ModelDescriptor, b: &ModelDescriptor) -> bool {
+    let params_match = a.params.len() == b.params.len()
+        && a.params.iter().zip(&b.params).all(|(x, y)| {
+            x.key == y.key
+                && x.label == y.label
+                && x.description == y.description
+                && x.group == y.group
+                && x.kind == y.kind
+                && x.apply == y.apply
+        });
+    params_match
+        && a.id == b.id
+        && a.name == b.name
+        && a.summary == b.summary
+        && a.rules == b.rules
+        && a.metrics == b.metrics
+        && a.tick_unit == b.tick_unit
+        && a.dt == b.dt
+        && a.deterministic == b.deterministic
+}
+
+/// The descriptor this mode serves for a running system: its `name` is the
+/// system's name, so the top bar reads "Custom Life Creator · Producers &
+/// consumers" instead of repeating the mode title. The model id is kept, so
+/// save / load still matches.
+pub fn served_descriptor(mut descriptor: ModelDescriptor, system_name: &str) -> ModelDescriptor {
+    if !system_name.trim().is_empty() {
+        descriptor.name = system_name.to_string();
+    }
+    descriptor
+}
+
+/// `SessionControl` over a custom-life runner with a live descriptor.
+pub struct CustomSession {
+    runner: Runner<CustomLifeSim>,
+    slots: Box<[OnceLock<ModelDescriptor>]>,
+    current: AtomicUsize,
+}
+
+impl CustomSession {
+    /// Wraps a runner; `first` is served until [`Self::update_descriptor`]
+    /// replaces it.
+    pub fn new(runner: Runner<CustomLifeSim>, first: ModelDescriptor) -> Self {
+        let slots: Box<[OnceLock<ModelDescriptor>]> = (0..DESCRIPTOR_SLOTS).map(|_| OnceLock::new()).collect();
+        let _ = slots[0].set(first);
+        Self { runner, slots, current: AtomicUsize::new(0) }
+    }
+
+    /// The typed runner.
+    pub fn runner(&self) -> &Runner<CustomLifeSim> {
+        &self.runner
+    }
+
+    /// The descriptor currently served.
+    pub fn current_descriptor(&self) -> &ModelDescriptor {
+        let i = self.current.load(Ordering::Acquire);
+        self.slots.get(i).and_then(OnceLock::get).unwrap_or_else(|| self.runner.descriptor())
+    }
+
+    /// Serves `descriptor` from now on when it differs in shape.
+    pub fn update_descriptor(&self, descriptor: ModelDescriptor) -> DescriptorUpdate {
+        if same_shape(self.current_descriptor(), &descriptor) {
+            return DescriptorUpdate::Unchanged;
+        }
+        let next = self.current.load(Ordering::Acquire) + 1;
+        let Some(slot) = self.slots.get(next) else { return DescriptorUpdate::Full };
+        if slot.set(descriptor).is_err() {
+            return DescriptorUpdate::Full;
+        }
+        self.current.store(next, Ordering::Release);
+        DescriptorUpdate::Updated
+    }
+
+    /// Sends a control message.
+    pub fn send(&self, control: Control<CustomLifeSim>) {
+        self.runner.send(control);
+    }
+}
+
+impl SessionControl for CustomSession {
+    fn descriptor(&self) -> &ModelDescriptor {
+        self.current_descriptor()
+    }
+    fn status(&self) -> RunnerStatus {
+        self.runner.status()
+    }
+    fn play(&self) {
+        self.runner.play();
+    }
+    fn pause(&self) {
+        self.runner.pause();
+    }
+    fn toggle_play(&self) {
+        SessionControl::toggle_play(&self.runner);
+    }
+    fn step(&self, n: u64) {
+        self.runner.step(n);
+    }
+    fn set_speed(&self, speed: Speed) {
+        SessionControl::set_speed(&self.runner, speed);
+    }
+    fn reset(&self) {
+        SessionControl::reset(&self.runner);
+    }
+    fn undo(&self) {
+        SessionControl::undo(&self.runner);
+    }
+    fn redo(&self) {
+        SessionControl::redo(&self.runner);
+    }
+    fn jump_to_history(&self, index: usize) {
+        SessionControl::jump_to_history(&self.runner, index);
+    }
+    fn set_history(&self, config: HistoryConfig) {
+        SessionControl::set_history(&self.runner, config);
+    }
+    fn set_param(&self, key: &str, value: ParamValue) {
+        SessionControl::set_param(&self.runner, key, value);
+    }
+    fn drain_metrics(&self) -> Vec<Metrics> {
+        self.runner.drain_metrics()
+    }
+    fn take_errors(&self) -> Vec<String> {
+        self.runner.take_errors()
+    }
+    fn request_snapshot(&self) -> Receiver<Result<Snapshot, SimError>> {
+        SessionControl::request_snapshot(&self.runner)
+    }
+    fn restore(&self, snapshot: Snapshot) {
+        SessionControl::restore(&self.runner, snapshot);
+    }
+    fn can_clear(&self) -> bool {
+        self.runner.can_clear()
+    }
+    fn clear(&self) {
+        SessionControl::clear(&self.runner);
+    }
+    fn can_randomize(&self) -> bool {
+        self.runner.can_randomize()
+    }
+    fn randomize(&self, seed: u64) {
+        SessionControl::randomize(&self.runner, seed);
+    }
+}
+
+/// The running session of this mode (inserted on enter, removed on exit).
+#[derive(Resource, Clone)]
+pub struct ClRunner(pub Arc<CustomSession>);
+
+impl ClRunner {
+    /// Sends a control message.
+    pub fn send(&self, control: Control<CustomLifeSim>) {
+        self.0.send(control);
+    }
+
+    /// Applies an undoable command.
+    pub fn edit(&self, command: CustomLifeCommand) {
+        self.0.send(Control::Edit(command));
+    }
+}
+
+/// "Clear": removes every entity (carried resources drop into the fields).
+fn clear_entities(sim: &mut CustomLifeSim) {
+    let ids: Vec<u64> = sim.entities().map(|(id, _)| id.get()).collect();
+    for id in ids {
+        let _ = sim.apply(CustomLifeCommand::Remove { id });
+    }
+}
+
+/// "Randomize": restarts from the reset target with a new seed (placement,
+/// initial fields, decisions and events all follow the seed).
+fn reseed(sim: &mut CustomLifeSim, seed: u64) {
+    if sim.set_param("seed", ParamValue::Int((seed & i64::MAX as u64) as i64)).is_ok() {
+        sim.reset();
+    }
+}
+
+/// Spawns a runner for `sim` with the mode's hooks and view request.
+pub fn spawn_session(sim: CustomLifeSim) -> Arc<CustomSession> {
+    let name = sim.system().name.clone();
+    let runner = Runner::spawn(sim, RunnerConfig::default()).with_clear(clear_entities).with_randomize(reseed);
+    runner.send(Control::SetViewRequest(view_request()));
+    let first = served_descriptor(runner.descriptor().clone(), &name);
+    Arc::new(CustomSession::new(runner, first))
+}
+
+/// What the view asks the simulation for.
+pub fn view_request() -> CustomLifeViewRequest {
+    CustomLifeViewRequest {
+        include_fields: true,
+        field_resolution: FIELD_RESOLUTION,
+        include_rules: true,
+        recent_events: 30,
+    }
+}
+
+/// Definitions read from the simulation thread.
+#[derive(Clone, Debug)]
+pub struct SimInfo {
+    /// The definition being simulated.
+    pub running: LifeSystem,
+    /// The definition and seed the next reset starts from.
+    pub target: LifeSystem,
+    /// Seed of the next reset.
+    pub seed: u64,
+    /// Descriptor of the running system.
+    pub descriptor: ModelDescriptor,
+}
+
+impl SimInfo {
+    fn read(sim: &CustomLifeSim) -> Self {
+        let (target, seed) = sim.reset_target();
+        let descriptor = served_descriptor(sim.descriptor(), &sim.system().name);
+        Self { running: sim.system().clone(), target: target.clone(), seed, descriptor }
+    }
+}
+
+/// Full state of one entity (selection inspector).
+#[derive(Clone, Debug)]
+pub struct EntityDetail {
+    /// Entity id.
+    pub id: u64,
+    /// Tick it was read at.
+    pub tick: u64,
+    /// The entity (`None` once it no longer exists).
+    pub entity: Option<Entity>,
+}
+
+/// Parts needed to rebuild a session that ran out of descriptor slots.
+struct RebuildParts {
+    snapshot: Snapshot,
+    running: LifeSystem,
+    target: LifeSystem,
+    seed: u64,
+}
+
+/// Data read from the runner, refreshed every frame.
+#[derive(Resource, Default)]
+pub struct ClData {
+    /// Latest published view.
+    pub view: Option<Arc<CustomLifeView>>,
+    /// Publication counter of `view`.
+    pub view_seq: u64,
+    /// Running and reset definitions.
+    pub info: Option<SimInfo>,
+    /// Revision of `info` (increments on every read that changed it).
+    pub info_rev: u64,
+    /// Selected entity, read from the simulation.
+    pub detail: Option<EntityDetail>,
+    info_rx: Mutex<Option<Receiver<SimInfo>>>,
+    detail_rx: Mutex<Option<Receiver<EntityDetail>>>,
+    rebuild_rx: Mutex<Option<Receiver<Result<RebuildParts, String>>>>,
+    info_timer: f32,
+    detail_timer: f32,
+    info_wanted: bool,
+    /// Start playing once a replaced simulation is confirmed (see [`ClData::play_when_ready`]).
+    play_pending: bool,
+}
+
+impl ClData {
+    /// Asks for the definitions on the next update (after an edit).
+    pub fn refresh_info(&mut self) {
+        self.info_wanted = true;
+    }
+
+    /// Plays as soon as the simulation that just replaced the old one is
+    /// confirmed by the runner status (so the metric plots restart cleanly).
+    pub fn play_when_ready(&mut self) {
+        self.play_pending = true;
+    }
+
+    /// Forgets the definitions read so far and any read in flight (the
+    /// simulation was replaced: the next read describes the new one and is
+    /// not compared with the old one).
+    pub fn forget_info(&mut self) {
+        self.info = None;
+        *self.info_rx.lock().unwrap_or_else(PoisonError::into_inner) = None;
+        self.info_wanted = true;
+    }
+
+    /// Forgets everything (new session).
+    pub fn reset(&mut self) {
+        *self = Self { info_wanted: true, ..Self::default() };
+    }
+
+    /// Tick of the latest view.
+    pub fn tick(&self) -> u64 {
+        self.view.as_ref().map_or(0, |v| v.tick)
+    }
+}
+
+fn take<T>(slot: &Mutex<Option<Receiver<T>>>) -> Option<T> {
+    let mut guard = slot.lock().unwrap_or_else(PoisonError::into_inner);
+    let rx = guard.as_ref()?;
+    match rx.try_recv() {
+        Ok(value) => {
+            *guard = None;
+            Some(value)
+        }
+        Err(TryRecvError::Empty) => None,
+        Err(TryRecvError::Disconnected) => {
+            *guard = None;
+            None
+        }
+    }
+}
+
+fn pending<T>(slot: &Mutex<Option<Receiver<T>>>) -> bool {
+    slot.lock().unwrap_or_else(PoisonError::into_inner).is_some()
+}
+
+fn store<T>(slot: &Mutex<Option<Receiver<T>>>, rx: Receiver<T>) {
+    *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(rx);
+}
+
+/// Built-in presets, loaded once.
+#[derive(Resource, Clone, Debug, Default)]
+pub struct ClScenarios {
+    /// Presets in their fixed order.
+    pub presets: Vec<Scenario>,
+    /// Why they could not be loaded, if so.
+    pub error: Option<String>,
+}
+
+impl ClScenarios {
+    /// Loads the embedded presets.
+    pub fn load() -> Self {
+        match scenarios::builtin() {
+            Ok(presets) => Self { presets, error: None },
+            Err(e) => Self { presets: Vec::new(), error: Some(e.to_string()) },
+        }
+    }
+
+    /// A preset by id.
+    pub fn get(&self, id: &str) -> Option<&Scenario> {
+        self.presets.iter().find(|s| s.id == id)
+    }
+
+    /// The preset opened when the mode starts.
+    pub fn default_preset(&self) -> Option<&Scenario> {
+        self.get(DEFAULT_SCENARIO).or_else(|| self.presets.first())
+    }
+}
+
+/// Preset opened on enter.
+pub const DEFAULT_SCENARIO: &str = "producers-consumers";
+
+/// Fills the top-bar scenario picker.
+pub fn fill_scenarios(presets: Res<ClScenarios>, mut list: ResMut<ModeScenarios>) {
+    let entries = presets
+        .presets
+        .iter()
+        .map(|s| ScenarioEntry { id: s.id.clone(), title: s.name.clone(), description: s.description.clone() })
+        .collect();
+    list.set(MODE, ScenarioList { entries, selected: presets.default_preset().map(|s| s.id.clone()) });
+}
+
+/// A blank system used when no preset is available.
+fn fallback_system() -> LifeSystem {
+    crate::draft::blank_system("New system")
+}
+
+/// What the mode was running when it was left, restored when it is
+/// entered again (so leaving for the dashboard never discards a design).
+#[derive(Resource, Default)]
+pub struct ClResume(Option<Resume>);
+
+enum Resume {
+    /// The complete state (snapshot, running and reset definitions, seed).
+    State(Box<RebuildParts>),
+    /// The system and seed of the next reset (the snapshot was not ready).
+    Reset(Box<LifeSystem>, u64),
+}
+
+impl ClResume {
+    /// Whether a previous visit left something to restore.
+    pub fn is_some(&self) -> bool {
+        self.0.is_some()
+    }
+}
+
+/// How long leaving the mode waits for the simulation thread's snapshot.
+pub const RESUME_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Starts the session on entering the mode. After a previous visit the
+/// world continues where it was left (same state, draft and selection of
+/// the editor); otherwise the selected preset (or the default one) starts
+/// and the draft becomes its definition.
+#[allow(clippy::too_many_arguments)]
+pub fn enter(
+    mut commands: Commands,
+    presets: Res<ClScenarios>,
+    list: Res<ModeScenarios>,
+    mut resume: ResMut<ClResume>,
+    mut editor: ResMut<ClEditor>,
+    mut data: ResMut<ClData>,
+    mut ui: ResMut<ClUi>,
+    mut toasts: ResMut<Toasts>,
+) {
+    data.reset();
+    ui.clear_selection();
+    ui.fit_requested = true;
+    if let Some(previous) = resume.0.take() {
+        let resumed = match previous {
+            Resume::State(parts) => rebuild(Ok(*parts)),
+            Resume::Reset(system, seed) => {
+                CustomLifeSim::new(*system, seed).map(spawn_session).map_err(|e| e.to_string())
+            }
+        };
+        match resumed {
+            Ok(session) => {
+                commands.insert_resource(ActiveSession::new(session.clone()));
+                commands.insert_resource(ClRunner(session));
+                return;
+            }
+            Err(e) => toasts.error(format!("The previous world could not be restored: {e}")),
+        }
+    }
+    let selected = list.get(MODE).and_then(|l| l.selected.clone());
+    let scenario = selected.as_deref().and_then(|id| presets.get(id)).or_else(|| presets.default_preset()).cloned();
+    if let Some(error) = &presets.error {
+        toasts.error(format!("Custom Life presets could not be loaded: {error}"));
+    }
+    let (system, seed, label) = match &scenario {
+        Some(s) => (s.system.clone(), s.seed, format!("Preset: {}", s.name)),
+        None => (fallback_system(), 1, "New system".to_string()),
+    };
+    let sim = match CustomLifeSim::new(system.clone(), seed) {
+        Ok(sim) => sim,
+        Err(e) => {
+            toasts.error(format!("Could not start {label}: {e}"));
+            match CustomLifeSim::new(fallback_system(), 1) {
+                Ok(sim) => sim,
+                Err(e) => {
+                    error!("the blank custom-life system does not compile: {e}");
+                    return;
+                }
+            }
+        }
+    };
+    let session = spawn_session(sim);
+    commands.insert_resource(ActiveSession::new(session.clone()));
+    commands.insert_resource(ClRunner(session));
+    editor.load(system, seed, label);
+}
+
+/// Stops the session on leaving the mode, keeping what it ran for the next
+/// visit (a snapshot taken on the simulation thread, or — if it does not
+/// answer within [`RESUME_TIMEOUT`] — the system of the next reset). The
+/// runner thread stops when the last reference is dropped.
+pub fn exit(
+    mut commands: Commands,
+    runner: Option<Res<ClRunner>>,
+    mut data: ResMut<ClData>,
+    mut resume: ResMut<ClResume>,
+) {
+    if let Some(runner) = runner {
+        let rx = runner.0.runner().request(rebuild_parts);
+        resume.0 = match rx.recv_timeout(RESUME_TIMEOUT) {
+            Ok(Ok(parts)) => Some(Resume::State(Box::new(parts))),
+            _ => data.info.as_ref().map(|i| Resume::Reset(Box::new(i.target.clone()), i.seed)),
+        };
+    }
+    commands.remove_resource::<ActiveSession>();
+    commands.remove_resource::<ClRunner>();
+    data.reset();
+}
+
+/// Everything needed to rebuild a simulation elsewhere (runs on the
+/// simulation thread).
+fn rebuild_parts(sim: &mut CustomLifeSim) -> Result<RebuildParts, String> {
+    let (target, seed) = sim.reset_target();
+    let (target, seed) = (target.clone(), seed);
+    sim.snapshot()
+        .map(|snapshot| RebuildParts { snapshot, running: sim.system().clone(), target, seed })
+        .map_err(|e| e.to_string())
+}
+
+/// Marks no preset as loaded in the top-bar picker (the running system is
+/// not one of them).
+pub fn clear_scenario(list: &mut ModeScenarios) {
+    if let Some(current) = list.get(MODE)
+        && current.selected.is_some()
+    {
+        let entries = current.entries.clone();
+        list.set(MODE, ScenarioList { entries, selected: None });
+    }
+}
+
+/// Replaces the simulation with a new one built from `system` (undo history
+/// and plots restart; the draft is not touched). The top-bar picker shows
+/// no preset afterwards ([`open_preset`] marks its own).
+pub fn start_system(
+    runner: &ClRunner,
+    system: LifeSystem,
+    seed: u64,
+    data: &mut ClData,
+    ui: &mut ClUi,
+    history: &mut MetricsHistory,
+    list: &mut ModeScenarios,
+) -> Result<(), String> {
+    let sim = CustomLifeSim::new(system, seed).map_err(|e| e.to_string())?;
+    let tick = sim.current_tick();
+    runner.send(Control::Replace(Box::new(sim)));
+    // Samples the old run produces until the replacement lands are dropped:
+    // the plots restart when the status shows the new run paused at `tick`.
+    history.expect_restore(tick);
+    data.view = None;
+    data.detail = None;
+    data.forget_info();
+    clear_scenario(list);
+    ui.clear_selection();
+    ui.fit_requested = true;
+    Ok(())
+}
+
+/// Opens a preset: the draft becomes its definition and the simulation
+/// restarts from it.
+#[allow(clippy::too_many_arguments)]
+pub fn open_preset(
+    id: &str,
+    presets: &ClScenarios,
+    runner: &ClRunner,
+    editor: &mut ClEditor,
+    data: &mut ClData,
+    ui: &mut ClUi,
+    history: &mut MetricsHistory,
+    list: &mut ModeScenarios,
+) -> Result<(), String> {
+    let scenario = presets.get(id).ok_or_else(|| format!("no preset `{id}`"))?;
+    start_system(runner, scenario.system.clone(), scenario.seed, data, ui, history, list)?;
+    editor.load(scenario.system.clone(), scenario.seed, format!("Preset: {}", scenario.name));
+    list.mark_selected(MODE, id);
+    Ok(())
+}
+
+/// Reacts to the top-bar scenario picker.
+#[allow(clippy::too_many_arguments)]
+pub fn handle_scenario_selection(
+    mut picked: MessageReader<ScenarioSelected>,
+    presets: Res<ClScenarios>,
+    runner: Option<Res<ClRunner>>,
+    mut editor: ResMut<ClEditor>,
+    mut data: ResMut<ClData>,
+    mut ui: ResMut<ClUi>,
+    mut history: ResMut<MetricsHistory>,
+    mut list: ResMut<ModeScenarios>,
+    mut toasts: ResMut<Toasts>,
+) {
+    let ids: Vec<String> = picked.read().filter(|s| s.mode == MODE).map(|s| s.id.clone()).collect();
+    let Some(runner) = runner else { return };
+    for id in ids {
+        let had_edits = editor.is_edited(data.info.as_ref());
+        match open_preset(&id, &presets, &runner, &mut editor, &mut data, &mut ui, &mut history, &mut list) {
+            Ok(()) if had_edits => toasts.warning("The previous draft had unapplied edits; they were replaced."),
+            Ok(()) => {}
+            Err(e) => toasts.error(e),
+        }
+    }
+}
+
+/// Reads the latest view, the definitions (periodically and after edits),
+/// the selected entity, and serves the running descriptor.
+#[allow(clippy::too_many_arguments)]
+pub fn poll_data(
+    mut commands: Commands,
+    runner: Option<Res<ClRunner>>,
+    mut data: ResMut<ClData>,
+    mut editor: ResMut<ClEditor>,
+    mut ui: ResMut<ClUi>,
+    time: Res<Time<Real>>,
+    history: Res<MetricsHistory>,
+    mut toasts: ResMut<Toasts>,
+) {
+    let Some(runner) = runner else { return };
+    let dt = time.delta_secs();
+    if data.play_pending && !history.awaiting_restore() {
+        data.play_pending = false;
+        runner.send(Control::Play);
+    }
+    if let Some(published) = runner.0.runner().latest_view()
+        && published.seq != data.view_seq
+    {
+        let went_back = data.view.as_ref().is_some_and(|v| published.tick < v.tick);
+        data.view_seq = published.seq;
+        data.view = Some(published.view);
+        if went_back {
+            data.info_wanted = true;
+        }
+    }
+    if let Some(info) = take(&data.info_rx) {
+        match runner.0.update_descriptor(info.descriptor.clone()) {
+            DescriptorUpdate::Full => {
+                let rx = runner.0.runner().request(rebuild_parts);
+                store(&data.rebuild_rx, rx);
+            }
+            DescriptorUpdate::Updated | DescriptorUpdate::Unchanged => {}
+        }
+        if let Some(old) = data.info.as_ref()
+            && (old.target != info.target || old.seed != info.seed)
+        {
+            // Parameters tab, undo/redo, load: keep the draft in step.
+            editor.follow_target(&old.target, old.seed, &info.target, info.seed);
+        }
+        let changed = data
+            .info
+            .as_ref()
+            .is_none_or(|old| old.running != info.running || old.target != info.target || old.seed != info.seed);
+        if changed {
+            data.info_rev += 1;
+            let names = |s: &LifeSystem| s.entity_types.iter().map(|t| t.name.clone()).collect::<Vec<_>>();
+            let resources: Vec<String> = info.running.world.resources.iter().map(|r| r.name.clone()).collect();
+            let fields: Vec<String> = resources
+                .iter()
+                .cloned()
+                .chain(info.running.world.environment.iter().map(|e| e.name.clone()))
+                .collect();
+            ui.sync_names(&names(&info.running), &resources, &fields);
+        }
+        data.info = Some(info);
+    }
+    data.info_timer += dt;
+    if (data.info_wanted || data.info_timer >= INFO_PERIOD) && !pending(&data.info_rx) {
+        data.info_wanted = false;
+        data.info_timer = 0.0;
+        let rx = runner.0.runner().request(|sim| SimInfo::read(sim));
+        store(&data.info_rx, rx);
+    }
+    if let Some(detail) = take(&data.detail_rx)
+        && ui.selected == Some(detail.id)
+    {
+        data.detail = Some(detail);
+    }
+    data.detail_timer += dt;
+    match ui.selected {
+        Some(id) => {
+            let stale = data.detail.as_ref().is_none_or(|d| d.id != id);
+            if (stale || data.detail_timer >= INSPECT_PERIOD) && !pending(&data.detail_rx) {
+                data.detail_timer = 0.0;
+                let rx = runner.0.runner().request(move |sim| EntityDetail {
+                    id,
+                    tick: sim.current_tick(),
+                    entity: sim.entities().find(|(i, _)| i.get() == id).map(|(_, e)| e.clone()),
+                });
+                store(&data.detail_rx, rx);
+            }
+        }
+        None => data.detail = None,
+    }
+    if let Some(parts) = take(&data.rebuild_rx) {
+        match rebuild(parts) {
+            Ok(session) => {
+                commands.insert_resource(ActiveSession::new(session.clone()));
+                commands.insert_resource(ClRunner(session));
+                data.view_seq = 0;
+                data.refresh_info();
+                toasts.info("The session was restarted from its current state to refresh the model description.");
+            }
+            Err(e) => toasts.error(format!("Could not refresh the session: {e}")),
+        }
+    }
+}
+
+fn rebuild(parts: Result<RebuildParts, String>) -> Result<Arc<CustomSession>, String> {
+    let parts = parts?;
+    let mut sim = CustomLifeSim::new(parts.running.clone(), parts.seed).map_err(|e| e.to_string())?;
+    sim.restore(&parts.snapshot).map_err(|e| e.to_string())?;
+    if parts.target != parts.running {
+        sim.edit_system(parts.target).map_err(|e| e.to_string())?;
+    }
+    if sim.reset_target().1 != parts.seed {
+        sim.set_param("seed", ParamValue::Int((parts.seed & i64::MAX as u64) as i64)).map_err(|e| e.to_string())?;
+    }
+    Ok(spawn_session(sim))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    fn wait_for<T>(rx: &Receiver<T>) -> T {
+        rx.recv_timeout(Duration::from_secs(10)).expect("the runner answers")
+    }
+
+    fn sim(id: &str) -> CustomLifeSim {
+        CustomLifeSim::from_scenario(&scenarios::builtin_by_id(id).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn descriptor_follows_the_running_system() {
+        let session = spawn_session(sim("bacterial-growth"));
+        let first = session.current_descriptor().clone();
+        assert!(first.rules.contains("rule feed for bacterium"));
+        // Same shape, other parameter defaults: not a new slot.
+        let mut tweaked = first.clone();
+        if let Some(p) = tweaked.params.first_mut() {
+            p.default = ParamValue::Int(77);
+        }
+        assert_eq!(session.update_descriptor(tweaked), DescriptorUpdate::Unchanged);
+        // A real change is served from now on.
+        let other = sim("robot-swarm").descriptor();
+        assert_eq!(session.update_descriptor(other.clone()), DescriptorUpdate::Updated);
+        assert_eq!(SessionControl::descriptor(&*session).rules, other.rules);
+    }
+
+    #[test]
+    fn slots_run_out_cleanly() {
+        let session = spawn_session(sim("bacterial-growth"));
+        let base = session.current_descriptor().clone();
+        let mut result = DescriptorUpdate::Unchanged;
+        for i in 0..DESCRIPTOR_SLOTS + 2 {
+            let mut d = base.clone();
+            d.summary = format!("version {i}");
+            result = session.update_descriptor(d);
+            if result == DescriptorUpdate::Full {
+                break;
+            }
+        }
+        assert_eq!(result, DescriptorUpdate::Full);
+        assert_eq!(session.current_descriptor().summary, format!("version {}", DESCRIPTOR_SLOTS - 2));
+    }
+
+    #[test]
+    fn clear_and_randomize_hooks() {
+        let session = spawn_session(sim("bacterial-growth"));
+        assert!(session.can_clear() && session.can_randomize());
+        session.clear();
+        let count = wait_for(&session.runner().request(|s| s.total_population()));
+        assert_eq!(count, 0, "clear removes every entity");
+        session.randomize(12345);
+        let (count, seed) = wait_for(&session.runner().request(|s| (s.total_population(), s.reset_target().1)));
+        assert_eq!(count, 20, "randomize restarts the preset's initial population");
+        assert_eq!(seed, 12345);
+    }
+
+    #[test]
+    fn rebuild_keeps_state_and_pending_edits() {
+        let mut s = sim("bacterial-growth");
+        s.advance(15);
+        let mut target = s.system().clone();
+        target.world.width = 64; // requires a reset
+        s.edit_system(target.clone()).unwrap();
+        let parts = RebuildParts {
+            snapshot: s.snapshot().unwrap(),
+            running: s.system().clone(),
+            target: target.clone(),
+            seed: 42,
+        };
+        let session = rebuild(Ok(parts)).unwrap();
+        let start = Instant::now();
+        let (tick, pending, width) = loop {
+            let r =
+                wait_for(&session.runner().request(|s| (s.current_tick(), s.reset_pending(), s.system().world.width)));
+            if r.0 == 15 || start.elapsed() > Duration::from_secs(5) {
+                break r;
+            }
+        };
+        assert_eq!((tick, pending, width), (15, true, 48));
+    }
+
+    #[test]
+    fn served_descriptors_name_the_system() {
+        for preset in scenarios::builtin().unwrap() {
+            let s = CustomLifeSim::from_scenario(&preset).unwrap();
+            let d = served_descriptor(s.descriptor(), &s.system().name);
+            assert_eq!(d.name, preset.system.name);
+            assert_eq!(d.id, rule_engine::MODEL_ID, "the id stays stable for save / load");
+            assert_eq!(d.params, s.descriptor().params, "parameters are served unchanged");
+        }
+        // Serving is deterministic, so shapes compare equal across reads.
+        let s = sim("bacterial-growth");
+        let a = served_descriptor(s.descriptor(), "x");
+        assert!(same_shape(&a, &served_descriptor(s.descriptor(), "x")));
+        assert!(!same_shape(&a, &served_descriptor(s.descriptor(), "y")), "a rename is a new descriptor");
+    }
+
+    #[test]
+    fn replacing_the_system_clears_the_picker() {
+        let mut list = ModeScenarios::default();
+        list.set(MODE, ScenarioList { entries: vec![], selected: None });
+        let presets = ClScenarios::load();
+        let entries = presets
+            .presets
+            .iter()
+            .map(|s| ScenarioEntry { id: s.id.clone(), title: s.name.clone(), description: String::new() })
+            .collect();
+        list.set(MODE, ScenarioList { entries, selected: Some(DEFAULT_SCENARIO.into()) });
+        clear_scenario(&mut list);
+        let l = list.get(MODE).unwrap();
+        assert_eq!((l.selected.as_deref(), l.entries.len()), (None, 7));
+    }
+
+    #[test]
+    fn leaving_and_entering_resumes_the_world_and_keeps_the_draft() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut world = World::new();
+        world.insert_resource(ClScenarios::load());
+        world.insert_resource(ModeScenarios::default());
+        world.insert_resource(ClResume::default());
+        world.insert_resource(ClEditor::default());
+        world.insert_resource(ClData::default());
+        world.insert_resource(ClUi::default());
+        world.insert_resource(Toasts::default());
+        world.run_system_once(enter).unwrap();
+        assert!(world.contains_resource::<ActiveSession>());
+        {
+            let runner = world.resource::<ClRunner>().clone();
+            runner.0.step(25);
+            let start = Instant::now();
+            while wait_for(&runner.0.runner().request(|s| s.current_tick())) < 25 {
+                assert!(start.elapsed() < Duration::from_secs(10));
+            }
+        }
+        world.resource_mut::<ClEditor>().draft.description = "my unapplied edit".into();
+        let old_session = Arc::downgrade(&world.resource::<ClRunner>().0);
+        world.run_system_once(exit).unwrap();
+        assert!(!world.contains_resource::<ClRunner>() && !world.contains_resource::<ActiveSession>());
+        assert!(old_session.upgrade().is_none(), "no reference keeps the old runner thread alive");
+        assert!(world.resource::<ClResume>().is_some());
+        world.run_system_once(enter).unwrap();
+        assert!(!world.resource::<ClResume>().is_some());
+        let runner = world.resource::<ClRunner>().clone();
+        let (tick, population) = wait_for(&runner.0.runner().request(|s| (s.current_tick(), s.total_population())));
+        assert_eq!(tick, 25, "the world continues where it was left");
+        assert!(population > 0);
+        assert_eq!(world.resource::<ClEditor>().draft.description, "my unapplied edit");
+    }
+
+    #[test]
+    fn presets_fill_the_picker() {
+        let presets = ClScenarios::load();
+        assert_eq!(presets.presets.len(), 7);
+        assert_eq!(presets.default_preset().map(|s| s.id.as_str()), Some(DEFAULT_SCENARIO));
+    }
+}
