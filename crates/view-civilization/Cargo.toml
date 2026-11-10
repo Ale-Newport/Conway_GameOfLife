@@ -1,0 +1,29 @@
+[package]
+name = "view-civilization"
+description = "Emergent Civilizations mode view."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+bevy.workspace = true
+bevy_egui.workspace = true
+bevy_panorbit_camera.workspace = true
+egui_plot.workspace = true
+simulation-core.workspace = true
+interface.workspace = true
+rendering.workspace = true
+organism-render.workspace = true
+organism-engine.workspace = true
+civilization.workspace = true
+serde.workspace = true
+
+[[example]]
+name = "civilization_standalone"
+path = "examples/civilization_standalone.rs"
+
+[lints]
+workspace = true
