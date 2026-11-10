@@ -310,7 +310,9 @@ fn visuals(p: &Palette) -> egui::Visuals {
         weak_text_color: Some(p.text_muted),
         widgets,
         selection: egui::style::Selection {
-            bg_fill: with_alpha(p.accent, if p.dark { 0.45 } else { 0.35 }),
+            // Opaque: bevy_egui blends in linear light (sRGB target), where a
+            // translucent accent over the light panel washes out to grey.
+            bg_fill: mix(p.panel, p.accent, 0.35),
             stroke: Stroke::new(1.0, p.accent),
         },
         hyperlink_color: p.accent,
@@ -374,6 +376,57 @@ mod tests {
         assert_eq!(hex(Color32::TRANSPARENT), "#00000000");
         assert_eq!(mix(Color32::BLACK, Color32::WHITE, 0.5), Color32::from_rgb(128, 128, 128));
         assert_eq!(color32_from_rgba([2.0, -1.0, 0.5, 1.0]), Color32::from_rgb(255, 0, 128));
+    }
+
+    /// What the screen shows for the egui colour `color` drawn over
+    /// `background`: bevy_egui writes egui's premultiplied sRGB colours to
+    /// an sRGB target, which blends in linear light.
+    fn composite(background: Color32, color: Color32) -> Color32 {
+        use egui::ecolor::{gamma_u8_from_linear_f32, linear_f32_from_gamma_u8};
+        let keep = 1.0 - f32::from(color.a()) / 255.0;
+        let channel =
+            |c: u8, b: u8| gamma_u8_from_linear_f32(linear_f32_from_gamma_u8(c) + keep * linear_f32_from_gamma_u8(b));
+        Color32::from_rgb(
+            channel(color.r(), background.r()),
+            channel(color.g(), background.g()),
+            channel(color.b(), background.b()),
+        )
+    }
+
+    /// Chroma (largest minus smallest channel) and hue in degrees.
+    fn chroma_and_hue(c: Color32) -> (f32, f32) {
+        let [r, g, b] = [c.r(), c.g(), c.b()].map(f32::from);
+        let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+        let chroma = max - min;
+        let hue = if chroma == 0.0 {
+            0.0
+        } else if max == r {
+            60.0 * ((g - b) / chroma).rem_euclid(6.0)
+        } else if max == g {
+            60.0 * ((b - r) / chroma + 2.0)
+        } else {
+            60.0 * ((r - g) / chroma + 4.0)
+        };
+        (chroma, hue)
+    }
+
+    #[test]
+    fn selected_widgets_show_the_accent_in_every_theme() {
+        use egui::widget_style::{Classes, HasClasses, SELECTED_CLASS, WidgetState};
+        let selected = Classes::default().with_class(SELECTED_CLASS);
+        let ctx = egui::Context::default();
+        for kind in ThemeKind::ALL {
+            for mode in crate::mode::AppMode::ALL {
+                let p = Palette::new(kind, mode.default_accent());
+                apply_palette(&ctx, &p);
+                let fill = ctx.global_style().button_style(&selected, WidgetState::Inactive).frame.fill;
+                let (chroma, hue) = chroma_and_hue(composite(p.panel, fill));
+                let (accent_chroma, accent_hue) = chroma_and_hue(p.accent);
+                assert!(chroma >= 0.25 * accent_chroma, "{kind:?} {mode:?}: the selection shows grey");
+                let gap = (hue - accent_hue).abs();
+                assert!(gap.min(360.0 - gap) <= 15.0, "{kind:?} {mode:?}: the selection is not the accent's hue");
+            }
+        }
     }
 
     #[test]
