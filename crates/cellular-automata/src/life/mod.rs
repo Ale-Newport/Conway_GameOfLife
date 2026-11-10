@@ -26,11 +26,11 @@ use simulation_core::{
 };
 
 use crate::engine::{
-    DenseEngine, EngineChoice, EngineKind, GenStats, LifeEngine, SelectionInput, create_engine, select_engine,
-    tile_regularity, transfer,
+    AUTO_HASHLIFE_MIN_POPULATION, AUTO_REGULARITY_MAX_POPULATION, DenseEngine, EngineChoice, EngineKind, GenStats,
+    LifeEngine, SelectionInput, create_engine, select_engine, tile_regularity, transfer,
 };
 use crate::error::CaError;
-use crate::geometry::{CellRect, MAX_FILL_CELLS, World, check_fill};
+use crate::geometry::{CellRect, MAX_EDIT_CELLS, MAX_FILL_CELLS, World, check_fill};
 use crate::view::{GridView, GridViewRequest, TexelGrid};
 use config::ResolvedInit;
 use snapshot::ResetPoint;
@@ -254,9 +254,13 @@ impl LifeSim {
     /// Copies the live cells of `rect` into a pattern whose coordinates are
     /// relative to the rectangle's top-left corner (so pasting it at
     /// `(rect.x0, rect.y0)` restores it). The pattern carries the current rule.
-    pub fn copy_region(&self, rect: CellRect) -> Pattern {
-        let cells = self.engine.cells_in_rect(rect).into_iter().map(|(x, y)| (x - rect.x0, y - rect.y0));
-        Pattern::from_live_cells(cells).with_rule(self.rule.to_string())
+    ///
+    /// # Errors
+    /// [`CaError::LimitExceeded`] when `rect` holds more than
+    /// [`MAX_EDIT_CELLS`] live cells.
+    pub fn copy_region(&self, rect: CellRect) -> Result<Pattern, CaError> {
+        let cells = self.region_cells(rect)?.into_iter().map(|(x, y)| (x - rect.x0, y - rect.y0));
+        Ok(Pattern::from_live_cells(cells).with_rule(self.rule.to_string()))
     }
 
     /// Cut: [`LifeSim::copy_region`] followed by
@@ -264,11 +268,29 @@ impl LifeSim {
     /// command). Paste the returned pattern with [`LifeCommand::Paste`].
     ///
     /// # Errors
-    /// Never for a valid rectangle; errors of [`Simulation::apply`] are passed on.
+    /// Errors of [`LifeSim::copy_region`] (nothing is cleared then) and of
+    /// [`Simulation::apply`].
     pub fn cut_region(&mut self, rect: CellRect) -> Result<Pattern, SimError> {
-        let pattern = self.copy_region(rect);
+        let pattern = self.copy_region(rect)?;
         Simulation::apply(self, LifeCommand::ClearRegion { rect })?;
         Ok(pattern)
+    }
+
+    /// The live cells of `rect`, sorted row-major, for the commands and
+    /// queries that list a region's cells one by one.
+    ///
+    /// # Errors
+    /// [`CaError::LimitExceeded`] when `rect` holds more than
+    /// [`MAX_EDIT_CELLS`] live cells (at most one more is listed to find out).
+    fn region_cells(&self, rect: CellRect) -> Result<Vec<(i64, i64)>, CaError> {
+        let cells = self.engine.cells_in_rect(rect, MAX_EDIT_CELLS as usize + 1);
+        if cells.len() as u64 > MAX_EDIT_CELLS {
+            return Err(CaError::LimitExceeded(format!(
+                "the region holds more than {MAX_EDIT_CELLS} live cells, the most a copy, move, rotation or mirror \
+                 handles"
+            )));
+        }
+        Ok(cells)
     }
 
     /// Picks the engine for a choice.
@@ -295,13 +317,20 @@ impl LifeSim {
         }
     }
 
-    /// Re-runs the automatic engine choice (no-op for a fixed choice).
+    /// Re-runs the automatic engine choice (no-op for a fixed choice). The
+    /// tile regularity is measured only up to
+    /// [`AUTO_REGULARITY_MAX_POPULATION`] live cells: a larger pattern keeps
+    /// Hashlife if it runs, and is treated as irregular otherwise.
     fn reselect(&mut self) -> Result<(), CaError> {
         if self.engine_choice != EngineChoice::Auto {
             return Ok(());
         }
         let population = self.engine.population();
-        let regularity = (!self.world.is_finite() && population >= crate::engine::AUTO_HASHLIFE_MIN_POPULATION)
+        if population > AUTO_REGULARITY_MAX_POPULATION && self.engine.kind() == EngineKind::Hashlife {
+            return Ok(());
+        }
+        let measured = AUTO_HASHLIFE_MIN_POPULATION..=AUTO_REGULARITY_MAX_POPULATION;
+        let regularity = (!self.world.is_finite() && measured.contains(&population))
             .then(|| tile_regularity(&self.engine.export_cells()));
         let kind =
             Self::choose(EngineChoice::Auto, self.world, self.rule, population, self.generations_per_tick, regularity)?;
@@ -488,7 +517,7 @@ impl LifeSim {
         if self.tracker.enabled() {
             match rect.and_then(|r| self.world.clip(&r)) {
                 Some(r) => {
-                    let cells = self.engine.cells_in_rect(r);
+                    let cells = self.engine.cells_in_rect(r, usize::MAX);
                     self.tracker.edit(r, cells);
                 }
                 None if rect.is_none() => {
@@ -509,7 +538,8 @@ impl LifeSim {
             Topology::Bounded => "a bounded plane: cells outside the W×H rectangle are permanently dead",
             Topology::Torus => "a torus: opposite edges are joined",
             Topology::KleinBottle => {
-                "a Klein bottle: left and right edges are joined; crossing the top or bottom edge mirrors x (x ↦ W−1−x)"
+                "a Klein bottle: left and right edges are joined; crossing the top or bottom edge mirrors x (x becomes \
+                 W−1−x)"
             }
             Topology::CrossSurface => {
                 "a cross-surface (projective plane): crossing the top or bottom edge mirrors x, crossing the left or \
@@ -522,8 +552,8 @@ impl LifeSim {
              Cells are dead (0) or alive (1) on a square grid. Every cell has the 8 cells of its Moore \
              neighbourhood as neighbours, and all cells update simultaneously once per generation. With *n* live \
              neighbours:\n\n\
-             * a dead cell becomes alive iff *n* ∈ B = {{{b}}};\n\
-             * a live cell stays alive iff *n* ∈ S = {{{s}}};\n\
+             * a dead cell becomes alive iff *n* is in B = {{{b}}};\n\
+             * a live cell stays alive iff *n* is in S = {{{s}}};\n\
              * every other cell is dead in the next generation.\n\n\
              **World.** The world is {topology}. On finite worlds a neighbour position outside the world is the \
              cell the topology maps it to (Golly's ghost-cell emulation; on worlds narrower than 3 cells the same \

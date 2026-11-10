@@ -318,7 +318,7 @@ impl LifeSim {
                 };
                 let dest = shifted(source, dx, dy)?;
                 let moved: Vec<(i64, i64)> =
-                    self.engine.cells_in_rect(source).into_iter().map(|(x, y)| (x + dx, y + dy)).collect();
+                    self.region_cells(source)?.into_iter().map(|(x, y)| (x + dx, y + dy)).collect();
                 if let Some(bbox) = CellRect::bounding(moved.iter().filter_map(|&(x, y)| self.world.map(x, y))) {
                     self.engine.reserve(bbox)?;
                 }
@@ -391,7 +391,7 @@ impl LifeSim {
         if CellRect::from_origin_size(rect.x0, rect.y0, nw, nh).is_none() {
             return Err(CaError::invalid("the rotated region would leave the 64-bit coordinate plane"));
         }
-        let cells = self.engine.cells_in_rect(rect);
+        let cells = self.region_cells(rect)?;
         let (out, new_rect) = transform_in_rect(&cells, rect, rotation, mirror);
         if let Some(bbox) = CellRect::bounding(out.iter().filter_map(|&(x, y)| self.world.map(x, y))) {
             self.engine.reserve(bbox)?;

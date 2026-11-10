@@ -194,8 +194,8 @@ impl Simulation for GenerationsSim {
              States: 0 = dead, 1 = alive (firing), 2..{last} = dying. Only cells in state 1 count as neighbours \
              (Moore neighbourhood, 8 cells; positions outside a finite world map through its topology). With *n* \
              live neighbours:\n\n\
-             * a dead cell becomes alive iff *n* ∈ B = {{{bl}}};\n\
-             * a live cell stays alive iff *n* ∈ S = {{{sl}}}, otherwise it starts dying (state 2, or dead when C = 2);\n\
+             * a dead cell becomes alive iff *n* is in B = {{{bl}}};\n\
+             * a live cell stays alive iff *n* is in S = {{{sl}}}, otherwise it starts dying (state 2, or dead when C = 2);\n\
              * a dying cell in state *k* moves to state *k* + 1, and to 0 after state C − 1 = {last}.\n\n\
              Dying cells can be neither re-born nor re-stimulated. This is Golly's `generationsalgo`.",
             canon = r,

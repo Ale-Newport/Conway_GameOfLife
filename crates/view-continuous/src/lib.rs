@@ -16,11 +16,8 @@
 //! * **Session** — a [`simulation_core::Runner`] behind
 //!   [`interface::ActiveSession`] with Clear and Randomize; the built-in
 //!   scenarios in the top-bar picker (grouped by model) and the model buttons
-//!   of the Tools panel. A scenario with the same descriptor reuses the
-//!   runner (`Control::Replace`); any other gets a new runner, because the
-//!   runner's descriptor (parameters, rules text, model id) is fixed when it
-//!   is spawned. The shell receives a [`ContinuousSession`] that forwards
-//!   every control to the runner but presents a display-ready descriptor
+//!   of the Tools panel, loaded into the same runner (`Control::Replace`).
+//!   The runner publishes a display-ready descriptor of the running model
 //!   ([`display_descriptor`]: glyphs egui can draw, "time unit" as the tick
 //!   unit, and no slider stepping for values off their step grid, which egui
 //!   would otherwise snap — and send to the model — merely by drawing).
@@ -75,8 +72,7 @@ pub use panels::live_parameter_descriptor;
 pub use plots::{GrowthChart, growth_chart, kernel_curves, positive_growth_band};
 pub use regime::{Regime, classify as classify_regime};
 pub use session::{
-    Catalog, ContinuousRunner, ContinuousSession, DEFAULT_SCENARIO, Family, LoadRequests, LoadedWorld,
-    display_descriptor, displayable,
+    Catalog, ContinuousRunner, DEFAULT_SCENARIO, Family, LoadRequests, LoadedWorld, display_descriptor, displayable,
 };
 pub use tools::{Hover, MODE_SHORTCUTS, ModeShortcut, Tool, ToolSettings};
 pub use tutorial::{TutorialCommand, tutorial};
@@ -156,10 +152,6 @@ impl Plugin for ContinuousViewPlugin {
             .add_systems(
                 Update,
                 (
-                    world::release_speed_keys_from_camera
-                        .after(ShellSet::Commands)
-                        .before(GridCameraSystems::Control)
-                        .run_if(in_state(MODE)),
                     world::frame_world.before(GridCameraSystems::Control).run_if(in_state(MODE)),
                     (
                         session::collect_scenario_picks,

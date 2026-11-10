@@ -130,10 +130,11 @@ impl Simulation for WireworldSim {
                  States: 0 = empty, 1 = electron head, 2 = electron tail, 3 = conductor (Golly numbering; RLE \
                  letters `.`, `A`, `B`, `C`). Moore neighbourhood (8 cells; positions outside a finite world map \
                  through its topology). Every generation, simultaneously:\n\n\
-                 * empty → empty;\n\
-                 * electron head → electron tail;\n\
-                 * electron tail → conductor;\n\
-                 * conductor → electron head iff exactly 1 or 2 neighbours are electron heads, otherwise conductor.",
+                 * empty stays empty;\n\
+                 * electron head becomes electron tail;\n\
+                 * electron tail becomes conductor;\n\
+                 * conductor becomes electron head iff exactly 1 or 2 neighbours are electron heads, otherwise it \
+                 stays a conductor.",
             )
             .params(StateCore::world_specs("bounded", 128))
             .metrics(vec![

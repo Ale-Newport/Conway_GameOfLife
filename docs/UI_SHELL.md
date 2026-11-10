@@ -89,7 +89,7 @@ fn enter(mut commands: Commands) {
 }
 fn exit(mut commands: Commands) {
     commands.remove_resource::<ActiveSession>();
-    commands.remove_resource::<ConwayRunner>(); // the Runner thread stops when the last Arc drops
+    commands.remove_resource::<ConwayRunner>(); // dropping the last Arc stops the runner's thread
 }
 app.add_systems(OnEnter(AppMode::ClassicConway), enter)
    .add_systems(OnExit(AppMode::ClassicConway), exit);
@@ -108,11 +108,41 @@ Rules:
 * The model's `ModelDescriptor` drives the Parameters, Rules and Metrics tabs:
   keep `rules` (Markdown) in sync with the code, give every `ParamSpec` a
   `description`, `group` and correct `ApplyPolicy`, and describe every metric.
+  The descriptor may depend on the running system: after every control that
+  can change the state (parameters, commands, edits, closures, reset,
+  undo/redo, history jumps, restores, `Control::Replace`; not after plain
+  ticks) the runner rebuilds it on the simulation thread and publishes it if
+  it changed. `SessionControl::descriptor()` returns the current
+  `Arc<ModelDescriptor>` (the shell reads it once per frame) and
+  `RunnerStatus::descriptor_seq` counts the changes, so a mode can rebuild
+  what it derives from the descriptor when the number moves. To show the
+  model with adapted texts (glyphs egui's fonts cannot draw, a shorter
+  summary, hidden parameters), spawn with
+  `Runner::spawn_with_descriptor(sim, config, |sim| adapt(sim.descriptor()))`
+  instead of wrapping the runner in another `SessionControl`.
+* After those controls the runner also records a metric sample of the
+  current tick (replacing a sample of the same tick), so the bottom-bar
+  population follows edits made while paused, loaded saves and closures that
+  advance the model by themselves.
+* Dropping the last `Runner` handle never waits: the worker is told to stop
+  and exits once it has handled the controls sent before (a long Hashlife
+  jump keeps running on its thread, not on the UI thread). Tests that must
+  know the thread has ended call `Runner::shutdown_and_wait()`;
+  `simulation_core::live_workers()` counts the worker threads still alive in
+  the process (diagnostics).
 * Save/Load uses `snapshot()` / `restore()`; the descriptor `id` must be stable
   (it is checked when loading) and snapshots carry your `schema_version`.
 * Replacing the whole simulation (new scenario) through
   `Control::Replace` keeps the same `ActiveSession`; re-inserting a different
   `ActiveSession` clears the metric plots.
+* While the mode has no `ActiveSession` the world area shows *Starting the
+  simulation…*. A mode that loads asynchronously or fails fatally (missing
+  assets, for example) replaces that text through `ResMut<ModePlaceholders>`:
+  `set(mode, ToastLevel::Error, "…")` (`Warning` and `Error` are drawn in
+  their theme colours, `Info` and `Success` muted; long texts wrap) and
+  `clear(mode)` to go back to the default. The entry belongs to the mode:
+  set it when entering or when the failure happens, clear it when it no
+  longer applies.
 
 ### 2.3 World cameras and input
 
@@ -311,6 +341,11 @@ All colours come from `theme::Palette` tokens. The light theme darkens the
 mode accent until it has at least 3:1 contrast on panels; the high-contrast
 theme uses black surfaces, white text, 1.5 px outlines and brightens the
 accent to at least 7:1 (checked by unit tests for every mode accent).
+Selections (selected buttons and labels, selected text, the filled part of
+sliders) are painted with an opaque mix of the panel and the accent (35 %)
+in every theme: bevy_egui blends in linear light, where a translucent accent
+over the light panel would wash out to grey (a unit test checks the colour
+as composited on screen).
 
 ## 4. Desktop application
 

@@ -418,7 +418,7 @@ pub(crate) fn pump_builds(
     if state.task.is_some() {
         return;
     }
-    let Some(published) = runner.0.runner().latest_view() else { return };
+    let Some(published) = runner.0.latest_view() else { return };
     if !matches!(*published.view, VoxelView::Surface(_)) {
         return;
     }

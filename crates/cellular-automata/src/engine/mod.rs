@@ -221,8 +221,10 @@ pub trait LifeEngine: Send + Sync {
     }
     /// Every live cell, sorted row-major (by `y`, then `x`).
     fn export_cells(&self) -> Vec<(i64, i64)>;
-    /// Live cells inside `rect`, sorted row-major.
-    fn cells_in_rect(&self, rect: CellRect) -> Vec<(i64, i64)>;
+    /// Live cells inside `rect`, sorted row-major: at most `limit` of them
+    /// (which ones are kept when the rectangle holds more depends on the
+    /// engine), so callers can refuse huge regions without listing them.
+    fn cells_in_rect(&self, rect: CellRect, limit: usize) -> Vec<(i64, i64)>;
     /// Advances one generation. Returns its births and deaths, or `None`
     /// when the engine does not count them (Hashlife).
     ///
@@ -354,6 +356,12 @@ pub const AUTO_HASHLIFE_MIN_STEP: u64 = 16;
 pub const AUTO_HASHLIFE_MIN_POPULATION: u64 = 1 << 16;
 /// See [`AUTO_HASHLIFE_MIN_POPULATION`].
 pub const AUTO_HASHLIFE_MIN_REGULARITY: f64 = 0.5;
+/// Largest population whose tile regularity `LifeSim`'s automatic choice
+/// measures (measuring lists every live cell). Above it a running Hashlife
+/// engine is kept, since leaving it would list every cell too, and the other
+/// engines are chosen as for an irregular pattern, so the choice stays
+/// bounded in time and memory for any population.
+pub const AUTO_REGULARITY_MAX_POPULATION: u64 = 1 << 20;
 
 /// Inputs of the automatic engine choice.
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -1166,10 +1166,6 @@ mod glyph_tests {
         let mut out = Vec::new();
         for (file, text) in sources {
             let text = text.split("\n#[cfg(test)]").next().unwrap_or(text);
-            let text = match text.find("const GLYPH_FALLBACKS") {
-                Some(a) => format!("{}{}", &text[..a], text[a..].split_once("\n\n").map_or("", |(_, rest)| rest)),
-                None => text.to_string(),
-            };
             for line in text.lines().filter(|l| !l.trim_start().starts_with("//")) {
                 for c in line.chars().filter(|c| !c.is_ascii()) {
                     if !out.iter().any(|(x, _)| *x == c) {

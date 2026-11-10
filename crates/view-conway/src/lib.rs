@@ -75,9 +75,7 @@ use bevy_egui::EguiPrimaryContextPass;
 use interface::{AppMode, ModeAppExt, ModeCard, ModeStatus, PanelSlot, ShellSet, TutorialAppExt};
 use rendering::{GridCameraPlugin, GridCameraSystems, GridRenderPlugin};
 
-pub use session::{
-    ConwayRunner, ConwayScenarios, ConwaySession, DEFAULT_SCENARIO, LiveWorld, LoadRequest, LoadRequests,
-};
+pub use session::{ConwayRunner, ConwayScenarios, DEFAULT_SCENARIO, LiveWorld, LoadRequest, LoadRequests};
 pub use style::{CellColors, RenderStyle, ViewSettings};
 pub use tools::{Selection, Tool, ToolSettings};
 
@@ -173,10 +171,6 @@ impl bevy::app::Plugin for ConwayViewPlugin {
             .add_systems(
                 Update,
                 (
-                    world::release_speed_keys_from_camera
-                        .after(ShellSet::Commands)
-                        .before(GridCameraSystems::Control)
-                        .run_if(in_state(MODE)),
                     world::frame_camera.before(GridCameraSystems::Control).run_if(in_state(MODE)),
                     (
                         session::collect_scenario_picks,

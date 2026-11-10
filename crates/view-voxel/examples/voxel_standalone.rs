@@ -24,9 +24,9 @@
 //! | `VIEW_SMOKE_ZOOM=<f>` | egui zoom factor (e.g. `0.7` to see whole panels) |
 //! | `VIEW_SMOKE_REENTER=<n>` | leave to the dashboard and re-enter the mode `n` times (1–3) before frame 25 |
 //!
-//! Before capturing, the smoke run checks that exactly one 3D Life session
-//! (simulation thread) is alive, so a session leaked by leaving and
-//! re-entering the mode fails the run.
+//! Before capturing, the smoke run checks that exactly one simulation
+//! thread is alive (`simulation_core::live_workers`), so a session leaked by
+//! leaving and re-entering the mode fails the run.
 
 use std::path::{Path, PathBuf};
 
@@ -177,13 +177,13 @@ fn smoke(
         }
     }
     if smoke.frame == smoke.frames {
-        let live = view_voxel::live_sessions();
+        let live = simulation_core::live_workers();
         if live != 1 {
-            error!("expected one 3D Life session, found {live}");
+            error!("expected one simulation thread, found {live}");
             exit.write(AppExit::error());
             return;
         }
-        info!("3D Life sessions alive: {live}");
+        info!("Simulation threads alive: {live}");
         if let Some(parent) = smoke.path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }

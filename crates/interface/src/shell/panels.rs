@@ -7,9 +7,11 @@ use rendering::WorldCamera;
 
 use super::{Frame, bottom_bar, run_panel};
 use crate::commands::RightPanelTab;
+use crate::mode::{ModePlaceholders, Placeholder};
 use crate::session::MetricsHistory;
 use crate::state::ShellState;
-use crate::theme::with_alpha;
+use crate::theme::{Palette, with_alpha};
+use crate::toasts::ToastLevel;
 use crate::widgets::rules::tick_label;
 use crate::widgets::{metrics_panel, param_editor, rules_panel};
 
@@ -72,15 +74,25 @@ pub(super) fn show_mode_layout(root: &mut Ui, world: &mut World, shell: &mut She
             });
     }
     if frame.session.is_none() {
-        root.painter().text(
-            central.center(),
-            Align2::CENTER_CENTER,
-            "Starting the simulation…",
-            egui::FontId::proportional(16.0),
-            with_alpha(frame.palette.text_muted, 0.8),
-        );
+        let (text, color) = placeholder(world.resource::<ModePlaceholders>().get(frame.mode), &frame.palette);
+        let painter = root.painter();
+        let galley = painter.layout(text.to_owned(), egui::FontId::proportional(16.0), color, central.width() - 48.0);
+        painter.galley(Align2::CENTER_CENTER.anchor_size(central.center(), galley.size()).min, galley, color);
     }
     central
+}
+
+/// Text and colour of the world area while the mode has no session.
+fn placeholder<'a>(placeholder: Option<&'a Placeholder>, palette: &Palette) -> (&'a str, egui::Color32) {
+    let muted = with_alpha(palette.text_muted, 0.8);
+    match placeholder {
+        None => ("Starting the simulation…", muted),
+        Some(p) => match p.level {
+            ToastLevel::Warning => (&p.text, palette.warning),
+            ToastLevel::Error => (&p.text, palette.error),
+            ToastLevel::Info | ToastLevel::Success => (&p.text, muted),
+        },
+    }
 }
 
 fn section_title(ui: &mut Ui, frame: &Frame, title: &str) {
@@ -129,19 +141,18 @@ fn right_panel(ui: &mut Ui, world: &mut World, shell: &mut ShellState, frame: &F
                     run_panel(world, system, ui);
                 }
             }
-            RightPanelTab::Parameters => match (&frame.session, &frame.status) {
-                (Some(session), Some(status)) => {
-                    param_editor(ui, session.session().descriptor(), &status.params, session.session())
+            RightPanelTab::Parameters => match (&frame.session, &frame.descriptor, &frame.status) {
+                (Some(session), Some(descriptor), Some(status)) => {
+                    param_editor(ui, descriptor, &status.params, session.session())
                 }
                 _ => no_session(ui),
             },
-            RightPanelTab::Rules => match &frame.session {
-                Some(session) => rules_panel(ui, session.session().descriptor(), &frame.palette),
+            RightPanelTab::Rules => match &frame.descriptor {
+                Some(descriptor) => rules_panel(ui, descriptor, &frame.palette),
                 None => no_session(ui),
             },
-            RightPanelTab::Metrics => match &frame.session {
-                Some(session) => {
-                    let descriptor = session.session().descriptor();
+            RightPanelTab::Metrics => match &frame.descriptor {
+                Some(descriptor) => {
                     let history = world.resource::<MetricsHistory>();
                     if history.awaiting_restore() {
                         ui.label(RichText::new("Waiting for the loaded state; plots restart from it.").small().weak());
@@ -163,4 +174,53 @@ fn right_panel(ui: &mut Ui, world: &mut World, shell: &mut ShellState, frame: &F
 
 fn no_session(ui: &mut Ui) {
     ui.label(RichText::new("No simulation is running in this mode.").weak());
+}
+
+#[cfg(test)]
+mod tests {
+    use bevy_egui::egui::epaint::Shape;
+
+    use super::*;
+    use crate::mode::{AppMode, ModePanels};
+    use crate::theme::ThemeKind;
+
+    /// Texts painted by one headless frame of the mode layout, with colours.
+    fn painted_texts(world: &mut World, frame: &Frame) -> Vec<(String, egui::Color32)> {
+        fn collect(shape: &Shape, out: &mut Vec<(String, egui::Color32)>) {
+            match shape {
+                Shape::Vec(shapes) => shapes.iter().for_each(|s| collect(s, out)),
+                Shape::Text(text) => {
+                    let color = text.galley.job.sections.first().map_or(text.fallback_color, |s| s.format.color);
+                    out.push((text.galley.text().to_string(), color));
+                }
+                _ => {}
+            }
+        }
+        let mut shell = ShellState::default();
+        let output = crate::run_headless_ui(&egui::Context::default(), |ui| {
+            show_mode_layout(ui, world, &mut shell, frame);
+        });
+        let mut texts = Vec::new();
+        output.shapes.iter().for_each(|clipped| collect(&clipped.shape, &mut texts));
+        texts
+    }
+
+    #[test]
+    fn the_world_area_shows_the_mode_placeholder() {
+        let mode = AppMode::ConwayWithinConway;
+        let palette = Palette::new(ThemeKind::Dark, mode.default_accent());
+        let frame =
+            Frame { mode, palette, session: None, descriptor: None, status: None, panels: ModePanels::default() };
+        let mut world = World::new();
+        world.init_resource::<ModePlaceholders>();
+        let starting = ("Starting the simulation…".to_string(), with_alpha(palette.text_muted, 0.8));
+        assert!(painted_texts(&mut world, &frame).contains(&starting));
+        let missing = "The OTCA tiles are missing from assets/patterns/otca.";
+        world.resource_mut::<ModePlaceholders>().set(mode, ToastLevel::Error, missing);
+        let texts = painted_texts(&mut world, &frame);
+        assert!(texts.contains(&(missing.to_string(), palette.error)), "{texts:?}");
+        assert!(!texts.contains(&starting));
+        world.resource_mut::<ModePlaceholders>().clear(mode);
+        assert!(painted_texts(&mut world, &frame).contains(&starting));
+    }
 }

@@ -75,7 +75,7 @@ fn mode_title(ui: &mut Ui, world: &mut World, frame: &Frame) {
         |c| (c.glyph.clone(), c.title.clone()),
     );
     ui.label(RichText::new(glyph).size(16.0).color(p.accent));
-    let descriptor = frame.session.as_ref().map(|s| s.session().descriptor());
+    let descriptor = frame.descriptor.as_deref();
     let response = ui.label(RichText::new(&title).size(16.0).strong().color(p.text));
     match descriptor {
         // The model's name is shown only when it adds something to the title.

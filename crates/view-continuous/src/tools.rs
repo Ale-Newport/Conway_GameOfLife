@@ -297,7 +297,7 @@ pub enum ModeShortcut {
 
 /// The mode's keys, for the shortcut list in the tools panel. None of them
 /// is used by the shell (`interface::input::SHORTCUTS`) or by the grid
-/// camera (arrows, WASD, `=`/`-`); checked by a test.
+/// camera (arrows, WASD); checked by a test.
 pub const MODE_SHORTCUTS: &[(KeyCode, ModeShortcut, &str, &str)] = &[
     (KeyCode::Digit1, ModeShortcut::Tool(Tool::Inspect), "1", "Inspect tool"),
     (KeyCode::Digit2, ModeShortcut::Tool(Tool::Brush), "2", "Brush tool"),
@@ -379,10 +379,6 @@ mod tests {
             KeyCode::KeyA,
             KeyCode::KeyS,
             KeyCode::KeyD,
-            KeyCode::Equal,
-            KeyCode::Minus,
-            KeyCode::NumpadAdd,
-            KeyCode::NumpadSubtract,
         ];
         for (i, (key, _, label, _)) in MODE_SHORTCUTS.iter().enumerate() {
             assert!(SHORTCUTS.iter().all(|s| s.key != *key), "{label} is a shell shortcut");

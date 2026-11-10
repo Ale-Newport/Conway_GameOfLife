@@ -13,7 +13,7 @@
 //!   about the running model ([`LabInfo`]), read on the simulation thread
 //!   when the view is published.
 
-use cellular_automata::ant::{Ant, AntCommand, AntConfig, AntView, LangtonsAntSim, TurmiteRule};
+use cellular_automata::ant::{Ant, AntCommand, AntView, LangtonsAntSim, TurmiteRule};
 use cellular_automata::scenario::{BuiltSimulation, Scenario};
 use cellular_automata::{
     CellRect, EngineKind, GenerationsConfig, GenerationsSim, GridView, GridViewRequest, LifeCommand, LifeConfig,
@@ -22,9 +22,7 @@ use cellular_automata::{
 };
 use patterns::{GenerationsRule, LifeRule};
 use serde::{Deserialize, Serialize};
-use simulation_core::{
-    ApplyPolicy, Metrics, ModelDescriptor, ParamSet, ParamValue, SimError, Simulation, Snapshot, Topology,
-};
+use simulation_core::{ApplyPolicy, Metrics, ModelDescriptor, ParamSet, ParamValue, SimError, Simulation, Snapshot};
 
 use crate::family::Family;
 
@@ -151,8 +149,7 @@ pub struct LabInfo {
     /// Why the model stopped, if it did.
     pub halted: Option<String>,
     /// The family's headline metric ([`Family::headline_metric`]) measured
-    /// when the view was built, so the overlay agrees with the cells shown
-    /// (also after edits made while paused, which record no sample).
+    /// when the view was built, so the overlay agrees with the cells shown.
     pub headline: Option<f64>,
 }
 
@@ -231,52 +228,17 @@ pub struct LabSaved {
     pub scenario: String,
     /// The model's own snapshot.
     pub inner: Snapshot,
-    /// Running world of an ant model (the model has no accessor for it).
-    pub ant_world: Option<World>,
 }
 
 /// The laboratory's simulation: one of five models.
 pub struct LabSim {
     model: LabModel,
     scenario: String,
-    ant_world: Option<World>,
     fill: FillSettings,
 }
 
 fn ca(e: cellular_automata::CaError) -> SimError {
     SimError::from(e)
-}
-
-/// World of an ant configuration.
-fn ant_config_world(config: &AntConfig) -> Option<World> {
-    World::new(config.topology, config.width, config.height).ok()
-}
-
-/// World described by an ant model's parameters (the world of its next reset).
-fn ant_params_world(params: &ParamSet) -> Option<World> {
-    let topology = params.get("topology").and_then(ParamValue::as_str).and_then(|t| match t {
-        "infinite" => Some(Topology::Infinite),
-        "torus" => Some(Topology::Torus),
-        "bounded" => Some(Topology::Bounded),
-        _ => None,
-    })?;
-    let side = |k: &str| params.get(k).and_then(ParamValue::as_i64).and_then(|v| u32::try_from(v).ok());
-    World::new(topology, side("width")?, side("height")?).ok()
-}
-
-/// Oldest row an elementary automaton still keeps (rows `first..=generation` exist).
-fn wolfram_first_row(sim: &WolframSim) -> u64 {
-    let generation = sim.tick();
-    if sim.row_at(0).is_some() {
-        return 0;
-    }
-    let (mut lo, mut hi) = (0u64, generation);
-    // Invariant: row `lo` is gone, row `hi` is kept.
-    while hi - lo > 1 {
-        let mid = lo + (hi - lo) / 2;
-        if sim.row_at(mid).is_some() { hi = mid } else { lo = mid }
-    }
-    hi
 }
 
 impl LabSim {
@@ -289,17 +251,13 @@ impl LabSim {
             BuiltSimulation::Ant(s) => LabModel::Ant(s),
             BuiltSimulation::Wolfram(s) => LabModel::Wolfram(s),
         };
-        let ant_world = match &scenario.model {
-            cellular_automata::ScenarioModel::Ant(config) => ant_config_world(config),
-            _ => None,
-        };
         if matches!(model, LabModel::Life(ref s) if s.mode() != LifeMode::Lab) {
             return Err(SimError::InvalidConfig(format!(
                 "scenario `{}` belongs to the Classic Conway mode",
                 scenario.id
             )));
         }
-        Ok(Self { model, scenario: scenario.id.clone(), ant_world, fill: FillSettings::default() })
+        Ok(Self { model, scenario: scenario.id.clone(), fill: FillSettings::default() })
     }
 
     /// Builds a scenario.
@@ -404,16 +362,11 @@ impl LabSim {
             }
             LabModel::Wireworld(s) => (FamilyInfo::Wireworld { world: s.world() }, s.halt_reason().map(str::to_string)),
             LabModel::Ant(s) => {
-                let world = self.ant_world.or_else(|| ant_params_world(&s.params())).unwrap_or(World {
-                    topology: Topology::Infinite,
-                    width: 256,
-                    height: 256,
-                });
                 let halted = (s.ants().is_empty()).then(|| "every ant has left the bounded world".to_string());
                 (
                     FamilyInfo::Ant {
                         rule: s.rule().clone(),
-                        world,
+                        world: s.world(),
                         ants: s.ants().len(),
                         first: s.ants().first().copied(),
                     },
@@ -423,8 +376,8 @@ impl LabSim {
             LabModel::Wolfram(s) => (
                 FamilyInfo::Wolfram {
                     rule: s.rule(),
-                    width: s.current_row().len() as u32,
-                    first_row: wolfram_first_row(s),
+                    width: s.width() as u32,
+                    first_row: s.first_row(),
                     generation: s.tick(),
                 },
                 None,
@@ -516,13 +469,6 @@ impl Simulation for LabSim {
 
     fn reset(&mut self) {
         delegate!(&mut self.model, s => s.reset());
-        if let LabModel::Ant(s) = &self.model {
-            // A reset rebuilds the configured world (or returns to the reset
-            // point, which lies in that same world).
-            if let Some(world) = ant_params_world(&s.params()) {
-                self.ant_world = Some(world);
-            }
-        }
     }
 
     fn apply(&mut self, command: LabCommand) -> Result<(), SimError> {
@@ -568,7 +514,7 @@ impl Simulation for LabSim {
 
     fn snapshot(&self) -> Result<Snapshot, SimError> {
         let inner = delegate!(&self.model, s => s.snapshot())?;
-        let saved = LabSaved { scenario: self.scenario.clone(), inner, ant_world: self.ant_world };
+        let saved = LabSaved { scenario: self.scenario.clone(), inner };
         Snapshot::encode(LAB_MODEL_ID, LAB_SCHEMA, self.tick(), &saved)
     }
 
@@ -586,7 +532,6 @@ impl Simulation for LabSim {
             self.model = model;
         }
         self.scenario = saved.scenario;
-        self.ant_world = saved.ant_world;
         Ok(())
     }
 
@@ -603,6 +548,7 @@ impl Simulation for LabSim {
 pub(crate) mod tests {
     use super::*;
     use cellular_automata::scenario::builtin_scenario;
+    use simulation_core::Topology;
 
     /// The pattern library with the asset catalog (the AND gate is read from `assets/`).
     pub(crate) fn test_library() -> PatternLibrary {
@@ -653,7 +599,7 @@ pub(crate) mod tests {
         let population = life.metrics().get("population");
         assert!(population.is_some_and(|p| p > 0.0));
         assert_eq!(life.view(&request).info.headline, population);
-        // An edit while paused records no metric sample, but the next view shows it.
+        // The next view shows an edit at once.
         life.apply(LabCommand::Life(LifeCommand::Clear)).unwrap();
         assert_eq!(life.view(&request).info.headline, Some(0.0));
         let ww = lab("wireworld-circuits");

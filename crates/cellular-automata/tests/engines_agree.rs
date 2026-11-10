@@ -250,6 +250,35 @@ fn level_of_detail_counts_agree_between_engines() {
 }
 
 #[test]
+fn region_listings_agree_between_engines_and_stop_at_the_limit() {
+    let mut rng = SimRng::seed_from_u64(17);
+    let plane = World::new(Topology::Infinite, 64, 64).expect("valid");
+    let torus = World::new(Topology::Torus, 150, 90).expect("valid");
+    let cells = soup(&mut rng, torus.home(), 0.3);
+    for (world, kind) in [
+        (plane, EngineKind::Dense),
+        (plane, EngineKind::Sparse),
+        (plane, EngineKind::Hashlife),
+        (torus, EngineKind::Dense),
+        (torus, EngineKind::Bit),
+    ] {
+        let mut e = create_engine(kind, world, LifeRule::conway()).unwrap();
+        e.load_cells(&cells);
+        for _ in 0..20 {
+            let (x0, y0) = (rng.range_i64(-20, 140), rng.range_i64(-20, 80));
+            let rect = CellRect::new(x0, y0, x0 + rng.range_i64(0, 100), y0 + rng.range_i64(0, 60));
+            let all = sorted(&cells.iter().copied().filter(|&(x, y)| rect.contains(x, y)).collect());
+            assert_eq!(e.cells_in_rect(rect, usize::MAX), all, "{} in {rect:?}", e.name());
+            for limit in [0, 1, all.len() / 2, all.len()] {
+                let some = e.cells_in_rect(rect, limit);
+                assert_eq!(some.len(), limit.min(all.len()), "{} in {rect:?}, limit {limit}", e.name());
+                assert!(some.is_sorted_by_key(|&(x, y)| (y, x)) && some.iter().all(|c| all.contains(c)));
+            }
+        }
+    }
+}
+
+#[test]
 fn long_runs_agree() {
     // 300 generations against the reference on a small Klein bottle, Conway and HighLife.
     let mut rng = SimRng::seed_from_u64(2718);

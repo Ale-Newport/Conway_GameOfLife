@@ -4,21 +4,17 @@
 //! live world (engine, topology, exact generation and population, bounding
 //! box, Hashlife memo statistics).
 //!
-//! **Why a session wrapper.** `simulation_core::Runner` captures the model
-//! descriptor when it is spawned, but `LifeSim`'s rules text depends on the
-//! running topology and generations per tick. [`ConwaySession`] serves a
-//! descriptor that follows the simulation thread, so the shell's Rules tab
-//! always describes what runs. Descriptors live in write-once slots (equal
-//! descriptors reuse their slot), so `descriptor()` hands out plain
-//! references without locks. The served descriptor omits the rule preset,
-//! the rule text and the engine parameters: this mode runs B3/S23 only (the
-//! Cellular Automata Lab runs other rules) and switches engines from its own
-//! Engine card, which refuses switches that would copy astronomically many
-//! cells out of Hashlife.
+//! **Served descriptor.** The runner publishes [`served_descriptor`] of the
+//! running model, rebuilt on the simulation thread after every control that
+//! may change it, so the shell's Rules tab follows the topology. It omits the
+//! rule preset, the rule text and the engine parameters: this mode runs
+//! B3/S23 only (the Cellular Automata Lab runs other rules) and switches
+//! engines from its own Engine card, which refuses switches that would copy
+//! astronomically many cells out of Hashlife.
 
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError};
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -32,18 +28,14 @@ use interface::{
 };
 use patterns::LifeRule;
 use simulation_core::{
-    Control, HistoryConfig, Metrics, ModelDescriptor, ParamSet, ParamValue, Runner, RunnerConfig, RunnerStatus,
-    SessionControl, SimError, Simulation, Snapshot, Speed, Topology,
+    Control, ModelDescriptor, ParamSet, ParamValue, Runner, RunnerConfig, Simulation, Speed, Topology,
 };
 
 use crate::MODE;
-use crate::labels::displayable;
 use crate::library::ConwayLibrary;
 
 /// Scenario opened the first time the mode is entered.
 pub const DEFAULT_SCENARIO: &str = "glider-gun-showcase";
-/// Write-once descriptor slots per session.
-pub const DESCRIPTOR_SLOTS: usize = 1024;
 /// Seconds between two reads of the live world while nothing changes.
 pub const LIVE_PERIOD: f32 = 0.2;
 /// Parameters of `LifeSim` that this mode does not offer in the shell's
@@ -115,10 +107,11 @@ pub const SERVED_SUMMARY: &str = "Conway's Game of Life (B3/S23) on bounded, tor
                                   or infinite worlds, with dense, bit-packed, sparse and Hashlife engines. Other \
                                   Life-like rules run in the Cellular Automata Lab.";
 
-/// The model's rules text quotes the current generations per tick ("One
-/// tick advances 64 generation(s)."). The served text names the setting
-/// instead, so the descriptor only changes with the topology or the rule
-/// and the write-once slots cannot run out when the value is scrubbed.
+/// The model's rules text quotes the generations per tick in effect ("One
+/// tick advances 64 generation(s)."). A new value takes effect on the next
+/// tick, after the runner rebuilt the descriptor for the control that set
+/// it, so the quoted number would lag behind; the served text names the
+/// setting instead.
 pub fn generic_ticks_sentence(rules: &str) -> String {
     const START: &str = "One tick advances ";
     const END: &str = " generation(s).";
@@ -135,145 +128,24 @@ pub fn generic_ticks_sentence(rules: &str) -> String {
 }
 
 /// What `descriptor()` serves for a model descriptor: hidden parameters
-/// removed, a Classic Conway summary, a rules text that does not depend on
-/// the generations per tick, and every text drawable by egui's built-in fonts.
+/// removed, a Classic Conway summary and a rules text that does not depend
+/// on the generations per tick.
 pub fn served_descriptor(descriptor: &ModelDescriptor) -> ModelDescriptor {
     let mut d = descriptor.clone();
     d.params.retain(|p| !HIDDEN_PARAMS.contains(&p.key.as_str()));
     d.summary = SERVED_SUMMARY.to_string();
-    d.rules = displayable(&generic_ticks_sentence(&d.rules));
-    for spec in &mut d.params {
-        spec.description = displayable(&spec.description);
-        spec.label = displayable(&spec.label);
-    }
-    for metric in &mut d.metrics {
-        metric.description = displayable(&metric.description);
-    }
+    d.rules = generic_ticks_sentence(&d.rules);
     d
 }
 
-/// `SessionControl` over the Life runner with a live descriptor.
-pub struct ConwaySession {
-    runner: Runner<LifeSim>,
-    slots: Box<[OnceLock<ModelDescriptor>]>,
-    used: AtomicUsize,
-    current: AtomicUsize,
-}
-
-impl ConwaySession {
-    /// Wraps a runner; `first` is served until [`Self::update_descriptor`].
-    pub fn new(runner: Runner<LifeSim>, first: ModelDescriptor) -> Self {
-        let slots: Box<[OnceLock<ModelDescriptor>]> = (0..DESCRIPTOR_SLOTS).map(|_| OnceLock::new()).collect();
-        let _ = slots[0].set(first);
-        Self { runner, slots, used: AtomicUsize::new(1), current: AtomicUsize::new(0) }
-    }
-
-    /// The typed runner.
-    pub fn runner(&self) -> &Runner<LifeSim> {
-        &self.runner
-    }
-
-    /// The descriptor currently served.
-    pub fn current_descriptor(&self) -> &ModelDescriptor {
-        let i = self.current.load(Ordering::Acquire);
-        self.slots.get(i).and_then(OnceLock::get).unwrap_or_else(|| self.runner.descriptor())
-    }
-
-    /// Serves `descriptor` from now on. Returns `false` when every slot is
-    /// used by other descriptors (the previous one stays served).
-    pub fn update_descriptor(&self, descriptor: ModelDescriptor) -> bool {
-        if *self.current_descriptor() == descriptor {
-            return true;
-        }
-        let used = self.used.load(Ordering::Acquire);
-        if let Some(i) = (0..used).find(|&i| self.slots[i].get() == Some(&descriptor)) {
-            self.current.store(i, Ordering::Release);
-            return true;
-        }
-        let Some(slot) = self.slots.get(used) else { return false };
-        if slot.set(descriptor).is_err() {
-            return false;
-        }
-        self.used.store(used + 1, Ordering::Release);
-        self.current.store(used, Ordering::Release);
-        true
-    }
-}
-
-impl SessionControl for ConwaySession {
-    fn descriptor(&self) -> &ModelDescriptor {
-        self.current_descriptor()
-    }
-    fn status(&self) -> RunnerStatus {
-        self.runner.status()
-    }
-    fn play(&self) {
-        self.runner.play();
-    }
-    fn pause(&self) {
-        self.runner.pause();
-    }
-    fn toggle_play(&self) {
-        SessionControl::toggle_play(&self.runner);
-    }
-    fn step(&self, n: u64) {
-        self.runner.step(n);
-    }
-    fn set_speed(&self, speed: Speed) {
-        SessionControl::set_speed(&self.runner, speed);
-    }
-    fn reset(&self) {
-        SessionControl::reset(&self.runner);
-    }
-    fn undo(&self) {
-        SessionControl::undo(&self.runner);
-    }
-    fn redo(&self) {
-        SessionControl::redo(&self.runner);
-    }
-    fn jump_to_history(&self, index: usize) {
-        SessionControl::jump_to_history(&self.runner, index);
-    }
-    fn set_history(&self, config: HistoryConfig) {
-        SessionControl::set_history(&self.runner, config);
-    }
-    fn set_param(&self, key: &str, value: ParamValue) {
-        SessionControl::set_param(&self.runner, key, value);
-    }
-    fn drain_metrics(&self) -> Vec<Metrics> {
-        self.runner.drain_metrics()
-    }
-    fn take_errors(&self) -> Vec<String> {
-        self.runner.take_errors()
-    }
-    fn request_snapshot(&self) -> Receiver<Result<Snapshot, SimError>> {
-        SessionControl::request_snapshot(&self.runner)
-    }
-    fn restore(&self, snapshot: Snapshot) {
-        SessionControl::restore(&self.runner, snapshot);
-    }
-    fn can_clear(&self) -> bool {
-        self.runner.can_clear()
-    }
-    fn clear(&self) {
-        SessionControl::clear(&self.runner);
-    }
-    fn can_randomize(&self) -> bool {
-        self.runner.can_randomize()
-    }
-    fn randomize(&self, seed: u64) {
-        SessionControl::randomize(&self.runner, seed);
-    }
-}
-
-/// Typed handle on the running session (the same object as [`ActiveSession`]).
+/// Typed handle on the running session (the same runner as [`ActiveSession`]).
 #[derive(Resource, Clone)]
-pub struct ConwayRunner(pub Arc<ConwaySession>);
+pub struct ConwayRunner(pub Arc<Runner<LifeSim>>);
 
 impl ConwayRunner {
     /// Sends a control message.
     pub fn send(&self, control: Control<LifeSim>) {
-        self.0.runner().send(control);
+        self.0.send(control);
     }
 
     /// Applies an undoable command.
@@ -288,7 +160,7 @@ impl ConwayRunner {
 
     /// Runs `f` on the simulation thread; poll the receiver with `try_recv`.
     pub fn request<R: Send + 'static>(&self, f: impl FnOnce(&mut LifeSim) -> R + Send + 'static) -> Receiver<R> {
-        self.0.runner().request(f)
+        self.0.request(f)
     }
 
     /// Sets a parameter.
@@ -327,25 +199,27 @@ pub(crate) fn sync_randomize_density(tools: Res<crate::tools::ToolSettings>, den
     }
 }
 
-/// A runner with Clear and Randomize (whole world, or the home region of the
-/// infinite plane, with the random fill tool's density) enabled.
-pub fn spawn_session(sim: LifeSim, speed: Speed, density: &RandomizeDensity) -> Arc<ConwaySession> {
-    let first = served_descriptor(&sim.descriptor());
+/// A runner serving [`served_descriptor`], with Clear and Randomize (whole
+/// world, or the home region of the infinite plane, with the random fill
+/// tool's density) enabled.
+pub fn spawn_session(sim: LifeSim, speed: Speed, density: &RandomizeDensity) -> Arc<Runner<LifeSim>> {
     let density = density.0.clone();
-    let runner = Runner::spawn(sim, RunnerConfig { speed, ..default() })
-        .with_clear(|sim: &mut LifeSim| {
-            if let Err(e) = sim.apply(LifeCommand::Clear) {
-                warn!("clear failed: {e}");
-            }
-        })
-        .with_randomize(move |sim: &mut LifeSim, seed| {
-            let density = f64::from_bits(density.load(Ordering::Relaxed));
-            let command = LifeCommand::Randomize { density, seed: Some(seed), region: None, symmetry: Symmetry::None };
-            if let Err(e) = sim.apply(command) {
-                warn!("randomize failed: {e}");
-            }
-        });
-    Arc::new(ConwaySession::new(runner, first))
+    let runner = Runner::spawn_with_descriptor(sim, RunnerConfig { speed, ..default() }, |sim| {
+        served_descriptor(&sim.descriptor())
+    })
+    .with_clear(|sim: &mut LifeSim| {
+        if let Err(e) = sim.apply(LifeCommand::Clear) {
+            warn!("clear failed: {e}");
+        }
+    })
+    .with_randomize(move |sim: &mut LifeSim, seed| {
+        let density = f64::from_bits(density.load(Ordering::Relaxed));
+        let command = LifeCommand::Randomize { density, seed: Some(seed), region: None, symmetry: Symmetry::None };
+        if let Err(e) = sim.apply(command) {
+            warn!("randomize failed: {e}");
+        }
+    });
+    Arc::new(runner)
 }
 
 /// Hashlife's memo statistics.
@@ -392,8 +266,6 @@ pub struct LiveInfo {
     pub hashlife: Option<HashlifeStats>,
     /// Approximate model memory.
     pub memory_bytes: usize,
-    /// The model's descriptor.
-    pub descriptor: ModelDescriptor,
 }
 
 impl LiveInfo {
@@ -424,7 +296,6 @@ impl LiveInfo {
                 }
             }),
             memory_bytes: sim.memory_bytes(),
-            descriptor: sim.descriptor(),
         }
     }
 
@@ -666,7 +537,7 @@ pub(crate) fn enter_session(
     }
 }
 
-/// `OnExit`: drops the session; the runner's `Drop` stops and joins its thread.
+/// `OnExit`: drops the session; the runner's `Drop` stops its thread.
 pub(crate) fn exit_session(mut commands: Commands, mut state: SessionState) {
     commands.remove_resource::<ActiveSession>();
     commands.remove_resource::<ConwayRunner>();
@@ -745,8 +616,7 @@ pub(crate) fn load_requests(
 }
 
 /// Reads the live world from the simulation thread: when a parameter or the
-/// generation changed, and every [`LIVE_PERIOD`] seconds. Keeps the served
-/// descriptor in step with the model's.
+/// generation changed, and every [`LIVE_PERIOD`] seconds.
 pub(crate) fn poll_live_world(
     time: Res<Time>,
     runner: Option<Res<ConwayRunner>>,
@@ -771,15 +641,10 @@ pub(crate) fn poll_live_world(
     match received {
         Some(Ok(info)) => {
             *lock(&sync.pending) = None;
-            if info.epoch == live.epoch {
-                if !runner.0.update_descriptor(served_descriptor(&info.descriptor)) {
-                    warn!("all {DESCRIPTOR_SLOTS} descriptor slots are used; the Rules tab keeps the previous text");
-                }
-                // A reset that applied a new topology or size, or a loaded
-                // save: frame the new world.
-                if live.current().is_some_and(|old| old.world != info.world) {
-                    loaded.frame_epoch = Some(live.epoch);
-                }
+            // A reset that applied a new topology or size, or a loaded save:
+            // frame the new world.
+            if info.epoch == live.epoch && live.current().is_some_and(|old| old.world != info.world) {
+                loaded.frame_epoch = Some(live.epoch);
             }
             live.info = Some(info);
         }
@@ -835,13 +700,12 @@ mod tests {
         let keys: Vec<&str> = d.params.iter().map(|p| p.key.as_str()).collect();
         assert!(!keys.contains(&"preset") && !keys.contains(&"rule") && !keys.contains(&"engine"));
         assert!(keys.contains(&"topology") && keys.contains(&"generations_per_tick"));
-        assert!(!d.rules.contains('∈'), "drawable characters only");
         assert_eq!(d.id, "life.classic");
         assert_eq!(d.summary, SERVED_SUMMARY);
     }
 
     /// The served descriptor does not change with the generations per tick,
-    /// so scrubbing that value cannot use up the descriptor slots.
+    /// so it cannot lag behind a new value taking effect on the next tick.
     #[test]
     fn served_rules_do_not_depend_on_the_generations_per_tick() {
         let mut sim = LifeSim::conway(1);
@@ -869,18 +733,24 @@ mod tests {
         assert_eq!(newest_counts((3, 7), None, true), (3, 7, false));
     }
 
+    /// The runner serves the adapted descriptor from the start and rebuilds
+    /// it when a reset applies another topology.
     #[test]
-    fn descriptor_slots_reuse_equal_descriptors() {
-        let sim = LifeSim::conway(1);
-        let first = served_descriptor(&sim.descriptor());
-        let session = ConwaySession::new(Runner::spawn(LifeSim::conway(1), RunnerConfig::default()), first.clone());
-        let mut other = first.clone();
-        other.rules.push_str("\n\nchanged");
-        assert!(session.update_descriptor(other.clone()));
-        assert_eq!(session.descriptor().rules, other.rules);
-        assert!(session.update_descriptor(first.clone()));
-        assert_eq!(*session.descriptor(), first);
-        assert_eq!(session.used.load(Ordering::Acquire), 2, "the first slot was reused");
+    fn the_served_descriptor_follows_the_running_world() {
+        let runner = ConwayRunner(spawn_session(LifeSim::conway(1), DEFAULT_SPEED, &RandomizeDensity::default()));
+        assert_eq!(*runner.0.descriptor(), served_descriptor(&LifeSim::conway(1).descriptor()));
+        assert!(runner.0.descriptor().rules.contains("a torus"));
+        runner.set_param("topology", ParamValue::Text("infinite".into()));
+        runner.send(Control::Reset);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while runner.0.status().descriptor_seq == 0 {
+            assert!(std::time::Instant::now() < deadline, "the descriptor was not published again");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        let d = runner.0.descriptor();
+        assert!(d.rules.contains("the infinite plane") && !d.rules.contains("a torus"), "{}", d.rules);
+        assert_eq!(d.summary, SERVED_SUMMARY);
+        assert!(d.params.iter().all(|p| !HIDDEN_PARAMS.contains(&p.key.as_str())));
     }
 
     fn lifecycle_world() -> World {
@@ -907,12 +777,12 @@ mod tests {
         world
     }
 
-    fn runner_of(world: &World) -> Weak<ConwaySession> {
+    fn runner_of(world: &World) -> Weak<Runner<LifeSim>> {
         Arc::downgrade(&world.resource::<ConwayRunner>().0)
     }
 
     /// Enter, leave, enter again: every exit drops the last handle on the
-    /// runner, whose `Drop` stops and joins the simulation thread.
+    /// runner, whose `Drop` stops the simulation thread.
     #[test]
     fn exit_releases_the_runner_and_reentry_starts_a_new_one() {
         let mut world = lifecycle_world();

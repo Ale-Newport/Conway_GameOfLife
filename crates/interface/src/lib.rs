@@ -7,9 +7,9 @@
 //! metric plots, save / load, exports, tutorials, credits and themes.
 //!
 //! Mode (view) crates integrate through [`mode::ModeAppExt`],
-//! [`mode::ActiveSession`], [`mode::ModeScenarios`] and
-//! [`tutorial::TutorialAppExt`]; the contract is documented in
-//! `docs/UI_SHELL.md`.
+//! [`mode::ActiveSession`], [`mode::ModeScenarios`],
+//! [`mode::ModePlaceholders`] and [`tutorial::TutorialAppExt`]; the
+//! contract is documented in `docs/UI_SHELL.md`.
 //!
 //! Frame flow:
 //!
@@ -63,8 +63,8 @@ pub use error::InterfaceError;
 pub use export::{ScreenshotFinished, ScreenshotTracker};
 pub use layout::ShellLayout;
 pub use mode::{
-    ActiveSession, AppMode, ModeAppExt, ModeCard, ModePanels, ModeRegistry, ModeScenarios, ModeStatus, PanelSlot,
-    PanelSystem, ScenarioEntry, ScenarioList, ScenarioSelected,
+    ActiveSession, AppMode, ModeAppExt, ModeCard, ModePanels, ModePlaceholders, ModeRegistry, ModeScenarios,
+    ModeStatus, PanelSlot, PanelSystem, Placeholder, ScenarioEntry, ScenarioList, ScenarioSelected,
 };
 pub use saves::DataLocation;
 pub use session::{MetricsHistory, SessionStatus, Telemetry};
@@ -122,6 +122,7 @@ impl Plugin for InterfacePlugin {
             .init_resource::<ModeRegistry>()
             .init_resource::<mode::ModePanelRegistry>()
             .init_resource::<ModeScenarios>()
+            .init_resource::<ModePlaceholders>()
             .init_resource::<TutorialRegistry>()
             .init_resource::<ThemeSettings>()
             .init_resource::<state::ShellState>()

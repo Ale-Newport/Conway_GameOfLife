@@ -8,11 +8,13 @@ mod timeline;
 mod top_bar;
 mod windows;
 
+use std::sync::Arc;
+
 use bevy::ecs::system::RegisteredSystemError;
 use bevy::prelude::*;
 use bevy_egui::egui;
 use bevy_egui::{EguiContext, PrimaryEguiContext};
-use simulation_core::RunnerStatus;
+use simulation_core::{ModelDescriptor, RunnerStatus};
 
 use crate::layout::ShellLayout;
 use crate::mode::{ActiveSession, AppMode, ModePanelRegistry, ModePanels, ModeRegistry};
@@ -29,6 +31,8 @@ pub(crate) struct Frame {
     pub palette: Palette,
     /// The active session.
     pub session: Option<ActiveSession>,
+    /// Its descriptor this frame.
+    pub descriptor: Option<Arc<ModelDescriptor>>,
     /// Its status this frame.
     pub status: Option<RunnerStatus>,
     /// Panel systems of the mode.
@@ -40,10 +44,12 @@ impl Frame {
         let mode = *world.resource::<State<AppMode>>().get();
         let theme = world.resource::<ThemeSettings>().kind;
         let accent = world.resource::<ModeRegistry>().accent(mode);
+        let session = world.get_resource::<ActiveSession>().cloned();
         Self {
             mode,
             palette: Palette::new(theme, accent),
-            session: world.get_resource::<ActiveSession>().cloned(),
+            descriptor: session.as_ref().map(|s| s.session().descriptor()),
+            session,
             status: world.resource::<SessionStatus>().get().cloned(),
             panels: world.resource::<ModePanelRegistry>().get(mode),
         }

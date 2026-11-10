@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use interface::{MetricsHistory, ModeScenarios, SessionStatus};
-use simulation_core::{ModelDescriptor, ParamSet, Simulation};
+use simulation_core::{ParamSet, Simulation};
 use voxel_life::{
     Axis, Bounds, Evidence, Neighbourhood, Rule3D, SliceView, VoxelLife, VoxelView, VoxelViewRequest, WorldConfig,
     WorldKind,
@@ -86,8 +86,6 @@ pub(crate) struct ScenarioMeta {
 /// Description of the running world.
 #[derive(Clone, Debug)]
 pub(crate) struct WorldInfo {
-    /// Fresh model descriptor.
-    pub descriptor: ModelDescriptor,
     /// The loaded scenario.
     pub scenario: ScenarioMeta,
     /// The rule being executed.
@@ -113,7 +111,6 @@ impl WorldInfo {
     pub(crate) fn capture(sim: &VoxelLife) -> Self {
         let scenario = sim.scenario();
         Self {
-            descriptor: sim.descriptor(),
             scenario: ScenarioMeta {
                 id: scenario.id.clone(),
                 name: scenario.name.clone(),
@@ -152,7 +149,7 @@ impl WorldInfo {
 
 /// Population and alive voxels at generation `tick`: from the recorded
 /// metrics, else from the world description when it was read at that
-/// generation (generation 0 is never recorded as a metric sample).
+/// generation (a new runner records no sample of its first generation).
 pub(crate) fn current_counts(history: &MetricsHistory, info: Option<&WorldInfo>, tick: u64) -> Option<(u64, u64)> {
     let store = history.store();
     if let Some(population) = store.last("population").filter(|p| p.tick == tick) {
@@ -259,7 +256,6 @@ pub(crate) fn refresh_world(
         if !selected {
             scenarios.mark_selected(crate::MODE, &info.scenario.id);
         }
-        runner.0.set_descriptor(info.descriptor.clone());
         let signature = info.signature();
         let is_new = world.signature.as_ref() != Some(&signature);
         world.signature = Some(signature);
@@ -280,8 +276,9 @@ pub(crate) fn refresh_world(
     world.since_refresh += time.delta();
     let Some(status) = status.get() else { return };
     // The world description, read on the simulation thread, is exact for
-    // its generation (including edits, which record no metrics); while the
-    // run moves on, the latest metrics carry the population box.
+    // its generation (also the first one, of which a new runner records no
+    // metrics); while the run moves on, the latest metrics carry the
+    // population box.
     let from_info = world.info.as_ref().filter(|i| i.tick == status.tick).map(|i| i.population_bounds);
     world.population = match from_info {
         Some(bounds) => bounds,
@@ -302,7 +299,7 @@ pub(crate) fn refresh_world(
         return;
     }
     world.since_refresh = Duration::ZERO;
-    let rx = runner.0.runner().request(|sim| WorldInfo::capture(sim));
+    let rx = runner.0.request(|sim| WorldInfo::capture(sim));
     world.pending.start(rx);
 }
 
@@ -368,11 +365,10 @@ pub(crate) fn poll_slice(
         return;
     }
     slice.requested = Some(key);
-    let rx =
-        runner.0.runner().request(move |sim| match sim.view(&VoxelViewRequest::Slice { axis, layer, window: None }) {
-            VoxelView::Slice(view) => Some(view),
-            _ => None,
-        });
+    let rx = runner.0.request(move |sim| match sim.view(&VoxelViewRequest::Slice { axis, layer, window: None }) {
+        VoxelView::Slice(view) => Some(view),
+        _ => None,
+    });
     slice.pending.start(rx);
 }
 
@@ -462,7 +458,7 @@ pub(crate) fn poll_region(
         return;
     }
     region.requested = Some(key);
-    let rx = runner.0.runner().request(move |sim| count_region(sim, bounds));
+    let rx = runner.0.request(move |sim| count_region(sim, bounds));
     region.pending.start(rx);
 }
 
@@ -565,7 +561,7 @@ pub(crate) fn poll_probe(mut probe_state: ResMut<ProbeState>, runner: Res<VoxelR
         return;
     }
     probe_state.requested = Some(key);
-    let rx = runner.0.runner().request(move |sim| probe(sim, pos));
+    let rx = runner.0.request(move |sim| probe(sim, pos));
     probe_state.pending.start(rx);
 }
 
@@ -651,11 +647,9 @@ mod tests {
         assert_eq!(info.scenario.id, "rokicki-ship");
         assert_eq!(info.config.kind, WorldKind::DenseTorus);
         assert!(info.is_finite());
-        assert!(info.descriptor.rules.contains(&info.rule.to_string()));
         sim.apply(VoxelCommand::Clear).expect("clear");
         sim.set_param("rule", simulation_core::ParamValue::Text("B6/S567".into())).expect("valid rule");
         let info = WorldInfo::capture(&sim);
         assert_eq!(info.rule.to_string(), "5-7/6/2/M");
-        assert!(info.descriptor.rules.contains("5-7/6/2/M"));
     }
 }

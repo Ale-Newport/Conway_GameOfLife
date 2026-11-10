@@ -32,9 +32,8 @@
 //!   overlay (rule, phase, legend, cut and scale);
 //! * gates world interaction on `rendering::WorldInput`.
 //!
-//! The shell's Parameters, Rules and Metrics tabs read the session
-//! descriptor; this mode keeps it current after scenario loads and rule
-//! changes (see `session.rs`).
+//! The shell's Parameters, Rules and Metrics tabs read the descriptor the
+//! runner publishes for the running rule and world (see `session.rs`).
 
 mod build;
 mod colors;
@@ -66,14 +65,7 @@ pub use settings::{
 };
 pub use shortcuts::{ModeShortcut, SHORTCUTS, ShortcutAction};
 
-use crate::session::{VoxelRunner, VoxelSession};
-
-/// Number of 3D Life sessions (simulation threads) alive in this process.
-/// Diagnostics: after the mode is left it is 0, inside the mode 1; the
-/// standalone example checks it after leaving and re-entering the mode.
-pub fn live_sessions() -> usize {
-    session::live_sessions()
-}
+use crate::session::VoxelRunner;
 
 /// The mode this crate implements.
 pub const MODE: AppMode = AppMode::ThreeDimensionalLife;
@@ -220,7 +212,7 @@ struct ViewRequestState(Option<VoxelViewRequest>);
 fn sync_view_request(settings: Res<ViewSettings>, runner: Res<VoxelRunner>, mut sent: ResMut<ViewRequestState>) {
     let request = VoxelViewRequest::Surface { range: settings.cut.range(), max_voxels: settings.render_cap };
     if sent.0.as_ref() != Some(&request) {
-        runner.0.runner().send(Control::SetViewRequest(request.clone()));
+        runner.0.send(Control::SetViewRequest(request.clone()));
         sent.0 = Some(request);
     }
 }
@@ -260,7 +252,7 @@ fn enter(
             }
         }
     };
-    let session = Arc::new(VoxelSession::spawn(life));
+    let session = Arc::new(session::spawn_runner(life));
     settings.cut.enabled = false;
     settings.sweep = false;
     settings.region.enabled = false;

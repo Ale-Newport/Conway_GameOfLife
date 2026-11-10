@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn every_kind_renders_without_sending() {
         let fake = Arc::new(FakeSession::new());
-        let mut descriptor = fake.descriptor.clone();
+        let mut descriptor = ModelDescriptor::clone(&fake.descriptor);
         descriptor.params = vec![
             ParamSpec::boolean("wrap", "Wrap", true),
             ParamSpec::int("w", "Width", 1, 1_000_000, 64).apply(ApplyPolicy::RequiresReset),
@@ -329,7 +329,7 @@ mod tests {
         // Step 1.0 (range / 1000): 0.006 lies between grid points, and egui's
         // step rounding must not turn displaying it into an edit.
         let fake = Arc::new(FakeSession::new());
-        let mut descriptor = fake.descriptor.clone();
+        let mut descriptor = ModelDescriptor::clone(&fake.descriptor);
         descriptor.params = vec![ParamSpec::float("m", "Metabolism", 0.0, 1000.0, 0.006)];
         let params = ParamSet::from_defaults(&descriptor.params);
         let ctx = egui::Context::default();

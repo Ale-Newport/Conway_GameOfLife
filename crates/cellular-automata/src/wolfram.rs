@@ -240,8 +240,22 @@ impl WolframSim {
         Ok(sim)
     }
 
-    fn width(&self) -> usize {
+    /// Cells per row of the running diagram (the `width` parameter reports
+    /// the width of the next reset).
+    pub fn width(&self) -> usize {
         self.config.width as usize
+    }
+
+    /// The boundary condition of the running rows (the `boundary` parameter
+    /// reports a change that applies from the next row).
+    pub fn boundary(&self) -> Boundary {
+        self.boundary
+    }
+
+    /// The oldest row still kept for the diagram: rows
+    /// `first_row()..=tick()` exist.
+    pub fn first_row(&self) -> u64 {
+        self.generation + 1 - self.rows.len() as u64
     }
 
     fn rebuild(&mut self) {
@@ -273,7 +287,7 @@ impl WolframSim {
 
     /// Row `t` as booleans, if it is still kept.
     pub fn row_at(&self, t: u64) -> Option<Vec<bool>> {
-        let first = self.generation + 1 - self.rows.len() as u64;
+        let first = self.first_row();
         if t < first || t > self.generation {
             return None;
         }
@@ -292,7 +306,7 @@ impl WolframSim {
     }
 
     fn rules_text(&self) -> String {
-        let table: Vec<String> = (0..8).rev().map(|i| format!("{:03b}→{}", i, self.rule >> i & 1)).collect();
+        let table: Vec<String> = (0..8).rev().map(|i| format!("{:03b}->{}", i, self.rule >> i & 1)).collect();
         let boundary = match self.boundary {
             Boundary::Fixed0 => "cells beyond both ends are always 0",
             Boundary::Fixed1 => "cells beyond both ends are always 1",
@@ -499,7 +513,7 @@ impl Simulation for WolframSim {
     /// The space-time diagram: R = cell value, B = 255 where the cell differs
     /// from the cell above it (it changed in that step), A = fraction of ones.
     fn view(&self, request: &GridViewRequest) -> GridView {
-        let first = self.generation + 1 - self.rows.len() as u64;
+        let first = self.first_row();
         let bounds = CellRect { x0: 0, y0: first as i64, x1: self.width() as i64 - 1, y1: self.generation as i64 };
         let grid = TexelGrid::plan(request, Some(bounds));
         let len = grid.len();

@@ -236,8 +236,8 @@ impl LifeEngine for HashlifeEngine {
         cells
     }
 
-    fn cells_in_rect(&self, rect: CellRect) -> Vec<(i64, i64)> {
-        self.universe.cells_in_rect(rect.x0, rect.y0, rect.x1, rect.y1, usize::MAX)
+    fn cells_in_rect(&self, rect: CellRect, limit: usize) -> Vec<(i64, i64)> {
+        self.universe.cells_in_rect(rect.x0, rect.y0, rect.x1, rect.y1, limit)
     }
 
     fn step(&mut self) -> Result<Option<GenStats>, CaError> {
@@ -309,7 +309,7 @@ mod tests {
         let mut fast = vec![0u32; grid.len()];
         e.count_live(&grid, &mut fast);
         let mut slow = vec![0u32; grid.len()];
-        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap()), &grid, &mut slow);
+        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap(), usize::MAX), &grid, &mut slow);
         assert_eq!(fast, slow);
     }
 
@@ -323,7 +323,7 @@ mod tests {
         let req = GridViewRequest { x0: -45, y0: -37, x1: 61, y1: 29, max_width: 9, max_height: 9 };
         let grid = TexelGrid::plan(&req, None);
         let mut exact = vec![0u32; grid.len()];
-        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap()), &grid, &mut exact);
+        HashlifeEngine::bin(&e.cells_in_rect(grid.clip.unwrap(), usize::MAX), &grid, &mut exact);
         for budget in [0, 50, 1 << 20] {
             let mut got = vec![0u32; grid.len()];
             e.count_live_with_budget(&grid, &mut got, budget);

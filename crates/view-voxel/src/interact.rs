@@ -109,12 +109,12 @@ pub(crate) fn world_pointer(
     match tool {
         Tool::Inspect => probe.pinned = hit.map(|h| h.voxel.to_array()),
         Tool::Place => match place {
-            Some(target) => runner.0.runner().edit(VoxelCommand::SetVoxel { pos: target.to_array(), state: 1 }),
+            Some(target) => runner.0.edit(VoxelCommand::SetVoxel { pos: target.to_array(), state: 1 }),
             None => toasts.info("Point at a voxel face or at the floor of the world to place a voxel."),
         },
         Tool::Erase => {
             if let Some(h) = hit {
-                runner.0.runner().edit(VoxelCommand::ClearVoxel { pos: h.voxel.to_array() });
+                runner.0.edit(VoxelCommand::ClearVoxel { pos: h.voxel.to_array() });
             }
         }
     }
@@ -320,7 +320,7 @@ pub(crate) fn load_scenario(
     probe: &mut ProbeState,
 ) -> Result<(), String> {
     let life = crate::scenario_life(id)?;
-    runner.0.runner().send(Control::Replace(Box::new(life)));
+    runner.0.send(Control::Replace(Box::new(life)));
     scenarios.mark_selected(MODE, id);
     world.invalidate();
     probe.pinned = None;

@@ -212,6 +212,7 @@ pub(crate) mod test_model {
 
         fn descriptor(&self) -> ModelDescriptor {
             ModelDescriptor::new("test.walker", "Walker", ModelFamily::AgentBased)
+                .rules(&format!("value += uniform integer in 0..={}", self.step_max))
                 .params(vec![ParamSpec::int("step_max", "Max step", 0, 100, 3)])
         }
         fn tick(&self) -> u64 {

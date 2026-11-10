@@ -1,19 +1,12 @@
-//! Runner lifecycle, the session wrapper, scenarios and data read from the
-//! simulation thread.
+//! Runner lifecycle, scenarios and data read from the simulation thread.
 //!
-//! **Why a wrapper.** `simulation_core::Runner` captures the model
-//! descriptor when it is spawned, but the custom-life descriptor is
-//! generated from the running definition (rules text, parameters, metrics).
-//! [`CustomSession`] implements `SessionControl` by delegating to the
-//! runner and serves a descriptor that follows the running system, so the
-//! shell's Parameters, Rules and Metrics tabs always describe what is
-//! simulated. Descriptors live in an append-only set of write-once slots,
-//! which lets `descriptor()` hand out plain references without locks;
-//! should the slots ever run out, the session is rebuilt from a snapshot.
+//! The custom-life descriptor is generated from the running definition
+//! (rules text, parameters, metrics); the runner publishes it again when it
+//! changes, so the shell's Parameters, Rules and Metrics tabs always
+//! describe what is simulated ([`served_descriptor`]).
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError};
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use bevy::prelude::*;
 use interface::{ActiveSession, MetricsHistory, ModeScenarios, ScenarioEntry, ScenarioList, ScenarioSelected, Toasts};
@@ -21,17 +14,11 @@ use rule_engine::def::LifeSystem;
 use rule_engine::scenarios::{self, Scenario};
 use rule_engine::sim::entity::Entity;
 use rule_engine::{CustomLifeCommand, CustomLifeSim, CustomLifeView, CustomLifeViewRequest};
-use simulation_core::{
-    Control, HistoryConfig, Metrics, ModelDescriptor, ParamValue, Runner, RunnerConfig, RunnerStatus, SessionControl,
-    SimError, Simulation, Snapshot, Speed,
-};
+use simulation_core::{Control, ModelDescriptor, ParamValue, Runner, RunnerConfig, Simulation, Snapshot};
 
 use crate::MODE;
 use crate::editor::ClEditor;
 use crate::state::ClUi;
-
-/// Write-once descriptor slots per session.
-pub const DESCRIPTOR_SLOTS: usize = 1024;
 
 /// Samples per axis requested for field grids.
 pub const FIELD_RESOLUTION: u32 = 256;
@@ -42,45 +29,12 @@ pub const INFO_PERIOD: f32 = 0.5;
 /// Seconds between two reads of the selected entity.
 pub const INSPECT_PERIOD: f32 = 0.2;
 
-/// What [`CustomSession::update_descriptor`] did.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DescriptorUpdate {
-    /// The new descriptor is now served.
-    Updated,
-    /// It describes the same model (only parameter defaults differ).
-    Unchanged,
-    /// No slot is left: rebuild the session.
-    Full,
-}
-
-/// Whether two descriptors describe the same model shape. Parameter
-/// defaults are ignored: they mirror the current values, which the shell
-/// reads from the runner status anyway.
-pub fn same_shape(a: &ModelDescriptor, b: &ModelDescriptor) -> bool {
-    let params_match = a.params.len() == b.params.len()
-        && a.params.iter().zip(&b.params).all(|(x, y)| {
-            x.key == y.key
-                && x.label == y.label
-                && x.description == y.description
-                && x.group == y.group
-                && x.kind == y.kind
-                && x.apply == y.apply
-        });
-    params_match
-        && a.id == b.id
-        && a.name == b.name
-        && a.summary == b.summary
-        && a.rules == b.rules
-        && a.metrics == b.metrics
-        && a.tick_unit == b.tick_unit
-        && a.dt == b.dt
-        && a.deterministic == b.deterministic
-}
-
 /// The descriptor this mode serves for a running system: its `name` is the
 /// system's name, so the top bar reads "Custom Life Creator · Producers &
 /// consumers" instead of repeating the mode title. The model id is kept, so
-/// save / load still matches.
+/// save / load still matches. The rename is presentation: the model's own
+/// name stays the model's ("Custom Life Creator") for the registry and the
+/// CLI.
 pub fn served_descriptor(mut descriptor: ModelDescriptor, system_name: &str) -> ModelDescriptor {
     if !system_name.trim().is_empty() {
         descriptor.name = system_name.to_string();
@@ -88,122 +42,9 @@ pub fn served_descriptor(mut descriptor: ModelDescriptor, system_name: &str) -> 
     descriptor
 }
 
-/// `SessionControl` over a custom-life runner with a live descriptor.
-pub struct CustomSession {
-    runner: Runner<CustomLifeSim>,
-    slots: Box<[OnceLock<ModelDescriptor>]>,
-    current: AtomicUsize,
-}
-
-impl CustomSession {
-    /// Wraps a runner; `first` is served until [`Self::update_descriptor`]
-    /// replaces it.
-    pub fn new(runner: Runner<CustomLifeSim>, first: ModelDescriptor) -> Self {
-        let slots: Box<[OnceLock<ModelDescriptor>]> = (0..DESCRIPTOR_SLOTS).map(|_| OnceLock::new()).collect();
-        let _ = slots[0].set(first);
-        Self { runner, slots, current: AtomicUsize::new(0) }
-    }
-
-    /// The typed runner.
-    pub fn runner(&self) -> &Runner<CustomLifeSim> {
-        &self.runner
-    }
-
-    /// The descriptor currently served.
-    pub fn current_descriptor(&self) -> &ModelDescriptor {
-        let i = self.current.load(Ordering::Acquire);
-        self.slots.get(i).and_then(OnceLock::get).unwrap_or_else(|| self.runner.descriptor())
-    }
-
-    /// Serves `descriptor` from now on when it differs in shape.
-    pub fn update_descriptor(&self, descriptor: ModelDescriptor) -> DescriptorUpdate {
-        if same_shape(self.current_descriptor(), &descriptor) {
-            return DescriptorUpdate::Unchanged;
-        }
-        let next = self.current.load(Ordering::Acquire) + 1;
-        let Some(slot) = self.slots.get(next) else { return DescriptorUpdate::Full };
-        if slot.set(descriptor).is_err() {
-            return DescriptorUpdate::Full;
-        }
-        self.current.store(next, Ordering::Release);
-        DescriptorUpdate::Updated
-    }
-
-    /// Sends a control message.
-    pub fn send(&self, control: Control<CustomLifeSim>) {
-        self.runner.send(control);
-    }
-}
-
-impl SessionControl for CustomSession {
-    fn descriptor(&self) -> &ModelDescriptor {
-        self.current_descriptor()
-    }
-    fn status(&self) -> RunnerStatus {
-        self.runner.status()
-    }
-    fn play(&self) {
-        self.runner.play();
-    }
-    fn pause(&self) {
-        self.runner.pause();
-    }
-    fn toggle_play(&self) {
-        SessionControl::toggle_play(&self.runner);
-    }
-    fn step(&self, n: u64) {
-        self.runner.step(n);
-    }
-    fn set_speed(&self, speed: Speed) {
-        SessionControl::set_speed(&self.runner, speed);
-    }
-    fn reset(&self) {
-        SessionControl::reset(&self.runner);
-    }
-    fn undo(&self) {
-        SessionControl::undo(&self.runner);
-    }
-    fn redo(&self) {
-        SessionControl::redo(&self.runner);
-    }
-    fn jump_to_history(&self, index: usize) {
-        SessionControl::jump_to_history(&self.runner, index);
-    }
-    fn set_history(&self, config: HistoryConfig) {
-        SessionControl::set_history(&self.runner, config);
-    }
-    fn set_param(&self, key: &str, value: ParamValue) {
-        SessionControl::set_param(&self.runner, key, value);
-    }
-    fn drain_metrics(&self) -> Vec<Metrics> {
-        self.runner.drain_metrics()
-    }
-    fn take_errors(&self) -> Vec<String> {
-        self.runner.take_errors()
-    }
-    fn request_snapshot(&self) -> Receiver<Result<Snapshot, SimError>> {
-        SessionControl::request_snapshot(&self.runner)
-    }
-    fn restore(&self, snapshot: Snapshot) {
-        SessionControl::restore(&self.runner, snapshot);
-    }
-    fn can_clear(&self) -> bool {
-        self.runner.can_clear()
-    }
-    fn clear(&self) {
-        SessionControl::clear(&self.runner);
-    }
-    fn can_randomize(&self) -> bool {
-        self.runner.can_randomize()
-    }
-    fn randomize(&self, seed: u64) {
-        SessionControl::randomize(&self.runner, seed);
-    }
-}
-
 /// The running session of this mode (inserted on enter, removed on exit).
 #[derive(Resource, Clone)]
-pub struct ClRunner(pub Arc<CustomSession>);
+pub struct ClRunner(pub Arc<Runner<CustomLifeSim>>);
 
 impl ClRunner {
     /// Sends a control message.
@@ -233,13 +74,16 @@ fn reseed(sim: &mut CustomLifeSim, seed: u64) {
     }
 }
 
-/// Spawns a runner for `sim` with the mode's hooks and view request.
-pub fn spawn_session(sim: CustomLifeSim) -> Arc<CustomSession> {
-    let name = sim.system().name.clone();
-    let runner = Runner::spawn(sim, RunnerConfig::default()).with_clear(clear_entities).with_randomize(reseed);
+/// Spawns a runner for `sim` with the mode's descriptor, hooks and view
+/// request.
+pub fn spawn_session(sim: CustomLifeSim) -> Arc<Runner<CustomLifeSim>> {
+    let runner = Runner::spawn_with_descriptor(sim, RunnerConfig::default(), |s| {
+        served_descriptor(s.descriptor(), &s.system().name)
+    })
+    .with_clear(clear_entities)
+    .with_randomize(reseed);
     runner.send(Control::SetViewRequest(view_request()));
-    let first = served_descriptor(runner.descriptor().clone(), &name);
-    Arc::new(CustomSession::new(runner, first))
+    Arc::new(runner)
 }
 
 /// What the view asks the simulation for.
@@ -261,15 +105,12 @@ pub struct SimInfo {
     pub target: LifeSystem,
     /// Seed of the next reset.
     pub seed: u64,
-    /// Descriptor of the running system.
-    pub descriptor: ModelDescriptor,
 }
 
 impl SimInfo {
     fn read(sim: &CustomLifeSim) -> Self {
         let (target, seed) = sim.reset_target();
-        let descriptor = served_descriptor(sim.descriptor(), &sim.system().name);
-        Self { running: sim.system().clone(), target: target.clone(), seed, descriptor }
+        Self { running: sim.system().clone(), target: target.clone(), seed }
     }
 }
 
@@ -284,7 +125,8 @@ pub struct EntityDetail {
     pub entity: Option<Entity>,
 }
 
-/// Parts needed to rebuild a session that ran out of descriptor slots.
+/// Parts needed to rebuild the simulation when the mode is entered again
+/// (see [`ClResume`]).
 struct RebuildParts {
     snapshot: Snapshot,
     running: LifeSystem,
@@ -307,7 +149,6 @@ pub struct ClData {
     pub detail: Option<EntityDetail>,
     info_rx: Mutex<Option<Receiver<SimInfo>>>,
     detail_rx: Mutex<Option<Receiver<EntityDetail>>>,
-    rebuild_rx: Mutex<Option<Receiver<Result<RebuildParts, String>>>>,
     info_timer: f32,
     detail_timer: f32,
     info_wanted: bool,
@@ -460,7 +301,7 @@ pub fn enter(
     ui.fit_requested = true;
     if let Some(previous) = resume.0.take() {
         let resumed = match previous {
-            Resume::State(parts) => rebuild(Ok(*parts)),
+            Resume::State(parts) => rebuild(*parts),
             Resume::Reset(system, seed) => {
                 CustomLifeSim::new(*system, seed).map(spawn_session).map_err(|e| e.to_string())
             }
@@ -513,7 +354,7 @@ pub fn exit(
     mut resume: ResMut<ClResume>,
 ) {
     if let Some(runner) = runner {
-        let rx = runner.0.runner().request(rebuild_parts);
+        let rx = runner.0.request(rebuild_parts);
         resume.0 = match rx.recv_timeout(RESUME_TIMEOUT) {
             Ok(Ok(parts)) => Some(Resume::State(Box::new(parts))),
             _ => data.info.as_ref().map(|i| Resume::Reset(Box::new(i.target.clone()), i.seed)),
@@ -617,18 +458,15 @@ pub fn handle_scenario_selection(
     }
 }
 
-/// Reads the latest view, the definitions (periodically and after edits),
-/// the selected entity, and serves the running descriptor.
-#[allow(clippy::too_many_arguments)]
+/// Reads the latest view, the definitions (periodically and after edits)
+/// and the selected entity.
 pub fn poll_data(
-    mut commands: Commands,
     runner: Option<Res<ClRunner>>,
     mut data: ResMut<ClData>,
     mut editor: ResMut<ClEditor>,
     mut ui: ResMut<ClUi>,
     time: Res<Time<Real>>,
     history: Res<MetricsHistory>,
-    mut toasts: ResMut<Toasts>,
 ) {
     let Some(runner) = runner else { return };
     let dt = time.delta_secs();
@@ -636,7 +474,7 @@ pub fn poll_data(
         data.play_pending = false;
         runner.send(Control::Play);
     }
-    if let Some(published) = runner.0.runner().latest_view()
+    if let Some(published) = runner.0.latest_view()
         && published.seq != data.view_seq
     {
         let went_back = data.view.as_ref().is_some_and(|v| published.tick < v.tick);
@@ -647,13 +485,6 @@ pub fn poll_data(
         }
     }
     if let Some(info) = take(&data.info_rx) {
-        match runner.0.update_descriptor(info.descriptor.clone()) {
-            DescriptorUpdate::Full => {
-                let rx = runner.0.runner().request(rebuild_parts);
-                store(&data.rebuild_rx, rx);
-            }
-            DescriptorUpdate::Updated | DescriptorUpdate::Unchanged => {}
-        }
         if let Some(old) = data.info.as_ref()
             && (old.target != info.target || old.seed != info.seed)
         {
@@ -681,7 +512,7 @@ pub fn poll_data(
     if (data.info_wanted || data.info_timer >= INFO_PERIOD) && !pending(&data.info_rx) {
         data.info_wanted = false;
         data.info_timer = 0.0;
-        let rx = runner.0.runner().request(|sim| SimInfo::read(sim));
+        let rx = runner.0.request(|sim| SimInfo::read(sim));
         store(&data.info_rx, rx);
     }
     if let Some(detail) = take(&data.detail_rx)
@@ -695,7 +526,7 @@ pub fn poll_data(
             let stale = data.detail.as_ref().is_none_or(|d| d.id != id);
             if (stale || data.detail_timer >= INSPECT_PERIOD) && !pending(&data.detail_rx) {
                 data.detail_timer = 0.0;
-                let rx = runner.0.runner().request(move |sim| EntityDetail {
+                let rx = runner.0.request(move |sim| EntityDetail {
                     id,
                     tick: sim.current_tick(),
                     entity: sim.entities().find(|(i, _)| i.get() == id).map(|(_, e)| e.clone()),
@@ -705,22 +536,9 @@ pub fn poll_data(
         }
         None => data.detail = None,
     }
-    if let Some(parts) = take(&data.rebuild_rx) {
-        match rebuild(parts) {
-            Ok(session) => {
-                commands.insert_resource(ActiveSession::new(session.clone()));
-                commands.insert_resource(ClRunner(session));
-                data.view_seq = 0;
-                data.refresh_info();
-                toasts.info("The session was restarted from its current state to refresh the model description.");
-            }
-            Err(e) => toasts.error(format!("Could not refresh the session: {e}")),
-        }
-    }
 }
 
-fn rebuild(parts: Result<RebuildParts, String>) -> Result<Arc<CustomSession>, String> {
-    let parts = parts?;
+fn rebuild(parts: RebuildParts) -> Result<Arc<Runner<CustomLifeSim>>, String> {
     let mut sim = CustomLifeSim::new(parts.running.clone(), parts.seed).map_err(|e| e.to_string())?;
     sim.restore(&parts.snapshot).map_err(|e| e.to_string())?;
     if parts.target != parts.running {
@@ -745,49 +563,35 @@ mod tests {
         CustomLifeSim::from_scenario(&scenarios::builtin_by_id(id).unwrap()).unwrap()
     }
 
+    /// The runner serves the running system's descriptor, named after it,
+    /// from the start and after the system is replaced.
     #[test]
     fn descriptor_follows_the_running_system() {
         let session = spawn_session(sim("bacterial-growth"));
-        let first = session.current_descriptor().clone();
+        let first = session.descriptor();
         assert!(first.rules.contains("rule feed for bacterium"));
-        // Same shape, other parameter defaults: not a new slot.
-        let mut tweaked = first.clone();
-        if let Some(p) = tweaked.params.first_mut() {
-            p.default = ParamValue::Int(77);
+        assert_eq!(first.name, sim("bacterial-growth").system().name);
+        let robots = sim("robot-swarm");
+        let expected = served_descriptor(robots.descriptor(), &robots.system().name);
+        session.send(Control::Replace(Box::new(robots)));
+        let start = Instant::now();
+        while session.status().descriptor_seq == 0 {
+            assert!(start.elapsed() < Duration::from_secs(10), "the descriptor was not published again");
+            std::thread::sleep(Duration::from_millis(2));
         }
-        assert_eq!(session.update_descriptor(tweaked), DescriptorUpdate::Unchanged);
-        // A real change is served from now on.
-        let other = sim("robot-swarm").descriptor();
-        assert_eq!(session.update_descriptor(other.clone()), DescriptorUpdate::Updated);
-        assert_eq!(SessionControl::descriptor(&*session).rules, other.rules);
-    }
-
-    #[test]
-    fn slots_run_out_cleanly() {
-        let session = spawn_session(sim("bacterial-growth"));
-        let base = session.current_descriptor().clone();
-        let mut result = DescriptorUpdate::Unchanged;
-        for i in 0..DESCRIPTOR_SLOTS + 2 {
-            let mut d = base.clone();
-            d.summary = format!("version {i}");
-            result = session.update_descriptor(d);
-            if result == DescriptorUpdate::Full {
-                break;
-            }
-        }
-        assert_eq!(result, DescriptorUpdate::Full);
-        assert_eq!(session.current_descriptor().summary, format!("version {}", DESCRIPTOR_SLOTS - 2));
+        assert_eq!(*session.descriptor(), expected);
     }
 
     #[test]
     fn clear_and_randomize_hooks() {
+        use simulation_core::SessionControl;
         let session = spawn_session(sim("bacterial-growth"));
         assert!(session.can_clear() && session.can_randomize());
         session.clear();
-        let count = wait_for(&session.runner().request(|s| s.total_population()));
+        let count = wait_for(&session.request(|s| s.total_population()));
         assert_eq!(count, 0, "clear removes every entity");
         session.randomize(12345);
-        let (count, seed) = wait_for(&session.runner().request(|s| (s.total_population(), s.reset_target().1)));
+        let (count, seed) = wait_for(&session.request(|s| (s.total_population(), s.reset_target().1)));
         assert_eq!(count, 20, "randomize restarts the preset's initial population");
         assert_eq!(seed, 12345);
     }
@@ -805,11 +609,10 @@ mod tests {
             target: target.clone(),
             seed: 42,
         };
-        let session = rebuild(Ok(parts)).unwrap();
+        let session = rebuild(parts).unwrap();
         let start = Instant::now();
         let (tick, pending, width) = loop {
-            let r =
-                wait_for(&session.runner().request(|s| (s.current_tick(), s.reset_pending(), s.system().world.width)));
+            let r = wait_for(&session.request(|s| (s.current_tick(), s.reset_pending(), s.system().world.width)));
             if r.0 == 15 || start.elapsed() > Duration::from_secs(5) {
                 break r;
             }
@@ -826,11 +629,6 @@ mod tests {
             assert_eq!(d.id, rule_engine::MODEL_ID, "the id stays stable for save / load");
             assert_eq!(d.params, s.descriptor().params, "parameters are served unchanged");
         }
-        // Serving is deterministic, so shapes compare equal across reads.
-        let s = sim("bacterial-growth");
-        let a = served_descriptor(s.descriptor(), "x");
-        assert!(same_shape(&a, &served_descriptor(s.descriptor(), "x")));
-        assert!(!same_shape(&a, &served_descriptor(s.descriptor(), "y")), "a rename is a new descriptor");
     }
 
     #[test]
@@ -866,7 +664,7 @@ mod tests {
             let runner = world.resource::<ClRunner>().clone();
             runner.0.step(25);
             let start = Instant::now();
-            while wait_for(&runner.0.runner().request(|s| s.current_tick())) < 25 {
+            while wait_for(&runner.0.request(|s| s.current_tick())) < 25 {
                 assert!(start.elapsed() < Duration::from_secs(10));
             }
         }
@@ -879,7 +677,7 @@ mod tests {
         world.run_system_once(enter).unwrap();
         assert!(!world.resource::<ClResume>().is_some());
         let runner = world.resource::<ClRunner>().clone();
-        let (tick, population) = wait_for(&runner.0.runner().request(|s| (s.current_tick(), s.total_population())));
+        let (tick, population) = wait_for(&runner.0.request(|s| (s.current_tick(), s.total_population())));
         assert_eq!(tick, 25, "the world continues where it was left");
         assert!(population > 0);
         assert_eq!(world.resource::<ClEditor>().draft.description, "my unapplied edit");

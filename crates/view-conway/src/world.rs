@@ -186,16 +186,6 @@ pub(crate) fn spawn_world(mut commands: Commands, settings: Res<ViewSettings>) {
     ));
 }
 
-/// The shell binds `=` / `-` (and the numpad keys) to Faster / Slower; the
-/// grid camera would also zoom with them. In this mode they keep their shell
-/// meaning: they are cleared after the shell's shortcuts ran and before the
-/// camera reads them (zoom with the wheel or a pinch).
-pub(crate) fn release_speed_keys_from_camera(mut keys: ResMut<ButtonInput<KeyCode>>) {
-    for key in [KeyCode::Equal, KeyCode::Minus, KeyCode::NumpadAdd, KeyCode::NumpadSubtract] {
-        keys.clear_just_pressed(key);
-    }
-}
-
 /// Size of the mode's overlay measured from the top-left corner of the world
 /// viewport (logical pixels), written by the overlay panel every frame it is
 /// drawn. Framing keeps the framed cells out of this corner.
@@ -305,7 +295,7 @@ pub(crate) fn draw_latest_view(
     mut surfaces: Query<&mut GridSurface, With<LifeSurface>>,
 ) {
     let Some(runner) = runner else { return };
-    let Some(published) = runner.0.runner().latest_view().filter(|p| p.seq != latest.seq) else { return };
+    let Some(published) = runner.0.latest_view().filter(|p| p.seq != latest.seq) else { return };
     latest.seq = published.seq;
     latest.tick = published.tick;
     for mut surface in &mut surfaces {

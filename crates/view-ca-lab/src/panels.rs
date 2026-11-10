@@ -558,7 +558,7 @@ fn wireworld_rule(ui: &mut Ui, palette: &Palette) {
         ] {
             ui.horizontal(|ui| {
                 swatch(ui, color32(family::WIREWORLD[state]), 12.0);
-                ui.label(RichText::new(crate::session::displayable(text)).size(12.5));
+                ui.label(RichText::new(text).size(12.5));
             });
         }
     });
@@ -709,11 +709,7 @@ fn wolfram_rule_editor(
         set(rules::toggle_output(next, i));
     }
     let bits: String = (0..8).rev().map(|i| if rules::output(next, i) { '1' } else { '0' }).collect();
-    muted(
-        ui,
-        palette,
-        crate::session::displayable(&format!("{next} = {bits} in binary: the outputs for 111 down to 000.")),
-    );
+    muted(ui, palette, format!("{next} = {bits} in binary: the outputs for 111 down to 000."));
     if next != running {
         ui.label(
             RichText::new(format!("Rule {next} applies from the next row (running {running})."))
@@ -1203,7 +1199,7 @@ fn rule_comparison(ui: &mut Ui, palette: &Palette, info: &LabInfo) {
             // A hanging indent: wrapped lines continue under the text, not under the bullet.
             ui.horizontal_top(|ui| {
                 ui.label(RichText::new("•").color(palette.accent));
-                ui.add(egui::Label::new(RichText::new(crate::session::displayable(note)).size(12.5)).wrap());
+                ui.add(egui::Label::new(RichText::new(note).size(12.5)).wrap());
             });
         }
     });

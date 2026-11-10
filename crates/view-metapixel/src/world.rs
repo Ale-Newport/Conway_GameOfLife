@@ -15,7 +15,7 @@ use metapixel::spec::{CellRect, TILE_PITCH};
 use metapixel::{AnnotationKind, MetapixelViewRequest, Programming, tile_annotations};
 use rendering::grid::{FrameGeometry, GridSpace, VisibleCells, frame_world_rect};
 use rendering::palette::{Colormap, GridPalette};
-use rendering::{GridAppearance, GridCameraController, GridStyle, GridSurface, WorldInput};
+use rendering::{GridAppearance, GridCameraController, GridStyle, GridSurface, WorldInput, shortcut_modifier_held};
 use simulation_core::Control;
 
 use crate::MODE;
@@ -266,15 +266,6 @@ pub(crate) fn spawn_world(
     ));
 }
 
-/// The shell binds `=`/`-` (and the numpad keys) to Faster/Slower; the
-/// grid camera also zooms with them. In this mode the shell keeps them
-/// (zoom with the wheel or a pinch).
-pub(crate) fn release_speed_keys_from_camera(mut keys: ResMut<ButtonInput<KeyCode>>) {
-    for key in [KeyCode::Equal, KeyCode::Minus, KeyCode::NumpadAdd, KeyCode::NumpadSubtract] {
-        keys.clear_just_pressed(key);
-    }
-}
-
 const CAMERA_KEYS: [KeyCode; 8] = [
     KeyCode::ArrowLeft,
     KeyCode::ArrowRight,
@@ -304,7 +295,7 @@ pub(crate) fn frame_world(
     let (camera, mut controller) = camera.into_inner();
     let user_moved = (input.pointer
         && (scroll.delta != Vec2::ZERO || buttons.any_just_pressed([MouseButton::Right, MouseButton::Middle])))
-        || (input.keyboard && keys.any_pressed(CAMERA_KEYS));
+        || (input.keyboard && keys.any_pressed(CAMERA_KEYS) && !shortcut_modifier_held(&keys));
     if user_moved {
         fit.auto = false;
     }
@@ -737,5 +728,30 @@ mod tests {
         assert_eq!(anatomy_tile(&tools), Some((1, 1)));
         tools.selected = Some((0, 2));
         assert_eq!(anatomy_tile(&tools), Some((0, 2)));
+    }
+
+    /// Pan keys pressed with Ctrl, Cmd or Alt are shortcuts that leave the
+    /// camera where it is, so the framing keeps following the grid.
+    #[test]
+    fn shortcut_chords_keep_the_framing() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut world = World::new();
+        world.insert_resource(WorldInput { keyboard: true, ..default() });
+        world.init_resource::<AccumulatedMouseScroll>();
+        world.init_resource::<ButtonInput<MouseButton>>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.init_resource::<SimData>();
+        world.init_resource::<ViewSettings>();
+        world.init_resource::<OverlayFootprint>();
+        world.insert_resource(CameraFit { auto: true, ..default() });
+        world.spawn((MpCamera, GridCameraController::default()));
+        let mut keys = world.resource_mut::<ButtonInput<KeyCode>>();
+        keys.press(KeyCode::ControlLeft);
+        keys.press(KeyCode::KeyS);
+        world.run_system_once(frame_world).expect("frame_world runs");
+        assert!(world.resource::<CameraFit>().auto, "Ctrl+S");
+        world.resource_mut::<ButtonInput<KeyCode>>().release(KeyCode::ControlLeft);
+        world.run_system_once(frame_world).expect("frame_world runs");
+        assert!(!world.resource::<CameraFit>().auto, "S pans");
     }
 }

@@ -289,8 +289,8 @@ pub(crate) fn execute_shell_commands(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::sync::Mutex;
     use std::sync::mpsc::{self, Receiver};
+    use std::sync::{Arc, Mutex};
 
     use simulation_core::{HistoryConfig, Metrics, ModelDescriptor, ModelFamily, ParamValue, SimError, Snapshot};
 
@@ -298,7 +298,7 @@ pub(crate) mod tests {
 
     /// Session double recording every call.
     pub(crate) struct FakeSession {
-        pub descriptor: ModelDescriptor,
+        pub descriptor: Arc<ModelDescriptor>,
         pub calls: Mutex<Vec<String>>,
         pub status: Mutex<RunnerStatus>,
         pub clear: bool,
@@ -310,7 +310,7 @@ pub(crate) mod tests {
     impl FakeSession {
         pub(crate) fn new() -> Self {
             Self {
-                descriptor: ModelDescriptor::new("test.fake", "Fake", ModelFamily::Cellular),
+                descriptor: Arc::new(ModelDescriptor::new("test.fake", "Fake", ModelFamily::Cellular)),
                 calls: Mutex::new(Vec::new()),
                 status: Mutex::new(RunnerStatus::default()),
                 clear: false,
@@ -330,8 +330,8 @@ pub(crate) mod tests {
     }
 
     impl SessionControl for FakeSession {
-        fn descriptor(&self) -> &ModelDescriptor {
-            &self.descriptor
+        fn descriptor(&self) -> Arc<ModelDescriptor> {
+            Arc::clone(&self.descriptor)
         }
         fn status(&self) -> RunnerStatus {
             self.status.lock().unwrap().clone()

@@ -611,10 +611,6 @@ mod tests {
             KeyCode::KeyA,
             KeyCode::KeyS,
             KeyCode::KeyD,
-            KeyCode::Equal,
-            KeyCode::Minus,
-            KeyCode::NumpadAdd,
-            KeyCode::NumpadSubtract,
         ];
         for (i, (key, _, label, _)) in MODE_SHORTCUTS.iter().enumerate() {
             assert!(SHORTCUTS.iter().all(|s| s.key != *key), "{label} is a shell shortcut");

@@ -286,10 +286,10 @@ impl LifeEngine for DenseEngine {
     }
 
     fn export_cells(&self) -> Vec<(i64, i64)> {
-        self.cells_in_rect(self.window())
+        self.cells_in_rect(self.window(), usize::MAX)
     }
 
-    fn cells_in_rect(&self, rect: CellRect) -> Vec<(i64, i64)> {
+    fn cells_in_rect(&self, rect: CellRect, limit: usize) -> Vec<(i64, i64)> {
         let mut out = Vec::new();
         let Some(clip) = rect.intersect(&self.window()) else {
             return out;
@@ -299,6 +299,9 @@ impl LifeEngine for DenseEngine {
             let (a, b) = ((clip.x0 - self.origin.0) as usize, (clip.x1 - self.origin.0) as usize);
             for (i, &c) in row[a..=b].iter().enumerate() {
                 if c != 0 {
+                    if out.len() == limit {
+                        return out;
+                    }
                     out.push((clip.x0 + i as i64, y));
                 }
             }

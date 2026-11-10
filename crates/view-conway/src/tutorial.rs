@@ -130,7 +130,7 @@ pub(crate) fn tutorial_actions(
             }
             TutorialCommand::Play => {
                 if let Some(runner) = &runner {
-                    runner.0.runner().play();
+                    runner.0.play();
                 }
             }
             TutorialCommand::Analyse => {

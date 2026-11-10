@@ -3,7 +3,7 @@
 
 use bevy::prelude::*;
 use bevy_egui::egui::{self, RichText, Ui};
-use simulation_core::{RunnerStatus, SessionControl, Speed};
+use simulation_core::{ModelDescriptor, RunnerStatus, SessionControl, Speed};
 
 use super::Frame;
 use super::timeline::timeline;
@@ -16,7 +16,9 @@ use crate::theme::Palette;
 use crate::widgets::rules::{counter_rate_label, simulated_time_text, tick_label, time_step_text};
 
 pub(super) fn show(ui: &mut Ui, world: &mut World, shell: &mut ShellState, frame: &Frame) {
-    let (Some(session), Some(status)) = (frame.session.as_ref(), frame.status.as_ref()) else {
+    let (Some(session), Some(descriptor), Some(status)) =
+        (frame.session.as_ref(), frame.descriptor.as_deref(), frame.status.as_ref())
+    else {
         ui.label(RichText::new("Time controls appear once the simulation is running.").weak());
         return;
     };
@@ -33,7 +35,7 @@ pub(super) fn show(ui: &mut Ui, world: &mut World, shell: &mut ShellState, frame
         }
     });
     ui.add_space(2.0);
-    readouts(ui, world, session, status, &frame.palette);
+    readouts(ui, world, descriptor, status, &frame.palette);
     for command in commands {
         world.write_message(command);
     }
@@ -129,8 +131,7 @@ fn chip(ui: &mut Ui, p: &Palette, label: &str, value: String, tooltip: &str) {
     ui.add_space(10.0);
 }
 
-fn readouts(ui: &mut Ui, world: &World, session: &dyn SessionControl, status: &RunnerStatus, p: &Palette) {
-    let descriptor = session.descriptor();
+fn readouts(ui: &mut Ui, world: &World, descriptor: &ModelDescriptor, status: &RunnerStatus, p: &Palette) {
     let telemetry = *world.resource::<Telemetry>();
     let population = world.resource::<MetricsHistory>().latest("population");
     ui.horizontal_wrapped(|ui| {

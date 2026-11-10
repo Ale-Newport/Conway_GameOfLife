@@ -160,6 +160,46 @@ fn hashlife_ticks_and_power_of_two_steps() {
 }
 
 #[test]
+fn the_automatic_choice_does_not_measure_patterns_too_large_to_list() {
+    use cellular_automata::engine::AUTO_REGULARITY_MAX_POPULATION;
+    // A soup too large to measure keeps Hashlife (measured, it would leave it as irregular).
+    let mut soup = sim(Topology::Infinite, 64, 64, vec![]);
+    soup.set_param("engine", text("hashlife")).unwrap();
+    let region = Some(CellRect::new(0, 0, 2047, 1199));
+    soup.apply(LifeCommand::Randomize { density: 0.5, seed: Some(3), region, symmetry: Symmetry::None }).unwrap();
+    assert!(soup.population() > AUTO_REGULARITY_MAX_POPULATION);
+    soup.set_param("engine", text("auto")).unwrap();
+    assert_eq!(soup.engine_kind(), EngineKind::Hashlife);
+    // The other engines treat such a pattern as irregular: a full block of
+    // identical tiles is measured up to the limit and stays on Sparse above it.
+    for (rows, kind) in [(1024, EngineKind::Hashlife), (1025, EngineKind::Sparse)] {
+        let mut full = sim(Topology::Infinite, 64, 64, vec![]);
+        full.set_param("engine", text("sparse")).unwrap();
+        let region = Some(CellRect::new(0, 0, 1023, rows - 1));
+        full.apply(LifeCommand::Randomize { density: 1.0, seed: Some(1), region, symmetry: Symmetry::None }).unwrap();
+        full.set_param("engine", text("auto")).unwrap();
+        assert_eq!(full.engine_kind(), kind, "{} live cells", full.population());
+    }
+    // A Gosper gun after 2^40 generations has about 1.8e11 live cells: back
+    // to one generation per tick, the choice keeps Hashlife without listing them.
+    let gun = InitItem::Pattern {
+        source: PatternSource::Library("gosper-glider-gun".into()),
+        x: 0,
+        y: 0,
+        rotation: Rotation::None,
+        mirror: false,
+    };
+    let mut s = sim(Topology::Infinite, 64, 64, vec![gun]);
+    s.set_param("generations_per_tick", ParamValue::Int(1 << 30)).unwrap();
+    s.advance(1 << 10);
+    assert_eq!((s.engine_kind(), s.tick()), (EngineKind::Hashlife, 1 << 40));
+    s.set_param("generations_per_tick", ParamValue::Int(1)).unwrap();
+    s.step();
+    assert_eq!((s.engine_kind(), s.tick()), (EngineKind::Hashlife, (1 << 40) + 1));
+    assert!(s.population() > 1 << 37, "{}", s.population());
+}
+
+#[test]
 fn metrics_count_births_and_deaths() {
     let blinker = Pattern::from_ascii("OOO").unwrap();
     let mut s = sim(Topology::Torus, 10, 10, vec![]);
@@ -264,23 +304,23 @@ fn paste_modes_rotation_and_mirror() {
 fn region_tools_and_copy() {
     let mut s = sim(Topology::Infinite, 64, 64, vec![glider_at(10, 10)]);
     let rect = CellRect::new(10, 10, 12, 12);
-    let copy = s.copy_region(rect);
+    let copy = s.copy_region(rect).unwrap();
     assert_eq!(copy.population(), 5);
     assert_eq!(copy.rule.as_deref(), Some("B3/S23"));
     s.apply(LifeCommand::MoveRegion { rect, dx: 100, dy: -5 }).unwrap();
-    assert_eq!(s.copy_region(CellRect::new(110, 5, 112, 7)), copy, "moved intact");
+    assert_eq!(s.copy_region(CellRect::new(110, 5, 112, 7)).unwrap(), copy, "moved intact");
     assert_eq!(s.population(), 5);
     let moved = CellRect::new(110, 5, 112, 7);
     s.apply(LifeCommand::RotateRegion { rect: moved, rotation: Rotation::Half }).unwrap();
     s.apply(LifeCommand::RotateRegion { rect: moved, rotation: Rotation::Half }).unwrap();
-    assert_eq!(s.copy_region(moved), copy, "two half turns are the identity");
+    assert_eq!(s.copy_region(moved).unwrap(), copy, "two half turns are the identity");
     s.apply(LifeCommand::MirrorRegion { rect: moved, axis: MirrorAxis::Vertical }).unwrap();
     let mirrored: Vec<(i64, i64)> = s.live_cells();
     s.apply(LifeCommand::MirrorRegion { rect: moved, axis: MirrorAxis::Vertical }).unwrap();
     assert_ne!(mirrored, s.live_cells());
-    assert_eq!(s.copy_region(moved), copy, "mirroring twice is the identity");
+    assert_eq!(s.copy_region(moved).unwrap(), copy, "mirroring twice is the identity");
     // Cut = copy + clear.
-    let cut = s.copy_region(moved);
+    let cut = s.copy_region(moved).unwrap();
     s.apply(LifeCommand::ClearRegion { rect: moved }).unwrap();
     assert_eq!(s.population(), 0);
     s.apply(LifeCommand::Paste {
@@ -292,7 +332,23 @@ fn region_tools_and_copy() {
         mode: PasteMode::Or,
     })
     .unwrap();
-    assert_eq!(s.copy_region(moved), copy);
+    assert_eq!(s.copy_region(moved).unwrap(), copy);
+}
+
+#[test]
+fn region_tools_refuse_more_live_cells_than_the_edit_limit() {
+    use cellular_automata::geometry::MAX_EDIT_CELLS;
+    // Every cell of an 8,192 × 8,193 torus alive: one row more than the limit.
+    let mut s = sim(Topology::Torus, 8192, 8193, vec![]);
+    s.apply(LifeCommand::Randomize { density: 1.0, seed: Some(1), region: None, symmetry: Symmetry::None }).unwrap();
+    let population = s.population();
+    assert_eq!(population, MAX_EDIT_CELLS + 8192);
+    let world = CellRect::new(0, 0, 8191, 8192);
+    let refused = |result: Result<(), SimError>| matches!(result, Err(SimError::LimitExceeded(m)) if m.contains(&MAX_EDIT_CELLS.to_string()));
+    assert!(refused(s.apply(LifeCommand::MoveRegion { rect: world, dx: 1, dy: 0 })));
+    assert!(refused(s.apply(LifeCommand::RotateRegion { rect: world, rotation: Rotation::Half })));
+    assert!(refused(s.cut_region(world).map(|_| ())), "copy_region refuses, so nothing is cleared");
+    assert_eq!(s.population(), population);
 }
 
 #[test]
@@ -614,7 +670,7 @@ fn hashlife_jumps_keep_the_generation_exact_when_a_later_jump_fails() {
 fn cut_copies_then_clears() {
     let mut s = sim(Topology::Infinite, 64, 64, vec![glider_at(10, 10)]);
     let rect = CellRect::new(10, 10, 12, 12);
-    let copy = s.copy_region(rect);
+    let copy = s.copy_region(rect).unwrap();
     let cut = s.cut_region(rect).unwrap();
     assert_eq!(cut, copy);
     assert_eq!(s.population(), 0);

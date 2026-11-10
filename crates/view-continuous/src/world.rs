@@ -16,7 +16,7 @@ use interface::theme::bevy_color;
 use interface::{MetricsHistory, ModeRegistry, Palette, ThemeSettings};
 use rendering::grid::{FrameGeometry, GridSpace, VisibleCells, frame_world_rect};
 use rendering::palette::{Colormap, GridPalette};
-use rendering::{GridAppearance, GridCameraController, GridStyle, GridSurface, WorldInput};
+use rendering::{GridAppearance, GridCameraController, GridStyle, GridSurface, WorldInput, shortcut_modifier_held};
 use simulation_core::Control;
 
 use crate::MODE;
@@ -305,16 +305,6 @@ pub(crate) fn spawn_world(mut commands: Commands, mut images: ResMut<Assets<Imag
     ));
 }
 
-/// The shell binds `=`/`-` (and the numpad keys) to Faster/Slower; the
-/// grid camera controller also zooms with them. In this mode the shell
-/// keeps them: they are cleared after the shell's shortcuts ran and before
-/// the camera controller reads them (zoom with the wheel or a pinch).
-pub(crate) fn release_speed_keys_from_camera(mut keys: ResMut<ButtonInput<KeyCode>>) {
-    for key in [KeyCode::Equal, KeyCode::Minus, KeyCode::NumpadAdd, KeyCode::NumpadSubtract] {
-        keys.clear_just_pressed(key);
-    }
-}
-
 const CAMERA_KEYS: [KeyCode; 8] = [
     KeyCode::ArrowLeft,
     KeyCode::ArrowRight,
@@ -341,7 +331,7 @@ pub(crate) fn frame_world(
     let (camera, mut controller) = camera.into_inner();
     let user_moved = (input.pointer
         && (scroll.delta != Vec2::ZERO || buttons.any_just_pressed([MouseButton::Right, MouseButton::Middle])))
-        || (input.keyboard && keys.any_pressed(CAMERA_KEYS));
+        || (input.keyboard && keys.any_pressed(CAMERA_KEYS) && !shortcut_modifier_held(&keys));
     if user_moved {
         fit.auto = false;
     }
@@ -674,5 +664,27 @@ mod tests {
         assert_eq!(a.palette, GridPalette::Continuous(Colormap::Magma));
         assert!(a.show_grid && !a.smooth_fields);
         assert_eq!(a.resolved_background(), a.palette.color(0), "background joins the colormap at 0");
+    }
+
+    /// Pan keys pressed with Ctrl, Cmd or Alt are shortcuts that leave the
+    /// camera where it is, so the framing keeps following the viewport.
+    #[test]
+    fn shortcut_chords_keep_the_framing() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut world = World::new();
+        world.insert_resource(WorldInput { keyboard: true, ..default() });
+        world.init_resource::<AccumulatedMouseScroll>();
+        world.init_resource::<ButtonInput<MouseButton>>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.insert_resource(CameraFit { auto: true, ..default() });
+        world.spawn((FieldCamera, GridCameraController::default()));
+        let mut keys = world.resource_mut::<ButtonInput<KeyCode>>();
+        keys.press(KeyCode::SuperLeft);
+        keys.press(KeyCode::KeyA);
+        world.run_system_once(frame_world).expect("frame_world runs");
+        assert!(world.resource::<CameraFit>().auto, "Cmd+A");
+        world.resource_mut::<ButtonInput<KeyCode>>().release(KeyCode::SuperLeft);
+        world.run_system_once(frame_world).expect("frame_world runs");
+        assert!(!world.resource::<CameraFit>().auto, "A pans");
     }
 }

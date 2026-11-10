@@ -19,7 +19,7 @@ use crate::geometry::{GridShape, ScreenRect, scale_bar};
 use crate::macro_layer::{
     MacroSource, colors, effective_source, exact_detail, exact_headline, macro_headline, macro_label,
 };
-use crate::session::{Catalog, Lifecycle, MpSession, SimData, Tiles, TilesState};
+use crate::session::{MpSession, SimData};
 use crate::timing::stage_label;
 use crate::tools::{Tool, ToolState};
 use crate::world::{LayerState, MpCamera, OverlayFootprint, ViewSettings, anatomy_tile, current_shape, mode_palette};
@@ -36,9 +36,6 @@ pub(crate) struct OverlayCtx<'w, 's> {
     space: Res<'w, GridSpace>,
     camera: Query<'w, 's, (&'static Camera, &'static GlobalTransform), With<MpCamera>>,
     session: Option<Res<'w, MpSession>>,
-    tiles: Res<'w, Tiles>,
-    lifecycle: Res<'w, Lifecycle>,
-    catalog: Res<'w, Catalog>,
     footprint: ResMut<'w, OverlayFootprint>,
 }
 
@@ -47,11 +44,10 @@ const CARD_WIDTH: f32 = 372.0;
 
 /// Overlay panel.
 pub(crate) fn overlay_panel(InMut(ui): InMut<egui::Ui>, mut ctx: OverlayCtx) {
-    let palette = mode_palette(&ctx.theme, &ctx.registry);
     if ctx.session.is_none() {
-        status_screen(ui, &ctx, &palette);
         return;
     }
+    let palette = mode_palette(&ctx.theme, &ctx.registry);
     let Some(view) = ctx.data.view.as_ref() else { return };
     let Some(shape) = current_shape(&ctx.data) else { return };
     let opacity = ctx.layer.macro_opacity;
@@ -255,48 +251,6 @@ pub(crate) fn overlay_panel(InMut(ui): InMut<egui::Ui>, mut ctx: OverlayCtx) {
         max: Vec2::new(r.max.x - origin.x, r.max.y - origin.y),
     }));
     ctx.footprint.set_if_neq(footprint);
-}
-
-/// The world area while there is no session: what is being prepared, or
-/// why nothing can be built (painted over the shell's generic notice).
-fn status_screen(ui: &Ui, ctx: &OverlayCtx, palette: &Palette) {
-    let area = ui.clip_rect();
-    let (title, body, busy) = if let Some(error) = ctx.tiles.error() {
-        (
-            "No construction: the OTCA tiles could not be loaded".to_string(),
-            format!(
-                "{error}\n\nBrice Due's tiles are GPL-2.0-or-later pattern data, read from the asset folder at run \
-                 time and never embedded in the application."
-            ),
-            false,
-        )
-    } else if let Some(error) = &ctx.lifecycle.error {
-        ("No construction".to_string(), error.clone(), false)
-    } else if matches!(ctx.tiles.state, TilesState::Ready(_)) {
-        let name = ctx.lifecycle.building.as_deref().map_or("the construction", |id| ctx.catalog.name_of(id));
-        (format!("Building {name}"), "Composing the tiles into one B3/S23 pattern for Hashlife.".to_string(), true)
-    } else {
-        ("Reading Brice Due's OTCA tiles".to_string(), ctx.tiles.dir.display().to_string(), true)
-    };
-    let painter = ui.painter().with_clip_rect(area);
-    // Covers the shell's "Starting the simulation" notice underneath.
-    painter.rect_filled(area, 0.0, palette.background);
-    let width = (area.width() - 64.0).clamp(120.0, 520.0);
-    let title = painter.layout(title, egui::FontId::proportional(16.0), palette.text, width - 30.0);
-    let body = painter.layout(body, egui::FontId::proportional(12.5), palette.text_muted, width);
-    let (title_height, body_height) = (title.size().y, body.size().y);
-    let card =
-        egui::Rect::from_center_size(area.center(), vec2(width + 36.0, title_height + 10.0 + body_height + 32.0));
-    let edge = if busy { palette.stroke } else { palette.error };
-    painter.rect(card, 10.0, palette.surface, Stroke::new(1.0, edge), egui::StrokeKind::Inside);
-    let mut pos = card.min + vec2(18.0, 16.0);
-    if busy {
-        let spinner = egui::Rect::from_min_size(egui::pos2(card.max.x - 40.0, pos.y - 2.0), vec2(22.0, 22.0));
-        egui::Spinner::new().color(palette.accent).paint_at(ui, spinner);
-    }
-    painter.galley(pos, title, palette.text);
-    pos.y += title_height + 10.0;
-    painter.galley(pos, body, palette.text_muted);
 }
 
 fn layer_name(source: MacroSource, editing: bool) -> String {

@@ -240,7 +240,7 @@ fn load_window(ctx: &egui::Context, world: &mut World, shell: &mut ShellState, f
     let mut chosen: Option<SaveEntry> = None;
     let mut delete: Option<SaveEntry> = None;
     let mut refresh = false;
-    let model_id = frame.session.as_ref().map(|s| s.session().descriptor().id.clone());
+    let model_id = frame.descriptor.as_ref().map(|d| d.id.clone());
     window(ctx, "Load state", 620.0).open(&mut open).default_height(380.0).show(ctx, |ui| {
         match &dialog.entries {
             Err(e) => {

@@ -258,6 +258,12 @@ impl LangtonsAntSim {
         &self.rule
     }
 
+    /// The world currently running ([`Simulation::params`] reports the world
+    /// of the next reset).
+    pub fn world(&self) -> World {
+        self.world
+    }
+
     /// The ants, in move order.
     pub fn ants(&self) -> &[Ant] {
         &self.ants
@@ -318,7 +324,7 @@ impl LangtonsAntSim {
              1. turns by letter *c* of the rule (`L` 90° left, `R` 90° right, `N` none, `U` 180°);\n\
              2. changes the cell to colour (*c* + 1) mod {n};\n\
              3. moves one cell forward.\n\n\
-             `RL` is Langton's ant (white → turn right, black → turn left). Ants do not interact except through \
+             `RL` is Langton's ant (white: turn right, black: turn left). Ants do not interact except through \
              the colours; on a bounded plane an ant leaving the world is removed, on a torus it wraps.",
             rule = self.rule,
             n = self.rule.colors()

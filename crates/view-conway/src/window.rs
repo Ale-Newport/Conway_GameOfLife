@@ -182,7 +182,7 @@ fn request_export(
     selection: Option<CellRect>,
 ) -> Receiver<Result<ExportText, String>> {
     let (tx, rx) = mpsc::channel();
-    runner.0.runner().exec(move |sim| {
+    runner.0.exec(move |sim| {
         let generation = sim.tick();
         let rect = match (scope, selection) {
             (ExportScope::Selection, Some(rect)) => Some(rect),
@@ -205,8 +205,12 @@ fn request_export(
             return;
         }
         let rule = sim.rule().to_string();
-        let mut pattern = match rect {
-            Some(r) => sim.copy_region(r),
+        let mut pattern = match rect.map(|r| sim.copy_region(r)) {
+            Some(Ok(copy)) => copy,
+            Some(Err(e)) => {
+                let _ = tx.send(Err(e.to_string()));
+                return;
+            }
             None => Pattern::from_live_cells(sim.live_cells()).with_rule(rule.clone()),
         };
         pattern.name = match rect {

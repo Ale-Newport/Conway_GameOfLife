@@ -47,7 +47,7 @@ use interface::{AppMode, ModeAppExt, ModeCard, ModeStatus, PanelSlot, ShellSet, 
 use rendering::{GridCameraPlugin, GridCameraSystems, GridRenderPlugin};
 
 pub use family::Family;
-pub use session::{Catalog, LabRunner, LabSession, LoadRequests, LoadedScenario};
+pub use session::{Catalog, LabRunner, LoadRequests, LoadedScenario};
 pub use sim::{LAB_MODEL_ID, LabCommand, LabInfo, LabSim, LabView};
 pub use tools::{Tool, ToolSettings};
 pub use world::{CameraFit, Colouring, LatestView, ViewSettings};
@@ -60,7 +60,7 @@ pub const MODE: AppMode = AppMode::CellularAutomataLab;
 /// [`rendering::VisibleCells`]).
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CaLabSystems {
-    /// Scenario loading, tutorial actions, descriptor synchronisation.
+    /// Scenario loading, tutorial actions, loaded-scenario synchronisation.
     Session,
     /// Pointer tools and keyboard shortcuts.
     Input,
@@ -97,7 +97,6 @@ impl bevy::app::Plugin for CaLabViewPlugin {
             .register_tutorial(MODE, tutorial::tutorial())
             .insert_resource(tools::Circuits::load(None))
             .init_resource::<session::LoadRequests>()
-            .init_resource::<session::DescriptorSync>()
             .init_resource::<world::ViewSettings>()
             .init_resource::<world::LatestView>()
             .init_resource::<world::ViewRequestState>()
@@ -125,10 +124,6 @@ impl bevy::app::Plugin for CaLabViewPlugin {
             .add_systems(
                 Update,
                 (
-                    world::release_speed_keys_from_camera
-                        .after(ShellSet::Commands)
-                        .before(GridCameraSystems::Control)
-                        .run_if(in_state(MODE)),
                     (world::frame_world, world::follow_subject)
                         .chain()
                         .before(GridCameraSystems::Control)
@@ -153,10 +148,14 @@ impl bevy::app::Plugin for CaLabViewPlugin {
 #[cfg(test)]
 mod glyph_tests {
     use bevy_egui::egui;
-    use simulation_core::Simulation;
+    use cellular_automata::{
+        Boundary, GenerationsConfig, GenerationsSim, LangtonsAntSim, LifeConfig, LifeMode, LifeSim, PatternLibrary,
+        WireworldConfig, WireworldSim, WolframConfig, WolframSim,
+    };
+    use simulation_core::{ModelDescriptor, ParamKind, Simulation, Topology};
 
     /// Non-ASCII characters of the string literals of this crate's sources
-    /// (comment lines, unit tests and the glyph fallback table are skipped).
+    /// (comment lines and unit tests are skipped).
     fn literal_chars() -> Vec<(char, &'static str)> {
         let sources: [(&str, &str); 8] = [
             ("family.rs", include_str!("family.rs")),
@@ -171,14 +170,6 @@ mod glyph_tests {
         let mut out = Vec::new();
         for (file, text) in sources {
             let text = text.split("\n#[cfg(test)]").next().unwrap_or(text);
-            // The fallback table lists exactly the characters that are never displayed.
-            let text = match text.find("const GLYPH_FALLBACKS") {
-                Some(a) => {
-                    let b = text[a..].find("];").map_or(text.len(), |b| a + b);
-                    format!("{}{}", &text[..a], &text[b..])
-                }
-                None => text.to_string(),
-            };
             for line in text.lines().filter(|l| !l.trim_start().starts_with("//")) {
                 for c in line.chars().filter(|c| !c.is_ascii()) {
                     if !out.iter().any(|(x, _)| *x == c) {
@@ -190,9 +181,48 @@ mod glyph_tests {
         out
     }
 
-    /// Every character the mode displays (its own texts, the tutorial and
-    /// the served descriptors of every scenario) exists in egui's built-in
-    /// fonts; otherwise it would render as a box.
+    /// The texts of a model descriptor: name, summary, rules, parameters and
+    /// metrics.
+    fn descriptor_texts(d: &ModelDescriptor) -> Vec<String> {
+        let mut all = vec![d.name.clone(), d.summary.clone(), d.rules.clone()];
+        for p in &d.params {
+            all.extend([p.label.clone(), p.description.clone(), p.group.clone()]);
+            if let ParamKind::Choice { options } = &p.kind {
+                all.extend(options.iter().map(|o| o.label.clone()));
+            }
+        }
+        for m in &d.metrics {
+            all.extend([m.label.clone(), m.description.clone(), m.unit.clone()]);
+        }
+        all
+    }
+
+    /// The descriptor of every model of the cellular-automata crate, in
+    /// every variant its texts depend on (mode, topology, boundary).
+    fn every_model_descriptor() -> Vec<ModelDescriptor> {
+        let library = PatternLibrary::builtin();
+        let mut out = Vec::new();
+        for mode in [LifeMode::Classic, LifeMode::Lab] {
+            for topology in Topology::ALL {
+                let config = LifeConfig { topology, init: vec![], ..LifeConfig::default() };
+                out.push(LifeSim::new(&config, 0, &library, mode).expect("valid").descriptor());
+            }
+        }
+        let generations = GenerationsConfig { init: vec![], ..GenerationsConfig::default() };
+        out.push(GenerationsSim::new(&generations, 0, &library).expect("valid").descriptor());
+        out.push(WireworldSim::new(&WireworldConfig::default(), 0, &library).expect("valid").descriptor());
+        out.push(LangtonsAntSim::langton(0).descriptor());
+        for boundary in [Boundary::Fixed0, Boundary::Fixed1, Boundary::Periodic] {
+            let config = WolframConfig { boundary, ..WolframConfig::default() };
+            out.push(WolframSim::new(&config, 0).expect("valid").descriptor());
+        }
+        out
+    }
+
+    /// Every character the mode displays (its own texts, the tutorial, the
+    /// descriptors of every scenario and of every model of the
+    /// cellular-automata crate) exists in egui's built-in fonts; otherwise it
+    /// would render as a box.
     #[test]
     fn every_displayed_character_has_a_glyph() {
         let ctx = egui::Context::default();
@@ -218,19 +248,13 @@ mod glyph_tests {
         let catalog = crate::session::Catalog::load(Some(&assets));
         for s in &catalog.scenarios {
             let sim = catalog.build(&s.id).expect("builds");
-            let d = crate::session::display_descriptor(&sim.descriptor());
-            let mut all = vec![d.name, d.summary, d.rules, s.name.clone(), s.description.clone()];
-            for p in &d.params {
-                all.extend([p.label.clone(), p.description.clone(), p.group.clone()]);
-                if let simulation_core::ParamKind::Choice { options } = &p.kind {
-                    all.extend(options.iter().map(|o| o.label.clone()));
-                }
-            }
-            for m in &d.metrics {
-                all.extend([m.label.clone(), m.description.clone(), m.unit.clone()]);
-            }
+            let mut all = descriptor_texts(&sim.descriptor());
+            all.extend([s.name.clone(), s.description.clone()]);
             all.extend(crate::panels::state_names(&sim.info()));
             texts.extend(all.into_iter().map(|t| (s.id.clone(), t)));
+        }
+        for d in every_model_descriptor() {
+            texts.extend(descriptor_texts(&d).into_iter().map(|t| (d.id.clone(), t)));
         }
         for (source, text) in texts {
             for c in text.chars().filter(|c| !c.is_ascii() && !has(*c)) {

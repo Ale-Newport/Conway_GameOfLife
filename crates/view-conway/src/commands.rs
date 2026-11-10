@@ -17,7 +17,7 @@ use simulation_core::{Control, ParamValue, Simulation};
 
 use crate::analysis::{Analysis, MAX_ANALYSIS_POPULATION};
 use crate::geometry::{jump_plan, moved_rect, rotated_selection};
-use crate::labels::{MAX_TRANSFER_CELLS, reselection_blocked, thousands};
+use crate::labels::{MAX_TRANSFER_CELLS, thousands};
 use crate::library::normalized_keeping_metadata;
 use crate::session::{ConwayRunner, LiveInfo, LiveWorld, RandomizeDensity, lock};
 use crate::style::{RenderStyle, Tracking, ViewSettings};
@@ -191,9 +191,8 @@ pub fn fill_refused(rect: CellRect, world: cellular_automata::World) -> Option<S
 }
 
 /// Prepares a jump on the simulation thread: tracking off (it would force
-/// generation-by-generation stepping) and the engine fixed to Hashlife (a
-/// later automatic re-selection could otherwise copy a huge pattern out of
-/// the quadtree).
+/// generation-by-generation stepping) and the engine fixed to Hashlife (the
+/// jump is a Hashlife jump whatever its size).
 pub(crate) fn prepare_jump(sim: &mut LifeSim) -> Result<(), String> {
     for key in ["track_ages", "track_activity"] {
         if sim.params().get(key).and_then(ParamValue::as_bool) == Some(true) {
@@ -289,17 +288,7 @@ impl CommandContext<'_> {
             },
             ModeCommand::EnableTracking(t) => self.enable_tracking(t),
             ModeCommand::SetGenerationsPerTick(n) => {
-                // With the automatic choice, a new value re-runs it.
-                let blocked =
-                    self.live.current().filter(|i| i.choice == EngineChoice::Auto && i.generations_per_tick != n);
-                if let Some(reason) = blocked.and_then(|i| reselection_blocked(i.engine, i.population)) {
-                    self.toasts.warning(format!(
-                        "Not changing the generations per tick: {reason} Fix the engine to Hashlife first \
-                         (Properties › Engine)."
-                    ));
-                    return;
-                }
-                runner.set_param("generations_per_tick", ParamValue::Int(n.min(i64::MAX as u64) as i64));
+                runner.set_param("generations_per_tick", ParamValue::Int(n.min(i64::MAX as u64) as i64))
             }
             ModeCommand::SetEngine(choice) => runner.set_param("engine", ParamValue::Text(choice.as_str().into())),
             ModeCommand::JumpRequested => {
@@ -374,15 +363,17 @@ impl CommandContext<'_> {
             }
             return;
         };
-        // Copies, moves, rotations and mirrors list the selected cells one by
-        // one (on the simulation thread); a huge Hashlife selection would
-        // exhaust memory.
+        // Copies become RLE text for the system clipboard (at most
+        // MAX_EXPORT_CELLS cells); the model refuses moves, rotations and
+        // mirrors of more than its edit limit. Refusing here, before sending,
+        // keeps the selection (moved or rotated right after sending) on its
+        // cells and a cut from clearing cells it could not copy.
         let limit = match op {
             SelectionOp::Copy | SelectionOp::Cut => Some(MAX_EXPORT_CELLS),
             SelectionOp::Rotate { .. }
             | SelectionOp::FlipHorizontal
             | SelectionOp::FlipVertical
-            | SelectionOp::Move(..) => Some(MAX_TRANSFER_CELLS as u64),
+            | SelectionOp::Move(..) => Some(cellular_automata::geometry::MAX_EDIT_CELLS),
             SelectionOp::Clear | SelectionOp::Fill => None,
         };
         let known = self.selection.current_info().map(|i| i.population);
@@ -512,7 +503,7 @@ pub(crate) fn poll_async_commands(
 
     let copied = lock(&clipboard.pending).as_ref().map(Receiver::try_recv);
     match copied {
-        Some(Ok(pattern)) => {
+        Some(Ok(Ok(pattern))) => {
             *lock(&clipboard.pending) = None;
             let population = pattern.population();
             let normalized = normalized_keeping_metadata(&pattern);
@@ -525,6 +516,10 @@ pub(crate) fn poll_async_commands(
                 "Copied {} live cells ({size}) as RLE. Ctrl/Cmd+V pastes them with the stamp tool.",
                 thousands(population as u128)
             ));
+        }
+        Some(Ok(Err(e))) => {
+            *lock(&clipboard.pending) = None;
+            toasts.error(format!("Cannot copy: {e}"));
         }
         Some(Err(TryRecvError::Disconnected)) => *lock(&clipboard.pending) = None,
         Some(Err(TryRecvError::Empty)) | None => {}

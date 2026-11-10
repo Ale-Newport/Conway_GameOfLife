@@ -11,7 +11,7 @@
 //!
 //! | Part | Module |
 //! |---|---|
-//! | Runner, session wrapper with a live descriptor, presets, data polling | [`session`] |
+//! | Runner with a live descriptor, presets, data polling | [`session`] |
 //! | Draft editing helpers (renames, sync status, detach) | [`draft`] |
 //! | System editor window and its tabs, apply semantics | [`editor`] |
 //! | Visual rule builder model ↔ DSL AST | [`blocks`] |
@@ -61,7 +61,7 @@ use interface::{AppMode, ModeAppExt, ModeCard, ModeStatus, PanelSlot, ShellSet, 
 use rendering::GridRenderPlugin;
 
 pub use editor::{ClEditor, EditorTab};
-pub use session::{ClData, ClRunner, ClScenarios, CustomSession};
+pub use session::{ClData, ClRunner, ClScenarios};
 pub use state::{ClUi, Tool};
 
 /// The application state of this mode.

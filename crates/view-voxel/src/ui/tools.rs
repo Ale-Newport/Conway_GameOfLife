@@ -254,7 +254,7 @@ fn seed_section(ui: &mut egui::Ui, palette: &Palette, p: &mut ToolsParams, runne
     }
     if seed_now {
         let seed = u64::try_from(draft.seed).unwrap_or_default();
-        runner.0.runner().edit(VoxelCommand::Randomize { seed: Some(seed) });
+        runner.0.edit(VoxelCommand::Randomize { seed: Some(seed) });
     }
     p.ui_state.seed.values = Some(draft);
     hint(

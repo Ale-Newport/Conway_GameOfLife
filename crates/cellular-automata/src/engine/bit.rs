@@ -240,7 +240,7 @@ impl LifeEngine for BitEngine {
         out
     }
 
-    fn cells_in_rect(&self, rect: CellRect) -> Vec<(i64, i64)> {
+    fn cells_in_rect(&self, rect: CellRect, limit: usize) -> Vec<(i64, i64)> {
         let mut out = Vec::new();
         let Some(clip) = self.clip(&rect) else {
             return out;
@@ -249,6 +249,10 @@ impl LifeEngine for BitEngine {
             let row = self.row(y as usize);
             for (k, mask) in Self::column_words(clip.x0, clip.x1) {
                 push_cells(row[k] & mask, 64 * k as i64, y, &mut out);
+                if out.len() >= limit {
+                    out.truncate(limit);
+                    return out;
+                }
             }
         }
         out
@@ -382,7 +386,7 @@ mod tests {
         let world = World::new(Topology::Bounded, 130, 3).unwrap();
         let mut e = BitEngine::new(world, LifeRule::conway()).unwrap();
         e.load_cells(&(0..130).map(|x| (x, 1)).collect::<Vec<_>>());
-        assert_eq!(e.cells_in_rect(CellRect::new(60, -5, 70, 5)).len(), 11);
+        assert_eq!(e.cells_in_rect(CellRect::new(60, -5, 70, 5), usize::MAX).len(), 11);
         e.clear_rect(CellRect::new(62, 0, 200, 2));
         assert_eq!(e.population(), 62);
         assert_eq!(e.bounding_box(), Some(CellRect::new(0, 1, 61, 1)));

@@ -576,7 +576,7 @@ pub(crate) fn properties_panel(
     section(ui, &palette, "Live parameters");
     match (&session, status.get()) {
         (Some(session), Some(current)) => {
-            let descriptor = live_parameter_descriptor(session.session().descriptor(), pick.0);
+            let descriptor = live_parameter_descriptor(&session.session().descriptor(), pick.0);
             param_editor(ui, &descriptor, &current.params, session.session());
         }
         _ => {

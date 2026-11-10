@@ -713,12 +713,7 @@ mod tests {
     use rule_engine::scenarios;
 
     fn info(sys: &LifeSystem, seed: u64) -> SimInfo {
-        SimInfo {
-            running: sys.clone(),
-            target: sys.clone(),
-            seed,
-            descriptor: simulation_core::ModelDescriptor::new("x", "x", simulation_core::ModelFamily::Hybrid),
-        }
+        SimInfo { running: sys.clone(), target: sys.clone(), seed }
     }
 
     #[test]

@@ -2966,10 +2966,13 @@ dependencies = [
  "interface",
  "rendering",
  "thiserror 2.0.21",
+ "view-ca-lab",
  "view-civilization",
  "view-continuous",
+ "view-conway",
  "view-custom-life",
  "view-evolution",
+ "view-metapixel",
  "view-voxel",
 ]
 
@@ -4332,7 +4335,6 @@ dependencies = [
 name = "model-registry"
 version = "0.1.0"
 dependencies = [
- "analytics",
  "cellular-automata",
  "civilization",
  "continuous",
@@ -4340,16 +4342,12 @@ dependencies = [
  "evolution",
  "hashlife",
  "metapixel",
- "organism-engine",
  "patterns",
- "persistence",
  "physics-world",
- "ron",
  "rule-engine",
  "serde",
  "simulation-core",
  "thiserror 2.0.21",
- "toml",
  "voxel-life",
 ]
 
@@ -5906,8 +5904,11 @@ dependencies = [
  "analytics",
  "anyhow",
  "clap",
+ "hashlife",
  "model-registry",
+ "patterns",
  "persistence",
+ "rayon",
  "serde",
  "serde_json",
  "simulation-core",

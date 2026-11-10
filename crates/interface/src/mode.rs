@@ -9,8 +9,9 @@
 //!    `OnExit(mode)`;
 //! 3. optionally contributes panel contents with
 //!    [`ModeAppExt::add_mode_panel`] (one-shot systems taking
-//!    `InMut<egui::Ui>`), scenarios through [`ModeScenarios`], and a tutorial
-//!    through [`crate::tutorial::TutorialAppExt::register_tutorial`].
+//!    `InMut<egui::Ui>`), scenarios through [`ModeScenarios`], the text
+//!    shown while it has no session through [`ModePlaceholders`], and a
+//!    tutorial through [`crate::tutorial::TutorialAppExt::register_tutorial`].
 //!
 //! See `docs/UI_SHELL.md` for the full contract.
 
@@ -22,6 +23,8 @@ use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use bevy_egui::egui::{self, Color32};
 use simulation_core::SessionControl;
+
+use crate::toasts::ToastLevel;
 
 /// Top-level application state: the dashboard or one simulation mode.
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
@@ -492,6 +495,42 @@ pub struct ScenarioSelected {
     pub mode: AppMode,
     /// [`ScenarioEntry::id`] of the chosen scenario.
     pub id: String,
+}
+
+/// What the world area of a mode shows while it has no [`ActiveSession`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Placeholder {
+    /// `Warning` and `Error` are drawn in their theme colours, the others
+    /// muted.
+    pub level: ToastLevel,
+    /// Text, wrapped to the world area.
+    pub text: String,
+}
+
+/// Placeholders of the modes. A mode sets its own while it has no session
+/// (still loading, or a fatal error such as missing assets) and clears it
+/// when it no longer applies; the shell shows "Starting the simulation…"
+/// for a mode without one.
+#[derive(Resource, Clone, Debug, Default)]
+pub struct ModePlaceholders {
+    entries: BTreeMap<AppMode, Placeholder>,
+}
+
+impl ModePlaceholders {
+    /// Shows `text` with `level` while `mode` has no session.
+    pub fn set(&mut self, mode: AppMode, level: ToastLevel, text: impl Into<String>) {
+        self.entries.insert(mode, Placeholder { level, text: text.into() });
+    }
+
+    /// Goes back to the default text for `mode`.
+    pub fn clear(&mut self, mode: AppMode) {
+        self.entries.remove(&mode);
+    }
+
+    /// Placeholder of `mode`.
+    pub fn get(&self, mode: AppMode) -> Option<&Placeholder> {
+        self.entries.get(&mode)
+    }
 }
 
 /// Registration helpers for mode crates.

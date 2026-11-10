@@ -98,12 +98,16 @@ impl MetricsHistory {
     pub fn ingest(&mut self, tick: u64, playing: bool, samples: &[Metrics]) {
         if let Some(pending) = &mut self.pending_restore {
             // `restore` pauses the run, so "paused at the restored tick" marks
-            // the switch; samples drained with that status predate it.
+            // the switch. Samples drained with that status are the old run's,
+            // then the runner's sample of the restored state, which is kept.
             let confirmed = tick == pending.tick && !playing;
             pending.polls += 1;
             if confirmed || pending.polls >= RESTORE_WAIT_POLLS {
                 self.clear();
                 self.last_status_tick = Some(tick);
+                if confirmed && let Some(restored) = samples.iter().rposition(|s| s.tick == tick) {
+                    self.record(&samples[restored..]);
+                }
             }
             return;
         }
@@ -228,6 +232,17 @@ mod tests {
     }
 
     #[test]
+    fn a_fresh_sample_of_the_newest_tick_replaces_it() {
+        // The runner samples the current tick again after an edit while paused.
+        let mut h = MetricsHistory::default();
+        h.ingest(3, false, &[sample(2, 5.0), sample(3, 6.0)]);
+        h.ingest(3, false, &[sample(3, 106.0)]);
+        let series = h.store().get("population").unwrap();
+        assert_eq!(series.ticks().collect::<Vec<_>>(), vec![2, 3]);
+        assert_eq!(h.latest("population"), Some(106.0));
+    }
+
+    #[test]
     fn loading_a_save_while_running_never_mixes_runs() {
         let mut h = MetricsHistory::default();
         h.ingest(400, true, &(391..=400).map(|t| sample(t, 1.0)).collect::<Vec<_>>());
@@ -242,6 +257,19 @@ mod tests {
         h.ingest(902, true, &[sample(901, 2.0), sample(902, 2.0)]);
         let ticks: Vec<u64> = h.store().get("population").unwrap().ticks().collect();
         assert_eq!(ticks, vec![901, 902]);
+    }
+
+    #[test]
+    fn the_sample_of_a_loaded_state_is_kept() {
+        // The runner samples the restored state after the old run's samples,
+        // so the bottom bar shows the loaded population before any tick.
+        let mut h = MetricsHistory::default();
+        h.ingest(400, false, &[sample(400, 1.0)]);
+        h.expect_restore(900);
+        h.ingest(900, false, &[sample(400, 1.0), sample(900, 7.0)]);
+        assert!(!h.awaiting_restore());
+        assert_eq!(h.store().get("population").unwrap().ticks().collect::<Vec<_>>(), vec![900]);
+        assert_eq!(h.latest("population"), Some(7.0));
     }
 
     #[test]

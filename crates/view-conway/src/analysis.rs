@@ -176,7 +176,7 @@ pub fn analyse(sim: &mut LifeSim, translate: bool, cancel: &AtomicBool, budget: 
 /// What is analysed.
 enum Source {
     World(Result<Snapshot, String>),
-    Cells(Pattern),
+    Cells(Result<Pattern, String>),
 }
 
 fn copy_of(source: Source) -> Result<LifeSim, String> {
@@ -190,6 +190,7 @@ fn copy_of(source: Source) -> Result<LifeSim, String> {
             Ok(sim)
         }
         Source::Cells(pattern) => {
+            let pattern = pattern?;
             let mut sim = LifeSim::new(&empty(Topology::Infinite), 0, &PatternLibrary::builtin(), LifeMode::Classic)
                 .map_err(|e| e.to_string())?;
             sim.apply(LifeCommand::Paste {
@@ -251,10 +252,10 @@ impl Analysis {
         self.running = Some(CellRectOrWorld(selection));
         // Runs on the simulation thread only long enough to copy the state;
         // the analysis itself runs on its own thread.
-        runner.0.runner().exec(move |sim: &mut LifeSim| {
+        runner.0.exec(move |sim: &mut LifeSim| {
             let generation = sim.tick();
             let (source, translate) = match selection {
-                Some(rect) => (Source::Cells(sim.copy_region(rect)), true),
+                Some(rect) => (Source::Cells(sim.copy_region(rect).map_err(|e| e.to_string())), true),
                 None => (Source::World(sim.snapshot().map_err(|e| e.to_string())), infinite_world),
             };
             let spawned = std::thread::Builder::new().name("conway-analysis".into()).spawn(move || {
@@ -310,7 +311,7 @@ mod tests {
 
     fn on_plane(text: &str) -> LifeSim {
         let pattern = Pattern::from_ascii(text).unwrap();
-        copy_of(Source::Cells(pattern)).unwrap()
+        copy_of(Source::Cells(Ok(pattern))).unwrap()
     }
 
     fn run(text: &str) -> AnalysisResult {
@@ -326,7 +327,7 @@ mod tests {
         assert_eq!(run("O..O.\n....O\nO...O\n.OOOO"), AnalysisResult::Spaceship { period: 4, dx: 2, dy: 0 });
         assert_eq!(run("O"), AnalysisResult::DiesOut { after: 1 });
         assert!(matches!(run(".O\nO.\nOO\n.OO"), AnalysisResult::NotFound { .. } | AnalysisResult::DiesOut { .. }));
-        let mut empty = copy_of(Source::Cells(Pattern::default())).unwrap();
+        let mut empty = copy_of(Source::Cells(Ok(Pattern::default()))).unwrap();
         assert_eq!(analyse(&mut empty, true, &AtomicBool::new(false), ANALYSIS_BUDGET), AnalysisResult::Empty);
     }
 

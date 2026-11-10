@@ -231,3 +231,18 @@ fn the_trail_shows_every_flip_of_the_last_tick_and_fades_per_tick() {
     let (x, y) = *visited.iter().next().unwrap();
     assert!(later.grid.texel_at_cell(x, y).is_some_and(|t| t[2] == 255 || t[2] == 255 - 16));
 }
+
+#[test]
+fn the_world_is_the_running_one_until_the_reset() {
+    let mut s = langton();
+    let infinite = s.world();
+    assert_eq!(infinite.topology, Topology::Infinite);
+    s.set_param("topology", ParamValue::Text("torus".into())).unwrap();
+    s.set_param("width", ParamValue::Int(64)).unwrap();
+    assert_eq!(s.world(), infinite, "the parameters describe the next reset");
+    let snapshot = s.snapshot().unwrap();
+    s.reset();
+    assert_eq!((s.world().topology, s.world().width, s.world().height), (Topology::Torus, 64, 256));
+    s.restore(&snapshot).unwrap();
+    assert_eq!(s.world(), infinite, "a restored state runs its own world");
+}

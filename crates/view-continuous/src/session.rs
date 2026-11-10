@@ -2,13 +2,9 @@
 //! [`ActiveSession`], scenario loading and a live copy of the rule fetched
 //! from the simulation thread.
 //!
-//! The runner captures the model descriptor when it is spawned, so the
-//! shell's Parameters and Rules tabs describe the scenario that spawned it.
-//! Loading a scenario therefore uses `Control::Replace` only when the new
-//! world has exactly the same descriptor; any other scenario gets a new
-//! runner (which also clears the metric plots, as the model changed). A
-//! loaded save whose parameter layout differs from the session's (another
-//! scenario of the same model) is moved to a fresh runner the same way.
+//! Every scenario is loaded into the same runner (`Control::Replace`); the
+//! runner publishes the new model's descriptor, so the shell's Parameters
+//! and Rules tabs follow it, also after loading a save of another scenario.
 
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -19,9 +15,8 @@ use continuous::scenario::{self, LibraryCreature, Scenario, ScenarioHeader};
 use continuous::{ContinuousSim, ModelKind, Rule};
 use interface::{ActiveSession, ModeScenarios, ScenarioEntry, ScenarioList, ScenarioSelected, SessionStatus, Toasts};
 use simulation_core::{
-    Control, ModelDescriptor, ParamSet, Runner, RunnerConfig, SimError, Simulation, Snapshot, Speed,
+    Control, ModelDescriptor, ParamKind, ParamSet, ParamValue, Runner, RunnerConfig, Simulation, Speed,
 };
-use simulation_core::{HistoryConfig, Metrics, ParamKind, ParamValue, RunnerStatus, SessionControl};
 
 use crate::MODE;
 use crate::world::{CameraFit, LatestView, ViewRequestState, ViewSettings};
@@ -199,7 +194,6 @@ pub struct LoadRequests(pub Vec<String>);
 #[derive(Clone, Debug)]
 pub(crate) struct LiveInfo {
     rule: Rule,
-    descriptor: ModelDescriptor,
     header: ScenarioHeader,
     width: usize,
     height: usize,
@@ -209,7 +203,6 @@ pub(crate) struct LiveInfo {
 #[derive(Resource, Default)]
 pub struct LiveSync {
     pending: Mutex<Option<Receiver<LiveInfo>>>,
-    respawn: Mutex<Option<Receiver<Result<Snapshot, SimError>>>>,
     last_params: Option<ParamSet>,
 }
 
@@ -220,7 +213,6 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 impl LiveSync {
     fn reset(&mut self) {
         *lock(&self.pending) = None;
-        *lock(&self.respawn) = None;
         self.last_params = None;
     }
 }
@@ -235,18 +227,16 @@ pub fn default_speed(kind: ModelKind) -> Speed {
     }
 }
 
-/// A runner with the generic Clear and Randomize controls enabled.
+/// A runner serving [`display_descriptor`], with the generic Clear and
+/// Randomize controls enabled.
 pub fn spawn_runner(sim: ContinuousSim, speed: Speed) -> Arc<Runner<ContinuousSim>> {
     Arc::new(
-        Runner::spawn(sim, RunnerConfig { speed, ..default() })
-            .with_clear(|sim: &mut ContinuousSim| sim.clear())
-            .with_randomize(|sim: &mut ContinuousSim, seed| sim.randomize(seed)),
+        Runner::spawn_with_descriptor(sim, RunnerConfig { speed, ..default() }, |sim| {
+            display_descriptor(&sim.descriptor(), &sim.params())
+        })
+        .with_clear(|sim: &mut ContinuousSim| sim.clear())
+        .with_randomize(|sim: &mut ContinuousSim, seed| sim.randomize(seed)),
     )
-}
-
-/// Whether two descriptors present the same parameters (model id and keys).
-pub fn same_layout(a: &ModelDescriptor, b: &ModelDescriptor) -> bool {
-    a.id == b.id && a.params.len() == b.params.len() && a.params.iter().zip(&b.params).all(|(x, y)| x.key == y.key)
 }
 
 /// Mode resources that start over with a new session.
@@ -271,86 +261,10 @@ impl SessionState<'_> {
     }
 }
 
-fn install(commands: &mut Commands, sim: ContinuousSim, speed: Speed) -> Arc<Runner<ContinuousSim>> {
-    let descriptor = display_descriptor(&sim.descriptor(), &sim.params());
+fn install(commands: &mut Commands, sim: ContinuousSim, speed: Speed) {
     let runner = spawn_runner(sim, speed);
-    commands.insert_resource(ActiveSession::new(Arc::new(ContinuousSession { runner: runner.clone(), descriptor })));
-    commands.insert_resource(ContinuousRunner(runner.clone()));
-    runner
-}
-
-/// The session handed to the shell: the runner with a display-ready copy
-/// of its descriptor (see [`display_descriptor`]). Every control goes to
-/// the runner unchanged.
-pub struct ContinuousSession {
-    runner: Arc<Runner<ContinuousSim>>,
-    descriptor: ModelDescriptor,
-}
-
-impl SessionControl for ContinuousSession {
-    fn descriptor(&self) -> &ModelDescriptor {
-        &self.descriptor
-    }
-    fn status(&self) -> RunnerStatus {
-        SessionControl::status(&*self.runner)
-    }
-    fn play(&self) {
-        SessionControl::play(&*self.runner);
-    }
-    fn pause(&self) {
-        SessionControl::pause(&*self.runner);
-    }
-    fn toggle_play(&self) {
-        self.runner.toggle_play();
-    }
-    fn step(&self, n: u64) {
-        SessionControl::step(&*self.runner, n);
-    }
-    fn set_speed(&self, speed: Speed) {
-        self.runner.set_speed(speed);
-    }
-    fn reset(&self) {
-        self.runner.reset();
-    }
-    fn undo(&self) {
-        self.runner.undo();
-    }
-    fn redo(&self) {
-        self.runner.redo();
-    }
-    fn jump_to_history(&self, index: usize) {
-        self.runner.jump_to_history(index);
-    }
-    fn set_history(&self, config: HistoryConfig) {
-        self.runner.set_history(config);
-    }
-    fn set_param(&self, key: &str, value: ParamValue) {
-        self.runner.set_param(key, value);
-    }
-    fn drain_metrics(&self) -> Vec<Metrics> {
-        SessionControl::drain_metrics(&*self.runner)
-    }
-    fn take_errors(&self) -> Vec<String> {
-        SessionControl::take_errors(&*self.runner)
-    }
-    fn request_snapshot(&self) -> Receiver<Result<Snapshot, SimError>> {
-        self.runner.request_snapshot()
-    }
-    fn restore(&self, snapshot: Snapshot) {
-        self.runner.restore(snapshot);
-    }
-    fn can_clear(&self) -> bool {
-        self.runner.can_clear()
-    }
-    fn clear(&self) {
-        self.runner.clear();
-    }
-    fn can_randomize(&self) -> bool {
-        self.runner.can_randomize()
-    }
-    fn randomize(&self, seed: u64) {
-        self.runner.randomize(seed);
-    }
+    commands.insert_resource(ActiveSession::new(runner.clone()));
+    commands.insert_resource(ContinuousRunner(runner));
 }
 
 /// Replacements for characters of the model's texts that egui's built-in
@@ -490,15 +404,13 @@ pub(crate) fn collect_scenario_picks(mut picked: MessageReader<ScenarioSelected>
     }
 }
 
-/// Loads queued scenarios: `Control::Replace` when the new world has the
-/// same descriptor as the session, otherwise a new runner.
+/// Loads queued scenarios into the running runner (`Control::Replace`).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn load_requested_scenarios(
     mut commands: Commands,
     mut requests: ResMut<LoadRequests>,
     catalog: Res<Catalog>,
     runner: Option<Res<ContinuousRunner>>,
-    status: Res<SessionStatus>,
     loaded: Option<Res<LoadedWorld>>,
     mut scenarios: ResMut<ModeScenarios>,
     mut toasts: ResMut<Toasts>,
@@ -520,17 +432,16 @@ pub(crate) fn load_requested_scenarios(
     let previous_kind = loaded.as_ref().map(|l| l.kind());
     let kind_changed = previous_kind != Some(scenario.rule.kind());
     match runner {
-        Some(runner) if sim.descriptor() == *runner.0.descriptor() => {
+        Some(runner) => {
             runner.0.send(Control::Replace(Box::new(sim)));
+            if kind_changed {
+                runner.0.send(Control::SetSpeed(default_speed(scenario.rule.kind())));
+            }
             runner.0.send(Control::RequestView);
+            // Inserted again, the session clears the metric plots of the previous world.
+            commands.insert_resource(ActiveSession::new(runner.0.clone()));
         }
-        _ => {
-            let speed = match status.get() {
-                Some(s) if !kind_changed => s.speed,
-                _ => default_speed(scenario.rule.kind()),
-            };
-            install(&mut commands, sim, speed);
-        }
+        None => install(&mut commands, sim, default_speed(scenario.rule.kind())),
     }
     state.settings.adapt_to(&scenario.rule, kind_changed);
     commands.insert_resource(LoadedWorld::from_scenario(&scenario));
@@ -540,53 +451,16 @@ pub(crate) fn load_requested_scenarios(
 
 /// Keeps [`LoadedWorld`] in step with the simulation thread: after any
 /// parameter change (including undo and loading a save) the live rule,
-/// size and scenario are fetched; a world whose parameter layout no longer
-/// matches the session's descriptor is moved to a fresh runner.
-#[allow(clippy::too_many_arguments)]
+/// size and scenario are fetched.
 pub(crate) fn sync_live_world(
-    mut commands: Commands,
     runner: Option<Res<ContinuousRunner>>,
     status: Res<SessionStatus>,
     loaded: Option<ResMut<LoadedWorld>>,
-    catalog: Res<Catalog>,
     mut scenarios: ResMut<ModeScenarios>,
-    mut toasts: ResMut<Toasts>,
     mut state: SessionState,
 ) {
     let (Some(runner), Some(mut loaded)) = (runner, loaded) else { return };
     let Some(current) = status.get() else { return };
-
-    // A respawn waiting for the state of the old runner.
-    let respawn = lock(&state.live.respawn).as_ref().map(Receiver::try_recv);
-    match respawn {
-        Some(Ok(Ok(snapshot))) => {
-            *lock(&state.live.respawn) = None;
-            let kind = loaded.kind();
-            let host = catalog.scenarios.iter().find(|s| s.rule.kind() == kind).cloned();
-            let rebuilt = host.ok_or_else(|| "no scenario of this model".to_string()).and_then(|host| {
-                let mut sim = ContinuousSim::from_scenario(host).map_err(|e| e.to_string())?;
-                sim.restore(&snapshot).map_err(|e| e.to_string())?;
-                Ok(sim)
-            });
-            match rebuilt {
-                Ok(sim) => {
-                    let new = install(&mut commands, sim, current.speed);
-                    if current.playing {
-                        new.play();
-                    }
-                    state.restart(true);
-                }
-                Err(e) => toasts.error(format!("Could not rebuild the parameter panel for the loaded state: {e}")),
-            }
-            return;
-        }
-        Some(Ok(Err(e))) => {
-            *lock(&state.live.respawn) = None;
-            toasts.error(format!("Could not read the loaded state: {e}"));
-        }
-        Some(Err(TryRecvError::Disconnected)) => *lock(&state.live.respawn) = None,
-        Some(Err(TryRecvError::Empty)) | None => {}
-    }
 
     let received = lock(&state.live.pending).as_ref().map(Receiver::try_recv);
     match received {
@@ -603,9 +477,6 @@ pub(crate) fn sync_live_world(
             if resized {
                 state.fit.request(true);
             }
-            if !same_layout(&info.descriptor, runner.0.descriptor()) && lock(&state.live.respawn).is_none() {
-                *lock(&state.live.respawn) = Some(runner.0.request(|sim| sim.snapshot()));
-            }
         }
         Some(Err(TryRecvError::Disconnected)) => *lock(&state.live.pending) = None,
         Some(Err(TryRecvError::Empty)) => {}
@@ -614,7 +485,6 @@ pub(crate) fn sync_live_world(
                 state.live.last_params = Some(current.params.clone());
                 *lock(&state.live.pending) = Some(runner.0.request(|sim| LiveInfo {
                     rule: sim.rule().clone(),
-                    descriptor: sim.descriptor(),
                     header: sim.scenario().header.clone(),
                     width: sim.width(),
                     height: sim.height(),
@@ -653,19 +523,6 @@ mod tests {
         assert!(catalog.creatures.iter().any(|c| c.name.starts_with("Orbium")));
         assert_eq!(catalog.name_of("lenia.fish"), "K=3 Fish");
         assert_eq!(catalog.name_of("nope"), "nope");
-    }
-
-    #[test]
-    fn layouts_compare_parameter_keys() {
-        let catalog = Catalog::builtin();
-        let descriptor =
-            |id: &str| ContinuousSim::from_scenario(catalog.get(id).unwrap().clone()).unwrap().descriptor();
-        let orbium = descriptor("lenia.orbium");
-        assert!(same_layout(&orbium, &descriptor("lenia.scutium_solidus")), "same keys, other defaults");
-        assert_ne!(orbium, descriptor("lenia.scutium_solidus"), "descriptors still differ: a new runner is needed");
-        assert!(!same_layout(&orbium, &descriptor("lenia.tessellatium_gyrans")));
-        assert!(!same_layout(&orbium, &descriptor("smoothlife.glider")));
-        assert_eq!(orbium, descriptor("lenia.orbium"), "reloading a scenario can reuse the runner");
     }
 
     #[test]
@@ -743,7 +600,7 @@ mod tests {
     }
 
     /// Enter, leave and enter again: every exit drops the last handle on the
-    /// runner (its `Drop` stops and joins the simulation thread).
+    /// runner (its `Drop` stops the simulation thread).
     #[test]
     fn exiting_releases_the_runner_and_reentering_starts_a_new_one() {
         use bevy::ecs::system::RunSystemOnce;
@@ -767,30 +624,41 @@ mod tests {
         assert!(second.upgrade().is_none());
     }
 
-    /// Reloading a scenario with the same descriptor reuses the runner
-    /// (`Control::Replace`); another model replaces it and drops the old one.
+    /// Every scenario, of any model, is loaded into the same runner
+    /// (`Control::Replace`), which then serves the new model's descriptor
+    /// and speed; the session is inserted again, so the plots start afresh.
     #[test]
-    fn scenario_loads_reuse_or_replace_the_runner() {
+    fn scenario_loads_reuse_the_runner() {
         use bevy::ecs::system::RunSystemOnce;
         let mut world = lifecycle_world();
         world.run_system_once(enter_session).unwrap();
         let first = runner_of(&world);
-        world.resource_mut::<LoadRequests>().0.push(DEFAULT_SCENARIO.into());
+        let session_changed = |world: &World| world.get_resource_change_ticks::<ActiveSession>().unwrap().changed;
+        let inserted = session_changed(&world);
+        world.resource_mut::<LoadRequests>().0.extend(["nope".to_string(), "smoothlife.glider".to_string()]);
         world.run_system_once(load_requested_scenarios).unwrap();
-        assert!(Weak::ptr_eq(&first, &runner_of(&world)), "same descriptor: Control::Replace");
-        world.resource_mut::<LoadRequests>().0.extend(["nope".to_string(), "flow_lenia.demo".to_string()]);
-        world.run_system_once(load_requested_scenarios).unwrap();
-        assert!(first.upgrade().is_none(), "another model gets a new runner; the old one stops");
-        assert_eq!(world.resource::<LoadedWorld>().kind(), ModelKind::FlowLenia);
+        assert!(Weak::ptr_eq(&first, &runner_of(&world)), "Control::Replace keeps the runner");
+        assert_ne!(session_changed(&world), inserted, "the session is inserted again: the plots start afresh");
+        assert_eq!(world.resource::<LoadedWorld>().kind(), ModelKind::SmoothLife);
         assert_eq!(
             world.resource::<ModeScenarios>().get(MODE).and_then(|l| l.selected.clone()).as_deref(),
-            Some("flow_lenia.demo")
+            Some("smoothlife.glider")
         );
         assert!(world.resource::<LoadRequests>().0.is_empty());
         assert_eq!(
             world.resource::<ViewSettings>().colormap,
             crate::world::default_colormap(&world.resource::<LoadedWorld>().rule)
         );
+        let runner = first.upgrade().unwrap();
+        let glider =
+            ContinuousSim::from_scenario(Catalog::builtin().get("smoothlife.glider").unwrap().clone()).unwrap();
+        let expected = display_descriptor(&glider.descriptor(), &glider.params());
+        let start = std::time::Instant::now();
+        while runner.status().descriptor_seq == 0 || runner.status().speed != default_speed(ModelKind::SmoothLife) {
+            assert!(start.elapsed().as_secs() < 10, "the new model's descriptor and speed were not published");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+        assert_eq!(*runner.descriptor(), expected);
     }
 
     #[test]

@@ -121,7 +121,7 @@ fn boundaries_and_contract() {
     );
     let mut s = sim(30, 65, Boundary::Fixed0, EcaStart::SingleCell);
     assert_eq!(s.descriptor().id, "ca.wolfram");
-    assert!(s.descriptor().rules.contains("100→1"));
+    assert!(s.descriptor().rules.contains("100->1"));
     assert!(s.apply(WolframCommand::SetCell { x: 65, alive: true }).is_err());
     s.advance(20);
     let snap = s.snapshot().unwrap();
@@ -151,4 +151,20 @@ fn boundaries_and_contract() {
     s.advance(30);
     assert_eq!(s.row_at(5), None, "only the last 10 rows are kept");
     assert!(s.row_at(25).is_some());
+}
+
+#[test]
+fn accessors_describe_the_running_diagram() {
+    let mut s = sim(30, 33, Boundary::Fixed0, EcaStart::SingleCell);
+    s.set_param("history", ParamValue::Int(8)).unwrap();
+    s.reset();
+    s.set_param("boundary", ParamValue::Text("periodic".into())).unwrap();
+    s.set_param("width", ParamValue::Int(65)).unwrap();
+    assert_eq!((s.width(), s.boundary(), s.first_row()), (33, Boundary::Fixed0, 0), "changes are pending");
+    s.advance(20);
+    assert_eq!(s.boundary(), Boundary::Periodic, "the boundary applies from the next row");
+    assert_eq!((s.first_row(), s.tick()), (13, 20), "the last 8 rows are kept");
+    assert!(s.row_at(12).is_none() && s.row_at(13).is_some());
+    s.reset();
+    assert_eq!((s.width(), s.first_row()), (65, 0), "the width applies on reset");
 }

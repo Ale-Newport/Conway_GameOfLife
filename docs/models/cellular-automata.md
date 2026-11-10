@@ -39,13 +39,13 @@ benchmark. No new third-party crate.
 |---|---|
 | `engine::{LifeEngine, EngineKind, EngineChoice, GenStats}` | engine trait, the four implementations' kinds, automatic/fixed choice, births/deaths of a generation |
 | `DenseEngine`, `BitEngine`, `SparseEngine`, `HashlifeEngine` | the engines |
-| `create_engine`, `switch_engine`, `select_engine`, `SelectionInput`, `tile_regularity` | construction, exact state transfer (refused, never lossy, when the target cannot hold every cell), automatic choice |
-| `LifeEngine::reserve`, `DenseEngine::window_fits`, `engine::BORDER_CELL_BUDGET` | capacity checks before writes; bounded view cost on Hashlife |
+| `create_engine`, `switch_engine`, `select_engine`, `SelectionInput`, `tile_regularity`, `engine::AUTO_REGULARITY_MAX_POPULATION` | construction, exact state transfer (refused, never lossy, when the target cannot hold every cell), automatic choice |
+| `LifeEngine::reserve`, `DenseEngine::window_fits`, `engine::BORDER_CELL_BUDGET`, the `limit` of `LifeEngine::cells_in_rect` | capacity checks before writes; bounded view cost on Hashlife; bounded region listings |
 | `engine::reference::reference_step` | naive reference stepper (used by the property tests) |
-| `LifeSim`, `LifeConfig`, `LifeMode`, `LifeCommand`, `PasteMode`, `MirrorAxis`, `RulePreset`, `InitItem`, `PatternSource`, `PatternLibrary`, `place_pattern` | the Life model, its configuration, commands and pattern resolution; `LifeSim::copy_region` is the copy query and `LifeSim::cut_region` the cut (copy + clear) |
+| `LifeSim`, `LifeConfig`, `LifeMode`, `LifeCommand`, `PasteMode`, `MirrorAxis`, `RulePreset`, `InitItem`, `PatternSource`, `PatternLibrary`, `place_pattern` | the Life model, its configuration, commands and pattern resolution; `LifeSim::copy_region` is the copy query and `LifeSim::cut_region` the cut (copy + clear), both refused above `MAX_EDIT_CELLS` live cells |
 | `GenerationsSim`/`GenerationsConfig`, `WireworldSim`/`WireworldConfig`, `PaintCommand`, `StateInit` | multi-state models and their shared painting commands (`halt_reason` reports a reset that could not be carried out) |
-| `LangtonsAntSim`, `AntConfig`, `AntCommand`, `Ant`, `Heading`, `TurmiteRule`, `AntView` | ants |
-| `WolframSim`, `WolframConfig`, `WolframCommand`, `Boundary`, `EcaStart`, `wolfram::eca_step` | elementary CA |
+| `LangtonsAntSim`, `AntConfig`, `AntCommand`, `Ant`, `Heading`, `TurmiteRule`, `AntView` | ants; `LangtonsAntSim::world` is the running world (the parameters describe the next reset) |
+| `WolframSim`, `WolframConfig`, `WolframCommand`, `Boundary`, `EcaStart`, `wolfram::eca_step` | elementary CA; `WolframSim::{width, boundary, first_row}` describe the running diagram (rows `first_row()..=tick()` are kept) |
 | `GridView`, `GridViewRequest`, `view::TexelGrid` | renderer contract (§6) |
 | `geometry::{CellRect, World, Rotation, Symmetry, line, disc, circle_outline, rectangle, stroke, check_fill, random_fill, random_fill_each, transform_in_rect}` | shapes, symmetric random fills (streamed up to the largest world, `MAX_FILL_CELLS` = 2^32 cells) and `World::images` (a rectangle as the topology sees it) used by every editing command |
 | `scenario::{Scenario, ScenarioModel, BuiltSimulation, parse, load_file, load_dir, builtin_scenarios, builtin_scenario, to_ron}` | scenario files |
@@ -142,7 +142,13 @@ counter stays exact when a later jump fails (coordinate overflow near
 pattern (tile contents compared through a 64-bit FNV-1a hash): 0 for soups, close to 1 for glider
 streams, agar or metapixel arrays — the structures Hashlife compresses. The
 choice is re-evaluated on reset, when a pattern is loaded and when the
-generations per tick change; a fixed choice is never overridden. Rationale
+generations per tick change; a fixed choice is never overridden. Measuring
+lists every live cell, so `LifeSim` measures patterns of at most
+`AUTO_REGULARITY_MAX_POPULATION` = 2^20 live cells: a larger pattern keeps
+Hashlife if it runs (leaving it would list every cell too; a breeder after a
+big jump has billions), whatever the tick, and is treated as irregular by the
+other engines. The choice therefore costs at most a few tens of megabytes
+for any population. Rationale
 (see `docs/research/life-engines-hashlife.md` §5.3): the bit engine has a
 constant cost of W·H/64 words per generation and wins on finite and dense
 worlds; tiles cost in proportion to the active area and win on unbounded,
@@ -203,7 +209,10 @@ region tools are clipped to the world. The *destination* of `MoveRegion`,
 (`World::images`: wrapped and mirrored across the edges of tori, Klein
 bottles and cross-surfaces), so moved or pasted cells that wrap around an
 edge replace what was there instead of merging with it. Drawing shapes larger
-than 2^26 cells are refused; random fills are streamed into the engine and
+than 2^26 cells (`MAX_EDIT_CELLS`) are refused, and so are moves, rotations,
+mirrors, copies and cuts of a region holding more than 2^26 live cells (they
+list its cells one by one; at most 2^26 + 1 are listed to find out, and
+nothing changes); random fills are streamed into the engine and
 cover any region up to 2^32 cells (the largest world). Shapes, pastes and
 rotations that would leave the 64-bit plane are refused (never clamped).
 
@@ -431,7 +440,8 @@ CARGO_TARGET_DIR=target/agents/cellular-automata cargo clippy -p cellular-automa
   ±2^50, 15–45 generations); 300-generation runs on a Klein bottle; 2000
   generations of an unbounded soup on three engines; Hashlife jumps against
   sparse stepping; engine switching; level-of-detail counts of every engine
-  against direct counting.
+  against direct counting; region listings of every engine, whole and cut
+  off at a limit.
 * **`tests/catalog.rs`**: every one of the 80 catalog patterns against its
   declared data — initial population and size; still lifes; oscillator periods
   (minimal) and population ranges; spaceship periods and displacements; gun
@@ -462,7 +472,12 @@ CARGO_TARGET_DIR=target/agents/cellular-automata cargo clippy -p cellular-automa
   changes) instead of dropping them; random fills of a 16,384 × 8,200 world;
   activity = 255 for every change of the tick, −16 per tick; births/deaths of
   the last tick after `advance(n)`; Hashlife jumps keep the generation exact
-  when a later jump fails at the ±2^61 limit; cut.
+  when a later jump fails at the ±2^61 limit; cut; region tools, copies and
+  cuts of more than 2^26 live cells refused unchanged; the automatic choice
+  keeps Hashlife for a soup too large to measure and for a Gosper gun after
+  2^40 generations (about 1.8 × 10^11 cells) without listing them, and keeps
+  Sparse for a full block one row above 2^20 cells (one of exactly 2^20 is
+  measured and moves to Hashlife).
 * **`tests/generations.rs`**: Brian's Brain 1 → 2 → 0 and no surviving cells,
   the domino spaceship, the exploding 2×2 block (12, 20, 28), Star Wars decay,
   streamed fills of worlds above 2^26 cells, world changes that would make the
@@ -476,11 +491,13 @@ CARGO_TARGET_DIR=target/agents/cellular-automata cargo clippy -p cellular-automa
   exactly 722 of the first 20,000 steps, including step 19,812; RL last
   symmetric at step 52 — all matching `docs/research/automata-catalog.md` §5;
   snapshots taken while a rule change waits for the reset replay with the
-  running rule; the trail marks every flip of the last tick.
+  running rule; the trail marks every flip of the last tick; `world()` is the
+  running world while a world change waits for the reset.
 * **`tests/wolfram.rs`**: rule 90 = Pascal's triangle mod 2 exactly for 300
   rows; rule 30 centre column = OEIS A051023 (257 terms); rule 184 conserves
   cars and reaches free flow; rule 110 edges; 30 ≅ 86 (mirror) ≅ 135
-  (complement); fixed-1 boundaries; history and view.
+  (complement); fixed-1 boundaries; history and view; `width`, `boundary` and
+  `first_row` describe the running diagram while changes are pending.
 * **`tests/scenarios.rs`**: files equal their embedded copies; all 29 build
   with the asset catalog, run and replay from a snapshot; embedded-only
   scenarios build without it; the gun showcase's streams never collide;

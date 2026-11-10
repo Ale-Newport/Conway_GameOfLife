@@ -584,7 +584,6 @@ mod tests {
         let config =
             WorldConfig { kind: WorldKind::SparseBounded, size: [4096, 4096, 64], init: InitSpec::default(), seed: 0 };
         let info = WorldInfo {
-            descriptor: simulation_core::ModelDescriptor::new("voxel.life", "3D", simulation_core::ModelFamily::Voxel),
             scenario: ScenarioMeta {
                 id: "x".into(),
                 name: "x".into(),

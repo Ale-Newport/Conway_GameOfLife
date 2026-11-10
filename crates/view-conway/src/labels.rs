@@ -1,10 +1,9 @@
-//! Text helpers: exact (possibly huge) numbers, explanations of topologies and
-//! engines derived from the model's own selection rules, and fallbacks for
-//! characters egui's built-in fonts cannot draw.
+//! Text helpers: exact (possibly huge) numbers, and explanations of
+//! topologies and engines derived from the model's own selection rules.
 
 use cellular_automata::engine::{
     AUTO_DENSE_MAX_CELLS, AUTO_HASHLIFE_MIN_POPULATION, AUTO_HASHLIFE_MIN_REGULARITY, AUTO_HASHLIFE_MIN_STEP,
-    MAX_DENSE_CELLS, MAX_DENSE_WINDOW_CELLS,
+    AUTO_REGULARITY_MAX_POPULATION, MAX_DENSE_CELLS, MAX_DENSE_WINDOW_CELLS,
 };
 use cellular_automata::{EngineChoice, EngineKind, World};
 use simulation_core::Topology;
@@ -148,8 +147,10 @@ pub fn auto_reason(world: World, kind: EngineKind, generations: u64) -> String {
         ),
         (false, EngineKind::Hashlife) => format!(
             "Infinite plane with a large, regular pattern (at the last selection: at least {} live cells and a tile \
-             regularity of at least {AUTO_HASHLIFE_MIN_REGULARITY}): Hashlife shares the repeated structure.",
-            thousands(u128::from(AUTO_HASHLIFE_MIN_POPULATION))
+             regularity of at least {AUTO_HASHLIFE_MIN_REGULARITY}, or more than {} live cells, which Hashlife keeps \
+             without measuring): Hashlife shares the repeated structure.",
+            thousands(u128::from(AUTO_HASHLIFE_MIN_POPULATION)),
+            thousands(u128::from(AUTO_REGULARITY_MAX_POPULATION))
         ),
         (false, EngineKind::Sparse) => format!(
             "Infinite plane with {generations} generation(s) per tick (below {AUTO_HASHLIFE_MIN_STEP} or not a \
@@ -160,23 +161,10 @@ pub fn auto_reason(world: World, kind: EngineKind, generations: u64) -> String {
     format!("{reason} {note}")
 }
 
-/// Why the automatic engine choice must not be re-run now, or `None`. To
-/// measure regularity, `LifeSim`'s automatic choice lists every live cell
-/// once the population reaches 65,536; out of a huge Hashlife quadtree that
-/// list would exhaust memory. It is re-run when *Automatic* is selected and,
-/// while it is selected, when the generations per tick change.
-pub fn reselection_blocked(running: EngineKind, population: u128) -> Option<String> {
-    (running == EngineKind::Hashlife && population > MAX_TRANSFER_CELLS).then(|| {
-        format!(
-            "The automatic choice would list all {} live cells one by one to measure the pattern's regularity.",
-            thousands(population)
-        )
-    })
-}
-
-/// Why `choice` cannot be selected now, or `None` when it can. Mirrors the
-/// model's own checks (`EngineKind::check`, Hashlife's power-of-two ticks)
-/// and adds the user interface's transfer guards ([`MAX_TRANSFER_CELLS`]).
+/// Why `choice` cannot be selected now, or `None` when it can (the
+/// automatic choice always can). Mirrors the model's own checks
+/// (`EngineKind::check`, Hashlife's power-of-two ticks) and adds the user
+/// interface's transfer guards ([`MAX_TRANSFER_CELLS`]).
 pub fn choice_unavailable(
     choice: EngineChoice,
     world: World,
@@ -185,7 +173,7 @@ pub fn choice_unavailable(
     population: u128,
     bbox_area: Option<u128>,
 ) -> Option<String> {
-    let Some(kind) = choice.fixed() else { return reselection_blocked(running, population) };
+    let kind = choice.fixed()?;
     let finite = world.is_finite();
     match kind {
         EngineKind::Bit if !finite => return Some("The bit-packed engine runs finite worlds only.".into()),
@@ -217,22 +205,6 @@ pub fn choice_unavailable(
         ));
     }
     None
-}
-
-/// Replacements for characters of the model's texts that egui's built-in
-/// fonts cannot draw (they would render as boxes).
-const GLYPH_FALLBACKS: &[(char, &str)] = &[('∈', "in"), ('↦', "->"), ('→', "->"), ('−', "-")];
-
-/// `text` with every character egui cannot draw replaced.
-pub fn displayable(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for c in text.chars() {
-        match GLYPH_FALLBACKS.iter().find(|(x, _)| *x == c) {
-            Some((_, replacement)) => out.push_str(replacement),
-            None => out.push(c),
-        }
-    }
-    out
 }
 
 #[cfg(test)]
@@ -291,16 +263,13 @@ mod tests {
         let stay = choice_unavailable(EngineChoice::Hashlife, inf, 1, EngineKind::Hashlife, 1 << 30, None);
         assert!(stay.is_none());
         let auto = choice_unavailable(EngineChoice::Auto, inf, 1, EngineKind::Hashlife, 1 << 30, None);
-        assert!(auto.unwrap().contains("regularity"));
-        assert!(choice_unavailable(EngineChoice::Auto, inf, 1, EngineKind::Hashlife, 1 << 20, None).is_none());
-        assert!(reselection_blocked(EngineKind::Sparse, 1 << 30).is_none());
+        assert!(auto.is_none(), "the model keeps Hashlife for patterns too large to measure");
     }
 
     #[test]
-    fn summaries_and_glyphs() {
+    fn summaries_and_names() {
         assert_eq!(world_summary(world(Topology::Torus, 512, 256)), "512 × 256 torus");
         assert_eq!(world_summary(world(Topology::Infinite, 256, 192)), "Infinite plane · home 256 × 192");
-        assert_eq!(displayable("n ∈ B, x ↦ W−1−x"), "n in B, x -> W-1-x");
         for kind in EngineKind::ALL {
             assert!(!engine_blurb(kind).is_empty() && !engine_name(kind).is_empty());
         }

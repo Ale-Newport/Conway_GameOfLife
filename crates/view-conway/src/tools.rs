@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use bevy::math::I64Vec2;
 use bevy::prelude::*;
 use cellular_automata::view::TexelGrid;
-use cellular_automata::{CellRect, GridViewRequest, LifeCommand, PasteMode, Rotation, Symmetry};
+use cellular_automata::{CaError, CellRect, GridViewRequest, LifeCommand, PasteMode, Rotation, Symmetry};
 use patterns::Pattern;
 use rendering::grid::GridSpace;
 use rendering::{WorldInput, cursor_to_cell};
@@ -294,8 +294,9 @@ pub fn read_selection(sim: &cellular_automata::LifeSim, rect: CellRect) -> Selec
         sim.engine().count_live(&grid, &mut counts);
     }
     let population = counts.iter().map(|&c| u64::from(c)).sum();
-    let content =
-        (rect.area() <= MAX_PREVIEW_AREA && population <= MAX_PREVIEW_CELLS).then(|| Arc::new(sim.copy_region(rect)));
+    let content = (rect.area() <= MAX_PREVIEW_AREA && population <= MAX_PREVIEW_CELLS)
+        .then(|| sim.copy_region(rect).ok().map(Arc::new))
+        .flatten();
     SelectionInfo { rect, population, content }
 }
 
@@ -329,7 +330,7 @@ pub(crate) fn poll_selection(time: Res<Time>, runner: Option<Res<ConwayRunner>>,
 pub struct Clipboard {
     /// Last copied pattern (normalised).
     pub pattern: Option<Arc<Pattern>>,
-    pub(crate) pending: Mutex<Option<Receiver<Pattern>>>,
+    pub(crate) pending: Mutex<Option<Receiver<Result<Pattern, CaError>>>>,
 }
 
 /// Hover tracking and the pointer tools.
@@ -512,7 +513,7 @@ const fn sc(
 }
 
 /// The mode's shortcuts. None uses a key of the shell (`interface::input::SHORTCUTS`)
-/// or of the grid camera (arrows, WASD, `=`, `-`); checked by a test.
+/// or of the grid camera (arrows, WASD); checked by a test.
 pub const MODE_SHORTCUTS: &[ModeShortcut] = &[
     sc(KeyCode::Digit1, KeyModifier::None, ShortcutAction::Tool(Tool::Draw), "1", "Draw tool"),
     sc(KeyCode::Digit2, KeyModifier::None, ShortcutAction::Tool(Tool::Erase), "2", "Erase tool"),
@@ -635,10 +636,6 @@ mod tests {
             KeyCode::KeyA,
             KeyCode::KeyS,
             KeyCode::KeyD,
-            KeyCode::Equal,
-            KeyCode::Minus,
-            KeyCode::NumpadAdd,
-            KeyCode::NumpadSubtract,
         ];
         for (i, s) in MODE_SHORTCUTS.iter().enumerate() {
             assert!(SHORTCUTS.iter().all(|shell| shell.key != s.key), "{} is a shell key", s.label);

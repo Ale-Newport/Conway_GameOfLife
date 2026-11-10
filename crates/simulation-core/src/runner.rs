@@ -2,12 +2,20 @@
 //!
 //! A [`Runner`] owns a [`Simulation`] on a dedicated thread. The user
 //! interface sends [`Control`] messages (play, pause, step, edits...) and reads
-//! the most recently published view, status and metrics without ever blocking
-//! on a long simulation step. When a model cannot keep up with the requested
-//! speed the runner simply runs slower and reports the measured rate; it never
-//! skips or alters ticks, so results do not depend on rendering performance.
+//! the most recently published view, status, descriptor and metrics without
+//! ever blocking on a long simulation step. When a model cannot keep up with
+//! the requested speed the runner simply runs slower and reports the measured
+//! rate; it never skips or alters ticks, so results do not depend on
+//! rendering performance.
+//!
+//! After the controls that can change the state other than by ticking
+//! (everything but play, pause, step, speed, view and history settings) the
+//! worker records a metric sample of the current tick and publishes the
+//! descriptor again if it changed, so edits made while paused and long
+//! closures show up at once.
 
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
@@ -43,7 +51,8 @@ pub struct RunnerConfig {
     pub publish_hz: f64,
     /// Maximum time spent stepping before controls are processed again.
     pub max_batch: Duration,
-    /// Record metrics every `metrics_every` ticks (0 disables recording).
+    /// Record metrics every `metrics_every` ticks, and after every control
+    /// that changes the state (0 disables recording).
     pub metrics_every: u64,
     /// Maximum number of buffered, not yet drained metric samples.
     pub metrics_capacity: usize,
@@ -77,6 +86,9 @@ pub type SimHook<S> = Arc<dyn Fn(&mut S) + Send + Sync>;
 
 /// Reusable mode-specific action taking a seed (e.g. "randomize").
 pub type SeededHook<S> = Arc<dyn Fn(&mut S, u64) + Send + Sync>;
+
+/// Builds the descriptor a runner publishes (see [`Runner::spawn_with_descriptor`]).
+type DescribeFn<S> = Box<dyn Fn(&S) -> ModelDescriptor + Send>;
 
 /// Messages accepted by a [`Runner`].
 pub enum Control<S: Simulation> {
@@ -172,11 +184,16 @@ pub struct RunnerStatus {
     pub params: ParamSet,
     /// Apply policy reported for the most recent parameter change.
     pub last_param_change: Option<(String, ApplyPolicy)>,
+    /// Number of times the published descriptor changed since spawning
+    /// (compare it to notice a new [`Runner::descriptor`], which is always
+    /// published before the status counting it).
+    pub descriptor_seq: u64,
 }
 
 struct Shared<S: Simulation> {
     view: Mutex<Option<Published<S::View>>>,
     status: Mutex<RunnerStatus>,
+    descriptor: Mutex<Arc<ModelDescriptor>>,
     metrics: Mutex<VecDeque<Metrics>>,
     errors: Mutex<Vec<String>>,
 }
@@ -186,11 +203,35 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// Worker threads that have not exited yet.
+static LIVE_WORKERS: AtomicUsize = AtomicUsize::new(0);
+
+/// Number of runner worker threads alive in this process, including those
+/// of dropped runners still handling the controls sent before the drop.
+pub fn live_workers() -> usize {
+    LIVE_WORKERS.load(Ordering::SeqCst)
+}
+
+/// Counts a worker thread for as long as it is owned by that thread.
+struct LiveWorker;
+
+impl LiveWorker {
+    fn new() -> Self {
+        LIVE_WORKERS.fetch_add(1, Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for LiveWorker {
+    fn drop(&mut self) {
+        LIVE_WORKERS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 /// Owns a simulation on a worker thread.
 pub struct Runner<S: Simulation> {
     tx: Sender<Control<S>>,
     shared: Arc<Shared<S>>,
-    descriptor: ModelDescriptor,
     handle: Option<JoinHandle<()>>,
     clear_hook: Option<SimHook<S>>,
     randomize_hook: Option<SeededHook<S>>,
@@ -199,7 +240,19 @@ pub struct Runner<S: Simulation> {
 impl<S: Simulation> Runner<S> {
     /// Moves `sim` to a new worker thread.
     pub fn spawn(sim: S, config: RunnerConfig) -> Self {
-        let descriptor = sim.descriptor();
+        Self::spawn_with_descriptor(sim, config, S::descriptor)
+    }
+
+    /// Like [`Runner::spawn`], but the published descriptor is
+    /// `describe(sim)` instead of [`Simulation::descriptor`], e.g. with texts
+    /// adapted to the user interface. `describe` runs here once, then on the
+    /// simulation thread after every control that may change the state.
+    pub fn spawn_with_descriptor(
+        sim: S,
+        config: RunnerConfig,
+        describe: impl Fn(&S) -> ModelDescriptor + Send + 'static,
+    ) -> Self {
+        let descriptor = Arc::new(describe(&sim));
         let shared = Arc::new(Shared {
             view: Mutex::new(None),
             status: Mutex::new(RunnerStatus {
@@ -208,16 +261,22 @@ impl<S: Simulation> Runner<S> {
                 tick: sim.tick(),
                 ..Default::default()
             }),
+            descriptor: Mutex::new(Arc::clone(&descriptor)),
             metrics: Mutex::new(VecDeque::new()),
             errors: Mutex::new(Vec::new()),
         });
         let (tx, rx) = mpsc::channel();
         let worker_shared = Arc::clone(&shared);
+        let name = format!("sim-{}", descriptor.id);
+        let live = LiveWorker::new();
         let handle = std::thread::Builder::new()
-            .name(format!("sim-{}", descriptor.id))
-            .spawn(move || Worker::new(sim, rx, worker_shared, config).run())
+            .name(name)
+            .spawn(move || {
+                let _live = live;
+                Worker::new(sim, rx, worker_shared, config, Box::new(describe), descriptor).run();
+            })
             .expect("failed to spawn simulation thread");
-        Self { tx, shared, descriptor, handle: Some(handle), clear_hook: None, randomize_hook: None }
+        Self { tx, shared, handle: Some(handle), clear_hook: None, randomize_hook: None }
     }
 
     /// Declares how this model is cleared, enabling the generic "Clear" control.
@@ -233,9 +292,11 @@ impl<S: Simulation> Runner<S> {
         self
     }
 
-    /// Descriptor of the model (captured at spawn time).
-    pub fn descriptor(&self) -> &ModelDescriptor {
-        &self.descriptor
+    /// Current descriptor of the model, published again by the worker when
+    /// a control changes it ([`RunnerStatus::descriptor_seq`] counts the
+    /// changes).
+    pub fn descriptor(&self) -> Arc<ModelDescriptor> {
+        Arc::clone(&lock(&self.shared.descriptor))
     }
 
     /// Sends a control message. Messages to a stopped worker are dropped.
@@ -302,14 +363,24 @@ impl<S: Simulation> Runner<S> {
     pub fn take_errors(&self) -> Vec<String> {
         std::mem::take(&mut *lock(&self.shared.errors))
     }
+
+    /// Stops the worker and waits until its thread has exited, which happens
+    /// once it has handled the controls sent before. Dropping a runner stops
+    /// the worker without waiting.
+    pub fn shutdown_and_wait(mut self) {
+        self.send(Control::Shutdown);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
 }
 
 /// Type-erased control surface of a running simulation. Generic user
 /// interface code (time controls, metric plots, history timeline, save/load)
 /// works through this trait without knowing the model type.
 pub trait SessionControl: Send + Sync {
-    /// Model descriptor.
-    fn descriptor(&self) -> &ModelDescriptor;
+    /// Current model descriptor (it changes when [`RunnerStatus::descriptor_seq`] does).
+    fn descriptor(&self) -> Arc<ModelDescriptor>;
     /// Current runner status.
     fn status(&self) -> RunnerStatus;
     /// Start running.
@@ -353,8 +424,8 @@ pub trait SessionControl: Send + Sync {
 }
 
 impl<S: Simulation> SessionControl for Runner<S> {
-    fn descriptor(&self) -> &ModelDescriptor {
-        &self.descriptor
+    fn descriptor(&self) -> Arc<ModelDescriptor> {
+        Runner::descriptor(self)
     }
     fn status(&self) -> RunnerStatus {
         Runner::status(self)
@@ -426,10 +497,11 @@ impl<S: Simulation> SessionControl for Runner<S> {
 
 impl<S: Simulation> Drop for Runner<S> {
     fn drop(&mut self) {
-        let _ = self.tx.send(Control::Shutdown);
-        if let Some(handle) = self.handle.take() {
-            let _ = handle.join();
-        }
+        // Never wait for the worker here: it may be in the middle of a long
+        // command (a Hashlife jump). It exits once it has handled the
+        // controls sent before this one; dropping the join handle detaches
+        // the thread.
+        self.send(Control::Shutdown);
     }
 }
 
@@ -438,6 +510,12 @@ struct Worker<S: Simulation> {
     rx: Receiver<Control<S>>,
     shared: Arc<Shared<S>>,
     config: RunnerConfig,
+    describe: DescribeFn<S>,
+    descriptor: Arc<ModelDescriptor>,
+    descriptor_seq: u64,
+    /// A control handled since the last publication may have changed the
+    /// state (and the descriptor).
+    state_changed: bool,
     playing: bool,
     speed: Speed,
     view_request: S::ViewRequest,
@@ -459,13 +537,24 @@ struct Worker<S: Simulation> {
 }
 
 impl<S: Simulation> Worker<S> {
-    fn new(sim: S, rx: Receiver<Control<S>>, shared: Arc<Shared<S>>, config: RunnerConfig) -> Self {
+    fn new(
+        sim: S,
+        rx: Receiver<Control<S>>,
+        shared: Arc<Shared<S>>,
+        config: RunnerConfig,
+        describe: DescribeFn<S>,
+        descriptor: Arc<ModelDescriptor>,
+    ) -> Self {
         let now = Instant::now();
         let start_gen = sim.tick();
         Self {
             sim,
             rx,
             shared,
+            describe,
+            descriptor,
+            descriptor_seq: 0,
+            state_changed: false,
             playing: false,
             speed: config.speed,
             view_request: S::ViewRequest::default(),
@@ -523,6 +612,12 @@ impl<S: Simulation> Worker<S> {
                     }
                 }
             }
+            if std::mem::take(&mut self.state_changed) {
+                self.refresh_descriptor();
+                if self.config.metrics_every > 0 {
+                    self.record_metrics();
+                }
+            }
             if self.playing {
                 self.run_due_ticks();
             }
@@ -570,13 +665,13 @@ impl<S: Simulation> Worker<S> {
                 self.sim.reset();
                 self.history.clear();
                 self.capture_history();
-                self.dirty = true;
+                self.changed();
             }
             Control::Command(command) => {
                 if let Err(e) = self.sim.apply(command) {
                     self.report(e.to_string());
                 }
-                self.dirty = true;
+                self.changed();
             }
             Control::Edit(command) => {
                 let before = self.sim.snapshot();
@@ -588,23 +683,23 @@ impl<S: Simulation> Worker<S> {
                     }
                     Err(e) => self.report(e.to_string()),
                 }
-                self.dirty = true;
+                self.changed();
             }
             Control::SetParam(key, value) => {
                 match self.sim.set_param(&key, value) {
                     Ok(policy) => self.last_param_change = Some((key, policy)),
                     Err(e) => self.report(e.to_string()),
                 }
-                self.dirty = true;
+                self.changed();
             }
             Control::Exec(f) => {
                 f(&mut self.sim);
-                self.dirty = true;
+                self.changed();
             }
             Control::ExecEdit(f) => {
                 self.record_undo();
                 f(&mut self.sim);
-                self.dirty = true;
+                self.changed();
             }
             Control::Undo => self.undo_redo(true),
             Control::Redo => self.undo_redo(false),
@@ -637,7 +732,7 @@ impl<S: Simulation> Worker<S> {
                 self.capture_history();
                 self.set_playing(false);
                 self.rate_start_gen = self.sim.tick();
-                self.dirty = true;
+                self.changed();
             }
             Control::RequestView => {
                 self.dirty = true;
@@ -646,6 +741,13 @@ impl<S: Simulation> Worker<S> {
             Control::Shutdown => return false,
         }
         true
+    }
+
+    /// Notes that the state may have changed: the view, the descriptor and a
+    /// metric sample are published again.
+    fn changed(&mut self) {
+        self.dirty = true;
+        self.state_changed = true;
     }
 
     fn set_playing(&mut self, playing: bool) {
@@ -683,7 +785,7 @@ impl<S: Simulation> Worker<S> {
             self.report(e.to_string());
         }
         self.rate_start_gen = self.sim.tick();
-        self.dirty = true;
+        self.changed();
     }
 
     fn run_due_ticks(&mut self) {
@@ -730,15 +832,33 @@ impl<S: Simulation> Worker<S> {
         self.rate_ticks += 1;
         let tick = self.sim.tick();
         if self.config.metrics_every > 0 && tick.is_multiple_of(self.config.metrics_every) {
-            let sample = self.sim.metrics();
-            let mut buffer = lock(&self.shared.metrics);
-            if buffer.len() >= self.config.metrics_capacity {
-                buffer.pop_front();
-            }
-            buffer.push_back(sample);
+            self.record_metrics();
         }
         self.capture_history();
         self.dirty = true;
+    }
+
+    /// Buffers a sample of the current tick. A buffered sample of the same
+    /// tick (taken before a state change) is replaced: one sample per tick.
+    fn record_metrics(&mut self) {
+        let sample = self.sim.metrics();
+        let mut buffer = lock(&self.shared.metrics);
+        if buffer.back().is_some_and(|last| last.tick == sample.tick) {
+            buffer.pop_back();
+        } else if buffer.len() >= self.config.metrics_capacity {
+            buffer.pop_front();
+        }
+        buffer.push_back(sample);
+    }
+
+    /// Publishes the descriptor again if it changed.
+    fn refresh_descriptor(&mut self) {
+        let descriptor = (self.describe)(&self.sim);
+        if descriptor != *self.descriptor {
+            self.descriptor = Arc::new(descriptor);
+            self.descriptor_seq += 1;
+            *lock(&self.shared.descriptor) = Arc::clone(&self.descriptor);
+        }
     }
 
     fn capture_history(&mut self) {
@@ -796,6 +916,7 @@ impl<S: Simulation> Worker<S> {
             finished: self.sim.is_finished(),
             params: self.sim.params(),
             last_param_change: self.last_param_change.clone(),
+            descriptor_seq: self.descriptor_seq,
         };
         *lock(&self.shared.status) = status;
     }
@@ -923,6 +1044,105 @@ mod tests {
         assert_eq!(value, 0);
         let snapshot = session.request_snapshot().recv_timeout(Duration::from_secs(5)).unwrap().unwrap();
         assert_eq!(snapshot.model_id, "test.walker");
+    }
+
+    #[test]
+    fn descriptor_follows_the_model() {
+        let runner = Runner::spawn(Walker::new(1), RunnerConfig::default());
+        let first = runner.descriptor();
+        assert!(first.rules.contains("0..=3"), "{}", first.rules);
+        runner.send(Control::SetParam("step_max".into(), ParamValue::Int(10)));
+        wait_for(&runner, |s| s.descriptor_seq == 1);
+        assert!(runner.descriptor().rules.contains("0..=10"));
+        assert!(first.rules.contains("0..=3"), "a published descriptor never changes");
+        // Ticks and unchanged descriptors publish nothing new.
+        runner.step(5);
+        runner.edit(WalkerCommand::Add(1));
+        let st = wait_for(&runner, |s| s.tick == 5 && s.can_undo);
+        assert_eq!(st.descriptor_seq, 1);
+        runner.send(Control::Reset);
+        wait_for(&runner, |s| s.descriptor_seq == 2);
+        assert_eq!(*runner.descriptor(), *first);
+    }
+
+    #[test]
+    fn custom_descriptors_are_published_from_the_start() {
+        let describe = |sim: &Walker| {
+            let mut d = sim.descriptor();
+            d.name = format!("Walker up to {}", sim.step_max);
+            d
+        };
+        let runner = Runner::spawn_with_descriptor(Walker::new(1), RunnerConfig::default(), describe);
+        assert_eq!(SessionControl::descriptor(&runner).name, "Walker up to 3");
+        runner.send(Control::SetParam("step_max".into(), ParamValue::Int(7)));
+        wait_for(&runner, |s| s.descriptor_seq == 1);
+        assert_eq!(runner.descriptor().name, "Walker up to 7");
+    }
+
+    #[test]
+    fn state_changes_publish_fresh_metrics() {
+        let runner = Runner::spawn(Walker::new(1), RunnerConfig::default());
+        runner.step(3);
+        wait_for(&runner, |s| s.tick == 3);
+        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        // An edit while paused replaces the sample of the current tick.
+        runner.edit(WalkerCommand::Add(100));
+        wait_for(&runner, |s| s.can_undo);
+        let samples = runner.drain_metrics();
+        assert_eq!(samples.iter().map(|m| m.tick).collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(samples[2].get("value"), Some((value + 100) as f64));
+        // So does a closure that advances the model by itself.
+        runner.exec(|sim| {
+            for _ in 0..10 {
+                Simulation::step(sim);
+            }
+        });
+        wait_for(&runner, |s| s.tick == 13);
+        let samples = runner.drain_metrics();
+        let value = runner.request(|sim| sim.value).recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(samples.len(), 1);
+        assert_eq!((samples[0].tick, samples[0].get("value")), (13, Some(value as f64)));
+    }
+
+    #[test]
+    fn dropping_does_not_wait_for_a_running_command() {
+        // The worker owns `describe`: `exited` disconnects when its thread ends.
+        let (exited_tx, exited) = mpsc::channel::<()>();
+        let describe = move |sim: &Walker| {
+            let _owned = &exited_tx;
+            sim.descriptor()
+        };
+        let runner = Runner::spawn_with_descriptor(Walker::new(1), RunnerConfig::default(), describe);
+        let (release_tx, release) = mpsc::channel::<()>();
+        runner.exec(move |_| {
+            let _ = release.recv();
+        });
+        let (dropped_tx, dropped) = mpsc::channel();
+        std::thread::spawn(move || {
+            drop(runner);
+            let _ = dropped_tx.send(());
+        });
+        dropped.recv_timeout(Duration::from_secs(5)).expect("dropping the runner waited for the running command");
+        assert_eq!(exited.recv_timeout(Duration::from_millis(50)), Err(RecvTimeoutError::Timeout));
+        release_tx.send(()).unwrap();
+        assert_eq!(exited.recv_timeout(Duration::from_secs(10)), Err(RecvTimeoutError::Disconnected));
+    }
+
+    #[test]
+    fn shutdown_and_wait_returns_once_the_worker_exited() {
+        let runner = Runner::spawn(Walker::new(1), RunnerConfig::default());
+        let (release_tx, release) = mpsc::channel::<()>();
+        runner.exec(move |_| {
+            let _ = release.recv();
+        });
+        let (joined_tx, joined) = mpsc::channel();
+        std::thread::spawn(move || {
+            runner.shutdown_and_wait();
+            let _ = joined_tx.send(());
+        });
+        assert!(joined.recv_timeout(Duration::from_millis(50)).is_err(), "the command is still running");
+        release_tx.send(()).unwrap();
+        joined.recv_timeout(Duration::from_secs(10)).expect("the worker exited");
     }
 
     #[test]

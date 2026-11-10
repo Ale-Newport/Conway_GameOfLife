@@ -15,7 +15,7 @@ use interface::theme::bevy_color;
 use interface::{ModeRegistry, Palette, ThemeSettings};
 use rendering::grid::{GridFrame, GridSpace, VisibleCells};
 use rendering::palette::Colormap;
-use rendering::{GridAppearance, GridCameraController, GridStyle, GridSurface, WorldInput};
+use rendering::{GridAppearance, GridCameraController, GridStyle, GridSurface, WorldInput, shortcut_modifier_held};
 use simulation_core::Control;
 
 use crate::MODE;
@@ -528,14 +528,6 @@ pub(crate) fn spawn_world(mut commands: Commands) {
     ));
 }
 
-/// The shell binds `=` / `-` (and the numpad keys) to Faster / Slower; the
-/// grid camera also zooms with them. In this mode the shell keeps them.
-pub(crate) fn release_speed_keys_from_camera(mut keys: ResMut<ButtonInput<KeyCode>>) {
-    for key in [KeyCode::Equal, KeyCode::Minus, KeyCode::NumpadAdd, KeyCode::NumpadSubtract] {
-        keys.clear_just_pressed(key);
-    }
-}
-
 const PAN_KEYS: [KeyCode; 8] = [
     KeyCode::ArrowLeft,
     KeyCode::ArrowRight,
@@ -585,7 +577,7 @@ pub(crate) fn frame_world(
         fit.pending = true;
     }
     let panned = (input.pointer && buttons.any_just_pressed([MouseButton::Right, MouseButton::Middle]))
-        || (input.keyboard && keys.any_pressed(PAN_KEYS));
+        || (input.keyboard && keys.any_pressed(PAN_KEYS) && !shortcut_modifier_held(&keys));
     if panned || (input.pointer && scroll.delta != Vec2::ZERO) {
         fit.auto = false;
     }
@@ -1067,5 +1059,34 @@ mod tests {
         let age = ViewSettings { colouring: Colouring::Age, ..default() };
         assert_eq!(appearance(&life(Topology::Torus), &age, 4).style, GridStyle::Age);
         assert_eq!(state_colors(&ww), family::WIREWORLD.to_vec());
+    }
+
+    /// Pan keys pressed with Ctrl, Cmd or Alt are shortcuts (Ctrl+arrows
+    /// switch macOS spaces) that leave the camera where it is, so framing
+    /// and following go on.
+    #[test]
+    fn shortcut_chords_keep_framing_and_following() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut world = bevy::ecs::world::World::new();
+        world.insert_resource(WorldInput { keyboard: true, ..default() });
+        world.init_resource::<AccumulatedMouseScroll>();
+        world.init_resource::<ButtonInput<MouseButton>>();
+        world.init_resource::<ButtonInput<KeyCode>>();
+        world.init_resource::<FitQuery>();
+        world.init_resource::<ViewSettings>();
+        world.init_resource::<OverlayInset>();
+        world.insert_resource(CameraFit { auto: true, ..default() });
+        world.spawn((LabCamera, GridCameraController::default()));
+        let following = |world: &bevy::ecs::world::World| {
+            (world.resource::<CameraFit>().auto, world.resource::<ViewSettings>().follow)
+        };
+        let mut keys = world.resource_mut::<ButtonInput<KeyCode>>();
+        keys.press(KeyCode::ControlLeft);
+        keys.press(KeyCode::ArrowLeft);
+        world.run_system_once(frame_world).expect("frame_world runs");
+        assert_eq!(following(&world), (true, true), "Ctrl+Left");
+        world.resource_mut::<ButtonInput<KeyCode>>().release(KeyCode::ControlLeft);
+        world.run_system_once(frame_world).expect("frame_world runs");
+        assert_eq!(following(&world), (false, false), "Left pans");
     }
 }

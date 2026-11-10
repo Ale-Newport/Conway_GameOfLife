@@ -15,11 +15,12 @@
 //! What the mode provides:
 //!
 //! * **Session** — a [`simulation_core::Runner`] behind
-//!   [`interface::ActiveSession`] (with Clear and Randomize), wrapped so the
-//!   shell's Rules tab follows the running macro rule; the seven built-in
-//!   scenarios in the top-bar picker, loaded with `Control::Replace`. The
-//!   OTCA tiles are read from `<assets>/patterns/otca/` on a background
-//!   thread (GPL-2.0-or-later data, never embedded).
+//!   [`interface::ActiveSession`] (with Clear and Randomize) whose
+//!   descriptor follows the running macro rule in the shell's Rules tab;
+//!   the seven built-in scenarios in the top-bar picker, loaded with
+//!   `Control::Replace`. The OTCA tiles are read from
+//!   `<assets>/patterns/otca/` on a background thread (GPL-2.0-or-later
+//!   data, never embedded).
 //! * **World** — two linked views of the one simulation: the **physical
 //!   cells** (the model's Hashlife grid view of the visible region at a
 //!   power-of-two level of detail) and the **macro layer** (one texel per
@@ -71,8 +72,8 @@ pub use panels::PanelSections;
 pub use panels::properties::PropertiesTab;
 pub use rule_editor::RuleDraft;
 pub use session::{
-    Catalog, DEFAULT_SCENARIO, Lifecycle, LoadRequests, MetapixelSession, MpSession, SimData, SimInfo, Tiles,
-    TilesState, jump_to_next_readout,
+    Catalog, DEFAULT_SCENARIO, Lifecycle, LoadRequests, MpSession, SimData, SimInfo, Tiles, TilesState,
+    jump_to_next_readout,
 };
 pub use tools::{MODE_SHORTCUTS, ModeShortcut, Tool, ToolState};
 pub use tutorial::tutorial;
@@ -157,15 +158,12 @@ impl bevy::app::Plugin for MetapixelViewPlugin {
             .add_systems(
                 Update,
                 (
-                    world::release_speed_keys_from_camera
-                        .after(ShellSet::Commands)
-                        .before(GridCameraSystems::Control)
-                        .run_if(in_state(MODE)),
                     world::frame_world.before(GridCameraSystems::Control).run_if(in_state(MODE)),
                     (
                         tutorial::tutorial_actions,
                         session::collect_scenario_requests,
                         session::drive_session,
+                        session::update_placeholder,
                         session::poll_data,
                     )
                         .chain()
@@ -183,7 +181,6 @@ impl bevy::app::Plugin for MetapixelViewPlugin {
                     world::draw_gizmos.in_set(MetapixelViewSystems::Draw),
                 ),
             )
-            .add_systems(Last, session::release_on_exit)
             .add_systems(
                 PostUpdate,
                 world::place_layers
