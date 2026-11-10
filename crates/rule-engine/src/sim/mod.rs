@@ -55,8 +55,9 @@ use view::{CustomLifeView, CustomLifeViewRequest};
 
 /// Model id used in descriptors and snapshots.
 pub const MODEL_ID: &str = "custom_life";
-/// Snapshot schema version.
-pub const SCHEMA_VERSION: u32 = 1;
+/// Snapshot schema version (2 added the reference design; version 1
+/// snapshots are still restored, with their definition as the reference).
+pub const SCHEMA_VERSION: u32 = 2;
 /// Maximum number of script errors kept in the error list.
 pub const MAX_SCRIPT_ERRORS: usize = 100;
 
@@ -179,6 +180,10 @@ pub struct CustomLifeSim {
     compiled: Arc<CompiledSystem>,
     /// System and seed restored by `reset()`.
     initial: (LifeSystem, u64),
+    /// The design as last loaded or applied: parameter defaults are its
+    /// values ([`params::specs_with_defaults`]); parameter changes leave it
+    /// alone.
+    reference: LifeSystem,
     scratch: Grid2<f32>,
 }
 
@@ -197,7 +202,7 @@ impl CustomLifeSim {
     pub fn new(system: LifeSystem, seed: u64) -> Result<Self, RuleEngineError> {
         let compiled = Arc::new(compile(&system)?);
         let state = world::initial_state(&compiled, seed, true);
-        Ok(Self { state, compiled, initial: (system, seed), scratch: Grid2::new(1, 1, 0.0) })
+        Ok(Self { state, compiled, initial: (system.clone(), seed), reference: system, scratch: Grid2::new(1, 1, 0.0) })
     }
 
     /// Builds the simulation of a scenario (its system and seed).
@@ -218,6 +223,18 @@ impl CustomLifeSim {
     /// The definition and seed `reset()` will use.
     pub fn reset_target(&self) -> (&LifeSystem, u64) {
         (&self.initial.0, self.initial.1)
+    }
+
+    /// The design parameter defaults refer to: the system as last loaded
+    /// ([`Self::new`]) or applied ([`Self::edit_system`]); snapshots carry it.
+    pub fn reference(&self) -> &LifeSystem {
+        &self.reference
+    }
+
+    /// Replaces the reference design without touching the simulation (e.g.
+    /// to rebuild a session around a restored state).
+    pub fn set_reference(&mut self, reference: LifeSystem) {
+        self.reference = reference;
     }
 
     /// Current tick.
@@ -291,9 +308,17 @@ impl CustomLifeSim {
 
     /// Replaces the definition. Compatible edits apply from the next tick
     /// (live entities are kept, cooldowns restart, values are clamped);
-    /// structural edits become the system of the next reset. Invalid
-    /// systems are rejected with all diagnostics and change nothing.
+    /// structural edits become the system of the next reset. Either way
+    /// `system` becomes the reference design. Invalid systems are rejected
+    /// with all diagnostics and change nothing.
     pub fn edit_system(&mut self, system: LifeSystem) -> Result<EditReport, RuleEngineError> {
+        let report = self.redefine(system.clone())?;
+        self.reference = system;
+        Ok(report)
+    }
+
+    /// [`Self::edit_system`] without changing the reference design.
+    fn redefine(&mut self, system: LifeSystem) -> Result<EditReport, RuleEngineError> {
         let compiled = Arc::new(compile(&system)?);
         let report = classify_edit(&self.state.system, &system);
         let seed = self.initial.1;
@@ -369,7 +394,7 @@ impl CustomLifeSim {
         if spec.apply != ApplyPolicy::RequiresReset {
             let mut current = self.state.system.clone();
             params::apply_param(&mut current, key, &value)?;
-            self.edit_system(current).map_err(SimError::from)?;
+            self.redefine(current).map_err(SimError::from)?;
         }
         self.initial.0 = target;
         Ok(spec.apply)
@@ -382,7 +407,7 @@ impl Simulation for CustomLifeSim {
     type View = CustomLifeView;
 
     fn descriptor(&self) -> ModelDescriptor {
-        report::descriptor(&self.compiled)
+        report::descriptor(&self.compiled, &self.reference)
     }
 
     fn tick(&self) -> u64 {
@@ -507,11 +532,17 @@ impl Simulation for CustomLifeSim {
     }
 
     fn snapshot(&self) -> Result<Snapshot, SimError> {
-        Snapshot::encode(MODEL_ID, SCHEMA_VERSION, self.state.tick, &self.state)
+        Snapshot::encode(MODEL_ID, SCHEMA_VERSION, self.state.tick, &(&self.state, &self.reference))
     }
 
     fn restore(&mut self, snapshot: &Snapshot) -> Result<(), SimError> {
-        let state: State = snapshot.decode(MODEL_ID, SCHEMA_VERSION)?;
+        let (state, reference): (State, LifeSystem) = if snapshot.schema_version < 2 {
+            let state: State = snapshot.decode(MODEL_ID, 1)?;
+            let reference = state.system.clone();
+            (state, reference)
+        } else {
+            snapshot.decode(MODEL_ID, SCHEMA_VERSION)?
+        };
         let compiled = Arc::new(compile(&state.system).map_err(SimError::from)?);
         let world = &compiled.source().world;
         let (w, h) = (world.width as usize, world.height as usize);
@@ -535,6 +566,7 @@ impl Simulation for CustomLifeSim {
             return Err(SimError::InvalidConfig("snapshot does not match its own definition".into()));
         }
         self.initial = (state.system.clone(), state.seed);
+        self.reference = reference;
         self.state = state;
         self.compiled = compiled;
         Ok(())
@@ -557,10 +589,9 @@ mod tests {
     use crate::scenarios;
 
     fn tampered(edit: impl FnOnce(&mut State)) -> Snapshot {
-        let sim = CustomLifeSim::from_scenario(&scenarios::builtin_by_id("bacterial-growth").unwrap()).unwrap();
-        let mut state = sim.state.clone();
-        edit(&mut state);
-        Snapshot::encode(MODEL_ID, SCHEMA_VERSION, state.tick, &state).unwrap()
+        let mut sim = CustomLifeSim::from_scenario(&scenarios::builtin_by_id("bacterial-growth").unwrap()).unwrap();
+        edit(&mut sim.state);
+        sim.snapshot().unwrap()
     }
 
     #[test]
@@ -582,5 +613,17 @@ mod tests {
         let good = tampered(|_| {});
         sim.restore(&good).unwrap();
         assert_eq!(sim.tick(), 0);
+    }
+
+    #[test]
+    fn version_1_snapshots_restore_with_their_definition_as_the_reference() {
+        let mut old = CustomLifeSim::from_scenario(&scenarios::builtin_by_id("bacterial-growth").unwrap()).unwrap();
+        old.set_param("entity.bacterium.metabolism", ParamValue::Float(0.5)).unwrap();
+        old.advance(4);
+        let v1 = Snapshot::encode(MODEL_ID, 1, old.state.tick, &old.state).unwrap();
+        let mut sim = CustomLifeSim::from_scenario(&scenarios::builtin_by_id("robot-swarm").unwrap()).unwrap();
+        sim.restore(&v1).unwrap();
+        assert_eq!((sim.tick(), sim.system()), (4, old.system()));
+        assert_eq!(sim.reference(), old.system());
     }
 }

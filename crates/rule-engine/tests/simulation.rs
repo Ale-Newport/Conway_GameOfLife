@@ -347,6 +347,43 @@ fn parameters_report_their_policy() {
 }
 
 #[test]
+fn parameter_defaults_are_the_design_as_last_loaded_or_applied() {
+    let t = format!(r#"(name: "a", {STILL}, initial: (count: 5, distribution: Uniform))"#);
+    let mut s = sim(world(&t, &[], ""));
+    let default = |s: &CustomLifeSim, key: &str| s.descriptor().param(key).unwrap().default.clone();
+    // Parameter changes move the values, not the defaults, so a UI can
+    // offer going back to the design.
+    s.set_param("entity.a.metabolism", ParamValue::Float(0.5)).unwrap();
+    s.set_param("width", ParamValue::Int(32)).unwrap();
+    s.reset();
+    assert_eq!(s.params().get("entity.a.metabolism"), Some(&ParamValue::Float(0.5)));
+    assert_eq!(default(&s, "entity.a.metabolism"), ParamValue::Float(0.0));
+    assert_eq!(s.params().get("width"), Some(&ParamValue::Int(32)));
+    assert_eq!(default(&s, "width"), ParamValue::Int(16));
+    let tuned = s.snapshot().unwrap();
+    // Applying a definition makes it the design.
+    let mut applied = s.system().clone();
+    applied.entity_types[0].energy.metabolism = 0.25;
+    s.edit_system(applied).unwrap();
+    assert_eq!(default(&s, "entity.a.metabolism"), ParamValue::Float(0.25));
+    assert_eq!(default(&s, "width"), ParamValue::Int(32));
+    // Undo, history jumps and loads bring back the design of their state.
+    s.restore(&tuned).unwrap();
+    assert_eq!(s.params().get("entity.a.metabolism"), Some(&ParamValue::Float(0.5)));
+    assert_eq!(default(&s, "entity.a.metabolism"), ParamValue::Float(0.0), "snapshots carry the design");
+    // Defaults stay valid: a design value outside the running range, or a
+    // parameter the design lacks, defaults to the running value.
+    s.set_param("entity.a.initial_count", ParamValue::Int(2)).unwrap();
+    s.reset();
+    s.set_param("max_entities", ParamValue::Int(3)).unwrap();
+    assert_eq!(default(&s, "entity.a.initial_count"), ParamValue::Int(2), "the design's 5 exceeds the cap of 3");
+    let mut renamed = s.system().clone();
+    renamed.entity_types[0].name = "b".into();
+    s.edit_system(renamed).unwrap();
+    assert_eq!(default(&s, "entity.a.metabolism"), ParamValue::Float(0.5), "`a` is renamed at the next reset");
+}
+
+#[test]
 fn end_conditions_finish_the_run_unless_disabled() {
     let t = format!(r#"(name: "a", {STILL}, lifecycle: (max_age: Some(3)), {})"#, at(8.0, 8.0));
     let mut sys = world(&t, &[], "");

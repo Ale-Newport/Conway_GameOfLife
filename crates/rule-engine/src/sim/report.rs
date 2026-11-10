@@ -7,6 +7,7 @@ use simulation_core::{MetricSpec, Metrics, ModelDescriptor, ModelFamily};
 
 use crate::compile::CompiledSystem;
 use crate::compile::ir::REvent;
+use crate::def::LifeSystem;
 use crate::sim::frame::env_value;
 use crate::sim::space::Space;
 use crate::sim::view::{
@@ -118,8 +119,9 @@ pub fn metric_specs(compiled: &CompiledSystem) -> Vec<MetricSpec> {
     specs
 }
 
-/// Formal description including the current rules.
-pub fn descriptor(compiled: &CompiledSystem) -> ModelDescriptor {
+/// Formal description including the current rules; parameter defaults
+/// are the values of the `reference` design.
+pub fn descriptor(compiled: &CompiledSystem, reference: &LifeSystem) -> ModelDescriptor {
     let sys = compiled.source();
     let mut rules = format!(
         "## Custom life: {}\n\n{PIPELINE}\n\n### Rules (per entity type, in evaluation order)\n\n```text\n",
@@ -149,7 +151,7 @@ pub fn descriptor(compiled: &CompiledSystem) -> ModelDescriptor {
     ModelDescriptor::new(MODEL_ID, "Custom Life Creator", ModelFamily::Hybrid)
         .summary(&summary)
         .rules(&rules)
-        .params(params::param_specs(sys))
+        .params(params::specs_with_defaults(sys, reference))
         .metrics(metric_specs(compiled))
         .time("tick", 1.0)
 }

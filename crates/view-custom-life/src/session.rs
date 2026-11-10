@@ -3,7 +3,10 @@
 //! The custom-life descriptor is generated from the running definition
 //! (rules text, parameters, metrics); the runner publishes it again when it
 //! changes, so the shell's Parameters, Rules and Metrics tabs always
-//! describe what is simulated ([`served_descriptor`]).
+//! describe what is simulated ([`served_descriptor`]). Parameter defaults
+//! are the exception: they are the design as last loaded or applied
+//! ([`CustomLifeSim::reference`]), so after a parameter change the shell
+//! offers going back to it.
 
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -542,7 +545,11 @@ fn rebuild(parts: RebuildParts) -> Result<Arc<Runner<CustomLifeSim>>, String> {
     let mut sim = CustomLifeSim::new(parts.running.clone(), parts.seed).map_err(|e| e.to_string())?;
     sim.restore(&parts.snapshot).map_err(|e| e.to_string())?;
     if parts.target != parts.running {
+        // Re-establishing the pending edits is not an Apply: the design the
+        // parameter defaults refer to stays the snapshot's.
+        let reference = sim.reference().clone();
         sim.edit_system(parts.target).map_err(|e| e.to_string())?;
+        sim.set_reference(reference);
     }
     if sim.reset_target().1 != parts.seed {
         sim.set_param("seed", ParamValue::Int((parts.seed & i64::MAX as u64) as i64)).map_err(|e| e.to_string())?;
@@ -618,6 +625,60 @@ mod tests {
             }
         };
         assert_eq!((tick, pending, width), (15, true, 48));
+    }
+
+    fn eventually(what: &str, done: impl Fn() -> bool) {
+        let start = Instant::now();
+        while !done() {
+            assert!(start.elapsed() < Duration::from_secs(10), "timed out waiting until {what}");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
+    /// The shell offers going back to a parameter's default (↺) while the
+    /// value differs from it: the default is the design as last loaded or
+    /// applied, which parameter changes leave alone.
+    #[test]
+    fn parameter_defaults_are_the_design_as_last_loaded_or_applied() {
+        use simulation_core::SessionControl;
+        const KEY: &str = "entity.bacterium.metabolism";
+        let runner = ClRunner(spawn_session(sim("bacterial-growth")));
+        let session = runner.0.clone();
+        let default = || session.descriptor().param(KEY).unwrap().default.clone();
+        let value = || session.status().params.get(KEY).cloned();
+        let designed = default();
+        session.set_param(KEY, ParamValue::Float(0.5));
+        eventually("the change is applied", || value() == Some(ParamValue::Float(0.5)));
+        assert_eq!(default(), designed, "parameter changes leave the default alone");
+        assert_ne!(value(), Some(default()), "so the shell offers going back (↺)");
+        session.set_param(KEY, default()); // what ↺ sends
+        eventually("the value is back at the design's", || value() == Some(designed.clone()));
+        // Applying from the editor makes the draft the design.
+        let info = wait_for(&session.request(|s| SimInfo::read(s)));
+        let mut editor = ClEditor::default();
+        editor.load(info.target.clone(), info.seed, "test");
+        rule_engine::sim::params::apply_param(&mut editor.draft, KEY, &ParamValue::Float(0.25)).unwrap();
+        let mut data = ClData::default();
+        crate::editor::apply_draft(&runner, &editor, &info, false, &mut data);
+        eventually("the applied value is the default", || default() == ParamValue::Float(0.25));
+        // Loading a scenario makes it the design.
+        let presets = ClScenarios::load();
+        let (mut ui, mut history, mut list) = (ClUi::default(), MetricsHistory::default(), ModeScenarios::default());
+        let id = "bacterial-growth";
+        open_preset(id, &presets, &runner, &mut editor, &mut data, &mut ui, &mut history, &mut list).unwrap();
+        eventually("the preset's value is the default", || default() == designed);
+    }
+
+    #[test]
+    fn rebuild_keeps_the_parameter_defaults() {
+        let mut s = sim("bacterial-growth");
+        let designed = served_descriptor(s.descriptor(), &s.system().name);
+        s.set_param("width", ParamValue::Int(64)).unwrap();
+        s.set_param("entity.bacterium.metabolism", ParamValue::Float(0.5)).unwrap();
+        let (target, seed) = s.reset_target();
+        let parts =
+            RebuildParts { snapshot: s.snapshot().unwrap(), running: s.system().clone(), target: target.clone(), seed };
+        assert_eq!(rebuild(parts).unwrap().descriptor().params, designed.params);
     }
 
     #[test]

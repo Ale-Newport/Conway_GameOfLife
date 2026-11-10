@@ -3,8 +3,11 @@
 //! Parameters are generated from the current definition: world settings,
 //! one group per resource field, entity type and random event. Each spec
 //! states its [`ApplyPolicy`]; editing a parameter edits the definition
-//! (next-tick parameters go through the same path as
-//! [`crate::CustomLifeSim::edit_system`]).
+//! (next-tick parameters are applied like
+//! [`crate::CustomLifeSim::edit_system`]). The declared defaults are the
+//! values of the reference design, the system as last loaded or applied
+//! ([`specs_with_defaults`]); parameter changes leave it alone, so a UI can
+//! offer going back to it.
 
 use simulation_core::{ApplyPolicy, ParamSet, ParamSpec, ParamValue, SimError, Topology};
 
@@ -28,9 +31,10 @@ fn topology_key(t: Topology) -> &'static str {
     }
 }
 
-/// Parameter specs for `sys`. Quantities whose useful values span several
-/// orders of magnitude (regrowth, maxima, decay, metabolism, event
-/// probabilities) use logarithmic sliders, so small values stay reachable.
+/// Parameter specs for `sys`, with `sys`'s values as defaults. Quantities
+/// whose useful values span several orders of magnitude (regrowth, maxima,
+/// decay, metabolism, event probabilities) use logarithmic sliders, so
+/// small values stay reachable.
 pub fn param_specs(sys: &LifeSystem) -> Vec<ParamSpec> {
     let side = (i64::from(MIN_WORLD_SIDE), i64::from(MAX_WORLD_SIDE));
     let mut specs = vec![
@@ -141,6 +145,22 @@ pub fn param_specs(sys: &LifeSystem) -> Vec<ParamSpec> {
             .group(&format!("Event: {}", ev.name))
             .apply(ApplyPolicy::NextTick),
         );
+    }
+    specs
+}
+
+/// Specs of the running system `sys` whose defaults are the values of
+/// `reference`, the design as last loaded or applied. A parameter the
+/// reference lacks (a structural edit waiting for a reset) or whose
+/// reference value the running system's range rejects defaults to its
+/// running value.
+pub fn specs_with_defaults(sys: &LifeSystem, reference: &LifeSystem) -> Vec<ParamSpec> {
+    let defaults = ParamSet::from_defaults(&param_specs(reference));
+    let mut specs = param_specs(sys);
+    for spec in &mut specs {
+        if let Some(valid) = defaults.get(&spec.key).and_then(|v| spec.validate(v).ok()) {
+            spec.default = valid;
+        }
     }
     specs
 }
