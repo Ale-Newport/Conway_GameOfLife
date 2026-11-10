@@ -172,6 +172,9 @@ pub struct OrbitCameraRig {
     pub fov: f32,
     applied: Option<OrbitPreset>,
     dragging: bool,
+    /// The perspective projection replaced by an orthographic preset, so
+    /// that leaving it restores the camera's own near / far planes.
+    saved_perspective: Option<PerspectiveProjection>,
 }
 
 impl Default for OrbitCameraRig {
@@ -194,6 +197,7 @@ impl OrbitCameraRig {
             fov: FRAC_PI_4,
             applied: None,
             dragging: false,
+            saved_perspective: None,
         }
     }
 
@@ -257,6 +261,30 @@ fn focus_with_fov(camera: &mut PanOrbitCamera, projection: &Projection, point: V
     .max(camera.zoom_lower_limit);
 }
 
+/// The projection after switching to (or from) an orthographic preset. The
+/// replaced perspective projection is kept in `saved` and restored with the
+/// rig's field of view, so a camera configured for large maps (far plane)
+/// keeps its settings across an isometric round trip.
+fn switch_projection(
+    current: &Projection,
+    orthographic: bool,
+    fov: f32,
+    saved: &mut Option<PerspectiveProjection>,
+) -> Projection {
+    if orthographic {
+        if let Projection::Perspective(p) = current {
+            *saved = Some(p.clone());
+        }
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: ScalingMode::FixedVertical { viewport_height: 1.0 },
+            far: ORTHO_FAR,
+            ..OrthographicProjection::default_3d()
+        })
+    } else {
+        Projection::Perspective(PerspectiveProjection { fov, ..saved.take().unwrap_or_default() })
+    }
+}
+
 /// Unit vectors on the ground plane for a camera yaw: (forward, right).
 pub fn ground_axes(yaw: f32) -> (Vec3, Vec3) {
     let forward = -Vec3::new(yaw.sin(), 0.0, yaw.cos());
@@ -293,15 +321,7 @@ fn apply_orbit_presets(mut rigs: Query<(&mut OrbitCameraRig, &mut PanOrbitCamera
         };
         let distance = current.clamp(lo, hi);
         if cfg.orthographic != was_ortho {
-            *projection = if cfg.orthographic {
-                Projection::Orthographic(OrthographicProjection {
-                    scaling_mode: ScalingMode::FixedVertical { viewport_height: 1.0 },
-                    far: ORTHO_FAR,
-                    ..OrthographicProjection::default_3d()
-                })
-            } else {
-                Projection::Perspective(PerspectiveProjection { fov, ..default() })
-            };
+            *projection = switch_projection(&projection, cfg.orthographic, fov, &mut rig.saved_perspective);
         }
         cam.zoom_lower_limit = zoom_lo;
         cam.zoom_upper_limit = zoom_hi;
@@ -567,6 +587,19 @@ mod tests {
         assert_eq!(edge_pan_direction(Vec2::new(795.0, 2.0), vp, 10.0), Vec2::new(1.0, 1.0));
         assert_eq!(edge_pan_direction(Vec2::new(400.0, 599.0), vp, 10.0), Vec2::NEG_Y);
         assert_eq!(edge_pan_direction(Vec2::new(2.0, 2.0), vp, 0.0), Vec2::ZERO);
+    }
+
+    #[test]
+    fn leaving_isometric_keeps_the_far_plane() {
+        let mut saved = None;
+        let far = Projection::Perspective(PerspectiveProjection { far: 50_000.0, ..default() });
+        let ortho = switch_projection(&far, true, 0.7, &mut saved);
+        assert!(matches!(ortho, Projection::Orthographic(_)));
+        let Projection::Perspective(back) = switch_projection(&ortho, false, 0.7, &mut saved) else {
+            panic!("perspective expected");
+        };
+        assert_eq!((back.far, back.fov), (50_000.0, 0.7));
+        assert!(saved.is_none());
     }
 
     #[test]
