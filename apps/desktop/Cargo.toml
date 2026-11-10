@@ -25,6 +25,7 @@ view-custom-life.workspace = true
 view-conway.workspace = true
 view-ca-lab.workspace = true
 view-metapixel.workspace = true
+view-ecosystem.workspace = true
 
 [lints]
 workspace = true

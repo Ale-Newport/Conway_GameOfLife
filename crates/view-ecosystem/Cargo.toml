@@ -1,0 +1,30 @@
+[package]
+name = "view-ecosystem"
+description = "Ecosystem Simulator mode view."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+bevy.workspace = true
+bevy_egui.workspace = true
+bevy_panorbit_camera.workspace = true
+egui_plot.workspace = true
+simulation-core.workspace = true
+interface.workspace = true
+rendering.workspace = true
+organism-render.workspace = true
+ecosystem.workspace = true
+physics-world.workspace = true
+organism-engine.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true
+
+[[example]]
+name = "ecosystem_standalone"
+path = "examples/ecosystem_standalone.rs"

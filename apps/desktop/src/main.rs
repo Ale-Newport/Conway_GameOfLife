@@ -24,6 +24,7 @@ use rendering::WorldInputPlugin;
 fn register_modes(app: &mut App) {
     app.add_plugins((
         view_conway::ConwayViewPlugin,
+        view_ecosystem::EcosystemViewPlugin,
         view_custom_life::CustomLifeViewPlugin,
         view_metapixel::MetapixelViewPlugin,
         view_ca_lab::CaLabViewPlugin,

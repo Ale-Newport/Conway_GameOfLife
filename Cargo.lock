@@ -2971,6 +2971,7 @@ dependencies = [
  "view-continuous",
  "view-conway",
  "view-custom-life",
+ "view-ecosystem",
  "view-evolution",
  "view-metapixel",
  "view-voxel",
