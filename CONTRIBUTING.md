@@ -7,6 +7,30 @@ between the shell and the laboratory views is in
 [`docs/UI_SHELL.md`](docs/UI_SHELL.md). Read both before you change a crate
 boundary or add a mode.
 
+## 0. How contributions flow
+
+1. **Discuss first** for anything bigger than a small fix: open an issue (bug,
+   feature or improvement form) or a thread in
+   [Discussions](https://github.com/Ale-Newport/Conway_GameOfLife/discussions).
+   Issues labelled `good first issue` are a good way in.
+2. **Fork** the repository and create a branch in your fork. Direct pushes to
+   this repository are reserved for the maintainer.
+3. Make focused commits (see §7), run the checks in §1, and open a **pull
+   request** against `main` using the template.
+4. CI must pass (rustfmt, clippy, tests on Linux/macOS/Windows, the web build,
+   CodeQL, cargo-deny and the secret scan).
+5. The maintainer (`@Ale-Newport`, the code owner of every file) reviews the
+   change. **A pull request is merged only after the maintainer's approval.**
+   Pushing new commits dismisses earlier approvals, and every conversation
+   must be resolved first.
+
+Optional but recommended: install the [gitleaks](https://github.com/gitleaks/gitleaks)
+pre-commit hook so secrets never reach a commit:
+
+```bash
+pip install pre-commit && pre-commit install   # uses .pre-commit-config.yaml
+```
+
 ## 1. Build, test and lint
 
 ```text
@@ -181,6 +205,7 @@ Look at `git log --oneline` for examples:
 * Do not add `Co-authored-by` lines.
 * Run `cargo fmt`, `cargo clippy --all-targets -- -D warnings` and the tests of
   the crates you touched before committing.
+* Add a line under *Unreleased* in `CHANGELOG.md` for user-visible changes.
 
 ## 8. Asset and data licence rules
 

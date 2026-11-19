@@ -1,7 +1,29 @@
 # Installation
 
-This guide covers how to build and run Emergence Lab from source. There are no
-prebuilt packages yet.
+This guide covers how to install Emergence Lab from a release archive or build
+it from source, and how to build the web demo.
+
+## 0. Prebuilt archives
+
+Each [GitHub Release](https://github.com/Ale-Newport/Conway_GameOfLife/releases)
+has archives built by CI (`.github/workflows/release.yml`):
+
+| Archive | Platform |
+|---|---|
+| `emergence-lab-<version>-x86_64-unknown-linux-gnu.tar.gz` | Linux x86_64 (glibc 2.35+) |
+| `emergence-lab-<version>-aarch64-apple-darwin.tar.gz` | macOS on Apple silicon |
+| `emergence-lab-<version>-x86_64-pc-windows-msvc.zip` | Windows x86_64 |
+
+Each archive contains `emergence-lab` (desktop app), `emergence-cli`, the
+`assets/` and `scenarios/` folders, the licences, `ASSET_LICENSES.md` and
+`THIRD_PARTY_LICENSES.html`. Keep `assets/` next to the executable. A
+`.sha256` file accompanies each archive.
+
+The binaries are not code-signed. On macOS, remove the quarantine flag once
+after extracting: `xattr -dr com.apple.quarantine emergence-lab-*/`. On
+Windows, SmartScreen may ask for confirmation. Linux needs the runtime
+libraries of the packages listed below (`libudev`, `libxkbcommon`, X11 or
+Wayland, a Vulkan or OpenGL driver).
 
 ## 1. Prerequisites
 
@@ -19,8 +41,8 @@ prebuilt packages yet.
 | Platform | Status in this repository | Notes |
 |---|---|---|
 | macOS (Apple silicon) | Built and run during development (Apple M2 Max, Metal). Smoke screenshots were taken there (`docs/research/bevy-0.20-api.md`). | Xcode Command Line Tools (`xcode-select --install`) provide the linker. |
-| Linux | **UNVERIFIED**: not built or run as part of this project. | Bevy's default platform features in use include `x11`/`wayland` and `gilrs` (gamepads). Bevy's own Linux setup guide lists system packages such as `pkg-config`, `libudev-dev`, `libx11-dev`, `libxkbcommon-dev` and `libwayland-dev` (Debian/Ubuntu names). Audio is not enabled, so ALSA development headers should not be needed (UNVERIFIED). Follow Bevy's guide for your distribution. |
-| Windows | **UNVERIFIED**: not built or run as part of this project. | Use the MSVC toolchain (Visual Studio Build Tools with the C++ workload), as recommended for Bevy. |
+| Linux | Built and unit-tested in CI (`ubuntu-latest`, x86_64). Running the desktop app is **UNVERIFIED**. | Bevy's default platform features in use include `x11`/`wayland` and `gilrs` (gamepads). Bevy's own Linux setup guide lists system packages such as `pkg-config`, `libudev-dev`, `libx11-dev`, `libxkbcommon-dev` and `libwayland-dev` (Debian/Ubuntu names). Audio is not enabled, so ALSA development headers should not be needed (UNVERIFIED); CI installs `libasound2-dev` anyway. Follow Bevy's guide for your distribution. |
+| Windows | Built and unit-tested in CI (`windows-latest`, MSVC). Running the desktop app is **UNVERIFIED**. | Use the MSVC toolchain (Visual Studio Build Tools with the C++ workload), as recommended for Bevy. |
 
 The Bevy features are set once in the workspace: `default-features = false`,
 plus `2d`, `3d`, `ui` and `mesh_picking`.
@@ -38,6 +60,7 @@ cargo build --release -p emergence-lab
 ```text
 cargo run -p emergence-lab --release                         # dashboard
 cargo run -p emergence-lab --release -- --mode <slug>        # open a laboratory directly
+cargo run -p emergence-lab --release -- --mode <slug> --play # ... with its simulation already running
 cargo run -p emergence-lab --release -- --help
 ```
 
@@ -134,3 +157,17 @@ cargo run -p emergence-lab --release -- --mode 3d-life --smoke-screenshot shots/
 | `no asset folder found; tried: ...` | Run from a checkout, or put `assets/` next to the executable. |
 | Conway within Conway shows an error about OTCA tiles | `assets/patterns/otca/OTCAmetapixel-{OFF,ON}.rle` are missing from the asset folder. |
 | `unknown mode` | Use one of the slugs above (`--help` lists the options). |
+
+## Web demo
+
+The browser demo (`apps/web`, crate `emergence-web`) compiles the Classic
+Conway engines to WebAssembly. It is deployed to
+<https://ale-newport.github.io/Conway_GameOfLife/> by
+`.github/workflows/pages.yml`. To build and serve it locally:
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --locked --version "$(scripts/wasm_bindgen_version.sh)"
+scripts/build_web.sh
+python3 -m http.server --directory apps/web/www 8000   # then open http://localhost:8000
+```

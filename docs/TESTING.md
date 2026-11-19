@@ -168,8 +168,27 @@ It exits non-zero if the file was not written, or after 600 extra frames.
 `scripts/capture_screenshots.sh` runs this for the dashboard and every mode
 slug, writing `docs/screenshots/<slug>.png`.
 
-`ecosystem` currently shows the dashboard, because `view-ecosystem` is not
-registered in `apps/desktop`.
+With `--smoke-sequence <N>` (and optionally `--smoke-every <K>`, default 2)
+the binary saves `N` numbered screenshots (`out-0001.png`, `out-0002.png`,
+...) one every `K` frames after the first `--smoke-frames`, then exits.
+`scripts/record_demo.sh` uses it to record `docs/demo.gif` from the real app:
+only the app's own window is captured.
+
+### Web demo
+
+`cargo test -p emergence-web` runs native tests of the browser wrapper (glider
+crossing a torus, Diehard dying at generation 130, deterministic soups, every
+embedded pattern loading, rule presets, refused input). CI also builds the
+WebAssembly module with `scripts/build_web.sh`.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request: rustfmt,
+clippy with `-D warnings`, `cargo test --workspace --locked` on Linux, macOS
+and Windows, `emergence-cli list scenarios` and `emergence-cli validate`, and
+the WebAssembly build. `security.yml` runs `cargo-deny`, gitleaks and (for pull
+requests) dependency review, and `codeql.yml` runs CodeQL on the Rust,
+JavaScript and workflow code.
 
 ## 6. Benchmarks
 

@@ -3,13 +3,15 @@
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-The workspace version is `0.1.0` (root `Cargo.toml`). No release has been
-tagged yet.
+The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The workspace version lives in the root `Cargo.toml`.
 
-## [0.1.0] - Unreleased
+## [Unreleased]
 
-The entries below summarise the commit history from 2026-11-09 to 2026-11-10
-(`git log --oneline`).
+## [0.1.0] - 2026-11-19
+
+First public release. The entries below summarise the commit history from
+2026-11-09 to 2026-11-19 (`git log --oneline`).
 
 ### Added
 
@@ -114,6 +116,9 @@ The entries below summarise the commit history from 2026-11-09 to 2026-11-10
 
 ### Fixed
 
+- CSV exports (`analytics`) neutralise spreadsheet formula injection: text
+  fields starting with `=`, `+`, `-`, `@`, a tab or a carriage return (and not
+  a number) get a leading `'`.
 - Parameter sliders no longer send values that the user did not edit.
 - The grid material is rebuilt when its texture is reallocated.
 - Every Life engine counts the live cells of a rectangle exactly before
@@ -131,3 +136,26 @@ The entries below summarise the commit history from 2026-11-09 to 2026-11-10
 - Project documentation: this changelog, `CONTRIBUTING.md`, the guides in
   `docs/` (including `PERFORMANCE.md` with measured benchmarks) and README
   screenshots of every laboratory.
+- **Web demo** (`apps/web`, crate `emergence-web`): the Classic Conway engines
+  and the embedded pattern library compiled to WebAssembly, with a canvas
+  front end (rules, patterns, drawing, live engine readout), deployed to
+  GitHub Pages. `scripts/build_web.sh` builds it locally.
+- `emergence-lab --play` opens laboratories with their simulation running.
+- `emergence-lab --smoke-sequence <N> --smoke-every <K>` saves a numbered
+  series of window screenshots; `scripts/record_demo.sh` uses it to record the
+  README animation (`docs/demo.gif`) from the real app.
+- **Continuous integration**: rustfmt, clippy (`-D warnings`), tests on
+  Linux, macOS and Windows, a headless `emergence-cli validate` run and the
+  WebAssembly build. Release archives for the three platforms are built from
+  version tags.
+- **Security and maintenance**: CodeQL (Rust, JavaScript, Actions),
+  `cargo-deny` (advisories, licences, bans, sources), gitleaks secret
+  scanning, dependency review, OpenSSF Scorecard and Dependabot for Cargo and
+  GitHub Actions. Actions are pinned to commit SHAs and run with read-only
+  tokens by default.
+- **Community files**: `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CITATION.cff`,
+  `.github/CODEOWNERS`, issue forms (bug, feature, improvement), a pull
+  request template, `.gitattributes` and `.env.example`.
+
+[Unreleased]: https://github.com/Ale-Newport/Conway_GameOfLife/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Ale-Newport/Conway_GameOfLife/releases/tag/v0.1.0
