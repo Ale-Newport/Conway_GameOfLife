@@ -17,6 +17,9 @@ OPTIONS:
                                 continuous-life; see the list below)
     --smoke-screenshot <PNG>    Save a screenshot after a few frames and exit (automated checks)
     --smoke-frames <N>          Frames to render before that screenshot [default: 30]
+    --smoke-sequence <N>        Save N numbered screenshots (<PNG stem>-0001.png, ...) instead of one,
+                                for demo recordings
+    --smoke-every <K>           Frames between sequence screenshots [default: 2]
     -h, --help                  Print this help
     -V, --version               Print the version
 
@@ -28,6 +31,21 @@ ENVIRONMENT:
 /// Default number of frames before a smoke screenshot.
 pub const DEFAULT_SMOKE_FRAMES: u32 = 30;
 
+/// Default number of frames between the screenshots of a sequence.
+pub const DEFAULT_SMOKE_EVERY: u32 = 2;
+
+/// Largest accepted `--smoke-sequence` length.
+pub const MAX_SMOKE_SEQUENCE: u32 = 10_000;
+
+/// A numbered series of screenshots, used to record demo animations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Sequence {
+    /// Number of screenshots.
+    pub count: u32,
+    /// Frames between two screenshots.
+    pub every: u32,
+}
+
 /// Automated visual check: screenshot after `frames` frames, then exit.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SmokeCapture {
@@ -35,6 +53,8 @@ pub struct SmokeCapture {
     pub path: PathBuf,
     /// Frames to render first.
     pub frames: u32,
+    /// Save a numbered series instead of one screenshot.
+    pub sequence: Option<Sequence>,
 }
 
 /// Parsed options for a normal run.
@@ -83,6 +103,28 @@ pub enum CliError {
     /// `--smoke-frames` without `--smoke-screenshot`.
     #[error("`--smoke-frames` requires `--smoke-screenshot`")]
     FramesWithoutScreenshot,
+    /// `--smoke-sequence` or `--smoke-every` with a value out of range.
+    #[error("`{flag}` must be a whole number from 1 to {max}, got `{value}`")]
+    InvalidSequence {
+        /// The flag.
+        flag: &'static str,
+        /// Value given.
+        value: String,
+        /// Largest accepted value.
+        max: u32,
+    },
+    /// `--smoke-sequence` / `--smoke-every` without what they need.
+    #[error("`{0}` requires `--smoke-screenshot` (and `--smoke-every` requires `--smoke-sequence`)")]
+    SequenceWithoutScreenshot(&'static str),
+}
+
+/// Parses a whole number in `1..=max` for `flag`.
+fn bounded(flag: &'static str, text: String, max: u32) -> Result<u32, CliError> {
+    text.parse::<u32>().ok().filter(|n| (1..=max).contains(n)).ok_or(CliError::InvalidSequence {
+        flag,
+        value: text,
+        max,
+    })
 }
 
 /// Parses the arguments (without the program name).
@@ -90,6 +132,8 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, CliErro
     let mut mode = None;
     let mut screenshot: Option<PathBuf> = None;
     let mut frames: Option<u32> = None;
+    let mut sequence: Option<u32> = None;
+    let mut every: Option<u32> = None;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let (flag, inline) = match arg.split_once('=') {
@@ -127,13 +171,32 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, CliErro
                     return Err(CliError::Repeated("--smoke-frames"));
                 }
             }
+            "--smoke-sequence" => {
+                let n = bounded("--smoke-sequence", value("--smoke-sequence")?, MAX_SMOKE_SEQUENCE)?;
+                if sequence.replace(n).is_some() {
+                    return Err(CliError::Repeated("--smoke-sequence"));
+                }
+            }
+            "--smoke-every" => {
+                let n = bounded("--smoke-every", value("--smoke-every")?, 1_000)?;
+                if every.replace(n).is_some() {
+                    return Err(CliError::Repeated("--smoke-every"));
+                }
+            }
             _ => return Err(CliError::Unknown(arg)),
         }
     }
-    let smoke = match (screenshot, frames) {
-        (Some(path), frames) => Some(SmokeCapture { path, frames: frames.unwrap_or(DEFAULT_SMOKE_FRAMES) }),
-        (None, Some(_)) => return Err(CliError::FramesWithoutScreenshot),
-        (None, None) => None,
+    if every.is_some() && sequence.is_none() {
+        return Err(CliError::SequenceWithoutScreenshot("--smoke-every"));
+    }
+    let sequence = sequence.map(|count| Sequence { count, every: every.unwrap_or(DEFAULT_SMOKE_EVERY) });
+    let smoke = match (screenshot, frames, sequence) {
+        (Some(path), frames, sequence) => {
+            Some(SmokeCapture { path, frames: frames.unwrap_or(DEFAULT_SMOKE_FRAMES), sequence })
+        }
+        (None, Some(_), _) => return Err(CliError::FramesWithoutScreenshot),
+        (None, None, Some(_)) => return Err(CliError::SequenceWithoutScreenshot("--smoke-sequence")),
+        (None, None, None) => None,
     };
     Ok(Command::Run(Options { mode, smoke }))
 }
@@ -160,7 +223,7 @@ mod tests {
             parsed,
             Command::Run(Options {
                 mode: Some(AppMode::ClassicConway),
-                smoke: Some(SmokeCapture { path: "out.png".into(), frames: 12 }),
+                smoke: Some(SmokeCapture { path: "out.png".into(), frames: 12, sequence: None }),
             })
         );
         let parsed = run(&["--mode=ecosystem", "--smoke-screenshot", "x.png"]).unwrap();
@@ -168,9 +231,28 @@ mod tests {
             parsed,
             Command::Run(Options {
                 mode: Some(AppMode::EcosystemSimulator),
-                smoke: Some(SmokeCapture { path: "x.png".into(), frames: DEFAULT_SMOKE_FRAMES }),
+                smoke: Some(SmokeCapture { path: "x.png".into(), frames: DEFAULT_SMOKE_FRAMES, sequence: None }),
             })
         );
+    }
+
+    #[test]
+    fn sequence_options() {
+        let parsed = run(&["--smoke-screenshot", "rec/a.png", "--smoke-sequence", "90", "--smoke-every=3"]).unwrap();
+        let Command::Run(Options { smoke: Some(capture), .. }) = parsed else { panic!("{parsed:?}") };
+        assert_eq!(capture.sequence, Some(Sequence { count: 90, every: 3 }));
+        let parsed = run(&["--smoke-screenshot", "a.png", "--smoke-sequence", "5"]).unwrap();
+        let Command::Run(Options { smoke: Some(capture), .. }) = parsed else { panic!("{parsed:?}") };
+        assert_eq!(capture.sequence, Some(Sequence { count: 5, every: DEFAULT_SMOKE_EVERY }));
+        assert_eq!(run(&["--smoke-sequence", "5"]), Err(CliError::SequenceWithoutScreenshot("--smoke-sequence")));
+        assert_eq!(
+            run(&["--smoke-screenshot", "a.png", "--smoke-every", "2"]),
+            Err(CliError::SequenceWithoutScreenshot("--smoke-every"))
+        );
+        assert!(matches!(
+            run(&["--smoke-screenshot", "a.png", "--smoke-sequence", "0"]),
+            Err(CliError::InvalidSequence { flag: "--smoke-sequence", .. })
+        ));
     }
 
     #[test]
