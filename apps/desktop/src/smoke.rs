@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use bevy::prelude::*;
-use interface::{ScreenshotFinished, ScreenshotTracker};
+use interface::{ActiveSession, ScreenshotFinished, ScreenshotTracker};
 
 use crate::cli::{Sequence, SmokeCapture};
 
@@ -114,6 +114,24 @@ fn smoke_capture(
     if state.elapsed > last_due + TIMEOUT_FRAMES {
         error!("smoke screenshot timed out after {} frames", state.elapsed);
         exit.write(AppExit::error());
+    }
+}
+
+/// `--play`: starts the simulation of each laboratory as soon as its
+/// session exists (laboratories open paused otherwise).
+pub struct AutoPlayPlugin;
+
+impl Plugin for AutoPlayPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Update, auto_play);
+    }
+}
+
+fn auto_play(session: Option<Res<ActiveSession>>) {
+    if let Some(session) = session
+        && session.is_added()
+    {
+        session.0.play();
     }
 }
 

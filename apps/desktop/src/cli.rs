@@ -15,6 +15,7 @@ USAGE:
 OPTIONS:
     --mode <NAME>               Open a laboratory directly (e.g. classic-conway, ecosystem,
                                 continuous-life; see the list below)
+    --play                      Start the laboratory's simulation running instead of paused
     --smoke-screenshot <PNG>    Save a screenshot after a few frames and exit (automated checks)
     --smoke-frames <N>          Frames to render before that screenshot [default: 30]
     --smoke-sequence <N>        Save N numbered screenshots (<PNG stem>-0001.png, ...) instead of one,
@@ -64,6 +65,8 @@ pub struct Options {
     pub mode: Option<AppMode>,
     /// Smoke screenshot request.
     pub smoke: Option<SmokeCapture>,
+    /// Start each laboratory's simulation running.
+    pub play: bool,
 }
 
 /// What the command line asks for.
@@ -130,6 +133,7 @@ fn bounded(flag: &'static str, text: String, max: u32) -> Result<u32, CliError> 
 /// Parses the arguments (without the program name).
 pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, CliError> {
     let mut mode = None;
+    let mut play = false;
     let mut screenshot: Option<PathBuf> = None;
     let mut frames: Option<u32> = None;
     let mut sequence: Option<u32> = None;
@@ -144,6 +148,11 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, CliErro
         match flag.as_str() {
             "-h" | "--help" => return Ok(Command::Help),
             "-V" | "--version" => return Ok(Command::Version),
+            "--play" => {
+                if std::mem::replace(&mut play, true) {
+                    return Err(CliError::Repeated("--play"));
+                }
+            }
             "--mode" => {
                 let name = value("--mode")?;
                 if mode.is_some() {
@@ -198,7 +207,7 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, CliErro
         (None, None, Some(_)) => return Err(CliError::SequenceWithoutScreenshot("--smoke-sequence")),
         (None, None, None) => None,
     };
-    Ok(Command::Run(Options { mode, smoke }))
+    Ok(Command::Run(Options { mode, smoke, play }))
 }
 
 #[cfg(test)]
@@ -224,6 +233,7 @@ mod tests {
             Command::Run(Options {
                 mode: Some(AppMode::ClassicConway),
                 smoke: Some(SmokeCapture { path: "out.png".into(), frames: 12, sequence: None }),
+                play: false,
             })
         );
         let parsed = run(&["--mode=ecosystem", "--smoke-screenshot", "x.png"]).unwrap();
@@ -232,8 +242,17 @@ mod tests {
             Command::Run(Options {
                 mode: Some(AppMode::EcosystemSimulator),
                 smoke: Some(SmokeCapture { path: "x.png".into(), frames: DEFAULT_SMOKE_FRAMES, sequence: None }),
+                play: false,
             })
         );
+    }
+
+    #[test]
+    fn play_option() {
+        let Ok(Command::Run(options)) = run(&["--play", "--mode", "evolution"]) else { panic!() };
+        assert!(options.play);
+        assert_eq!(options.mode, Some(AppMode::EvolutionLab));
+        assert_eq!(run(&["--play", "--play"]), Err(CliError::Repeated("--play")));
     }
 
     #[test]

@@ -79,6 +79,9 @@ fn main() -> ExitCode {
     info!("assets: {} ({source:?})", asset_root.display());
     app.add_plugins((WorldInputPlugin, InterfacePlugin { asset_root, initial_mode: options.mode }));
     register_modes(&mut app);
+    if options.play {
+        app.add_plugins(smoke::AutoPlayPlugin);
+    }
     if let Some(capture) = options.smoke {
         app.add_plugins(smoke::SmokeScreenshotPlugin(capture));
     }
