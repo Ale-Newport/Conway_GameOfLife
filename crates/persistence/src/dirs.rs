@@ -203,9 +203,12 @@ mod tests {
         assert_eq!(mac.root(), Path::new("/Users/ada/Library/Application Support/EmergenceLab"));
         let linux = UserDataDirs::resolve_with(Platform::Unix, env(&[("HOME", "/home/ada")])).unwrap();
         assert_eq!(linux.root(), Path::new("/home/ada/.local/share/emergence-lab"));
-        let xdg = UserDataDirs::resolve_with(Platform::Unix, env(&[("HOME", "/home/ada"), ("XDG_DATA_HOME", "/data")]))
-            .unwrap();
-        assert_eq!(xdg.root(), Path::new("/data/emergence-lab"));
+        // XDG_DATA_HOME must be absolute on the host (`/data` has no drive
+        // letter on Windows, so it would be ignored there, as relative values are).
+        let data = if cfg!(windows) { "C:/data" } else { "/data" };
+        let xdg =
+            UserDataDirs::resolve_with(Platform::Unix, env(&[("HOME", "/home/ada"), ("XDG_DATA_HOME", data)])).unwrap();
+        assert_eq!(xdg.root(), Path::new(data).join("emergence-lab"));
         let windows =
             UserDataDirs::resolve_with(Platform::Windows, env(&[("APPDATA", "C:/Users/ada/AppData/Roaming")])).unwrap();
         assert_eq!(windows.root(), Path::new("C:/Users/ada/AppData/Roaming").join("EmergenceLab"));

@@ -118,7 +118,9 @@ mod tests {
         );
         let err = resolve(None, Some("/opt/lab".into()), ws, dirs(&[])).unwrap_err();
         assert_eq!(err, AssetRootError::NotFound(vec!["/opt/lab/assets".into(), "/ws/assets".into()]));
-        assert!(err.to_string().contains("/opt/lab/assets"));
+        // Joined paths display with the platform separator (`/opt/lab\assets` on Windows).
+        let expected = Path::new("/opt/lab").join("assets");
+        assert!(err.to_string().contains(&expected.display().to_string()), "{err}");
     }
 
     #[test]
