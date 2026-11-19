@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      bevy:
+        patterns: ["bevy*", "egui*", "bevy_egui", "bevy_panorbit_camera"]
+      rust-minor-and-patch:
+        update-types: ["minor", "patch"]
+        exclude-patterns: ["bevy*", "egui*", "bevy_egui", "bevy_panorbit_camera"]
+    labels: ["dependencies", "rust"]
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    labels: ["dependencies", "github-actions"]
+    commit-message:
+      prefix: "ci"
