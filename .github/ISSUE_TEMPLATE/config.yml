@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/Ale-Newport/Conway_GameOfLife/discussions
+    about: Ask questions, share experiments and discuss ideas in GitHub Discussions.
+  - name: Report a security vulnerability
+    url: https://github.com/Ale-Newport/Conway_GameOfLife/security/advisories/new
+    about: Please report vulnerabilities privately, not as public issues.

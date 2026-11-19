@@ -1,0 +1,68 @@
+name: Bug report
+description: Something does not work as documented (wrong results, crashes, rendering problems).
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem. Please search the
+        [existing issues](https://github.com/Ale-Newport/Conway_GameOfLife/issues) first.
+        **Security problems:** do not open an issue — follow [SECURITY.md](https://github.com/Ale-Newport/Conway_GameOfLife/blob/main/SECURITY.md).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Classic Conway / Life engines / Hashlife
+        - Cellular Automata Lab
+        - Conway Within Conway (OTCA metapixel)
+        - Ecosystem Simulator
+        - Custom Life Creator / rule engine
+        - Evolution Lab
+        - Continuous Life (Lenia, SmoothLife)
+        - 3D Life
+        - Emergent Civilizations
+        - Application shell / rendering / UI
+        - emergence-cli
+        - Web demo
+        - Build / installation / docs
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Commands, scenario file, seed and parameters. Deterministic models replay exactly for a given seed.
+      placeholder: |
+        1. cargo run --release -p emergence-lab -- --mode classic-conway
+        2. Load pattern ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Terminal output (run with RUST_LOG=info) or a screenshot.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0 or the output of `git rev-parse --short HEAD`
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS, CPU/GPU and Rust version
+      placeholder: macOS 15, Apple M2, rustc 1.98.1
+    validations:
+      required: true

@@ -1,0 +1,30 @@
+# Normalise line endings; keep LF in the repository and in shell scripts.
+* text=auto eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Better diffs
+*.rs diff=rust
+*.md diff=markdown
+
+# Binary data (never touched by line-ending conversion or textual diffs)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.ktx2 binary
+*.glb binary
+*.bin binary
+*.gz binary
+*.wasm binary
+*.elsnap binary
+*.ttf binary
+*.otf binary
+
+# GitHub language statistics: data files and docs are not code
+assets/** linguist-vendored
+docs/** linguist-documentation
+scenarios/** linguist-detectable=false

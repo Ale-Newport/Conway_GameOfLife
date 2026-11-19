@@ -1,0 +1,24 @@
+name: Improvement
+description: Make something that already exists faster, clearer, more accurate or easier to use.
+labels: ["improvement", "triage"]
+body:
+  - type: input
+    id: target
+    attributes:
+      label: What should be improved?
+      placeholder: e.g. crates/hashlife memory use, the user guide, the ecosystem panel
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behaviour
+      description: Measurements, screenshots or doc links are very welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: better
+    attributes:
+      label: Suggested improvement
+    validations:
+      required: true

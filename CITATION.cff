@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use Emergence Lab in research or teaching, please cite it as below."
+title: "Emergence Lab: a laboratory for artificial life"
+abstract: >-
+  A deterministic Rust laboratory for artificial life: Conway's Game of Life
+  with dense, bit-packed, sparse and Hashlife engines, the OTCA metapixel,
+  Life-like and multi-state cellular automata, Lenia and SmoothLife, 3D
+  automata, an individual-based ecosystem simulator, evolution and emergent
+  civilizations, with a desktop application, a headless CLI and a web demo.
+type: software
+authors:
+  - given-names: Alejandro
+    family-names: Newport Diaz
+repository-code: "https://github.com/Ale-Newport/Conway_GameOfLife"
+url: "https://ale-newport.github.io/Conway_GameOfLife/"
+license:
+  - MIT
+  - Apache-2.0
+version: 0.1.0
+date-released: "2026-11-19"
+keywords:
+  - artificial life
+  - cellular automata
+  - game of life
+  - hashlife
+  - lenia
+  - ecosystem simulation
+  - rust
+  - bevy
