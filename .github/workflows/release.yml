@@ -48,7 +48,10 @@ jobs:
         with:
           tool: cargo-about
       - name: Third-party licence texts
-        run: cargo about generate --locked --offline about.hbs -o THIRD_PARTY_LICENSES.html
+        # cargo-about reads metadata for every target, so fetch all crates first.
+        run: |
+          cargo fetch --locked
+          cargo about generate --locked --offline about.hbs -o THIRD_PARTY_LICENSES.html
       - name: Package
         shell: bash
         run: |
