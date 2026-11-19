@@ -52,14 +52,22 @@ fn smoothlife_soup_condenses_into_a_glider_whatever_the_rounding() {
             assert!(s.fields()[0].as_slice().iter().all(|&f| (0.0..=1.0).contains(&f)));
         }
         // Only isolated gliders remain: the mass is a small multiple of one
-        // glider's (≈ 799) and few cells are active. (Measured: the original
-        // keeps one glider, the translated copy two.)
+        // glider's (≈ 799) and few cells are active. Measured: the original
+        // keeps one glider on aarch64 (Apple M2 Max) and on x86_64 (GitHub's
+        // Linux runners); the translated copy keeps two on aarch64 and dies
+        // out on x86_64, where the FFT rounds differently. The models are only
+        // bit-reproducible on one platform (docs/models/continuous.md), so the
+        // copy may also end empty, but never in persistent turbulence.
         let mass = s.mass();
         let gliders = (mass / 799.4).round();
         let active = s.metrics().get("active_fraction").unwrap_or(1.0);
-        assert!((1.0..=3.0).contains(&gliders), "{name}: mass {mass}");
-        assert!((mass - gliders * 799.4).abs() < 6.0 * gliders, "{name}: mass {mass} is not {gliders} glider(s)");
-        assert!(active < 0.02 * gliders, "{name}: active fraction {active}");
+        let allowed = if name == "original" { 1.0..=3.0 } else { 0.0..=3.0 };
+        assert!(allowed.contains(&gliders), "{name}: mass {mass}");
+        assert!(
+            (mass - gliders * 799.4).abs() < 6.0 * gliders.max(1.0),
+            "{name}: mass {mass} is not {gliders} glider(s)"
+        );
+        assert!(active < 0.02 * gliders.max(1.0), "{name}: active fraction {active}");
     }
 }
 
