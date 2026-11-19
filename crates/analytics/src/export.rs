@@ -5,7 +5,10 @@
 //! is wrapped in double quotes, and embedded quotes are doubled. Lines end
 //! with `\n`. Numbers use Rust's shortest round-trip formatting, so parsing
 //! an exported value gives back exactly the stored `f64`; empty cells mean
-//! "no sample at this tick". The `write_*` functions stream rows to a writer
+//! "no sample at this tick". Text fields that a spreadsheet would run as a
+//! formula (starting with `=`, `+`, `-`, `@`, a tab or a carriage return, and
+//! not a number) are prefixed with `'` (CSV injection protection, OWASP).
+//! The `write_*` functions stream rows to a writer
 //! (memory independent of the run length); the `*_to_csv` functions return
 //! the same text as a `String`.
 //!
@@ -26,10 +29,20 @@ use crate::series::{Point, Series, TimeSeriesStore};
 /// Schema version of the JSON documents written by this build.
 pub const JSON_SCHEMA_VERSION: u32 = 1;
 
-/// Quotes a CSV field when needed (RFC 4180).
+/// Quotes a CSV field when needed (RFC 4180) and neutralises text that a
+/// spreadsheet would evaluate as a formula by prefixing it with `'`.
+/// Numbers (including negative ones such as `-3` or `-1e-7`) are unchanged.
 pub fn escape_csv_field(field: &str) -> Cow<'_, str> {
+    let field: Cow<'_, str> =
+        if is_formula_like(field) { Cow::Owned(format!("'{field}")) } else { Cow::Borrowed(field) };
     let needs_quotes = field.contains([',', '"', '\n', '\r']) || field.starts_with(' ') || field.ends_with(' ');
-    if needs_quotes { Cow::Owned(format!("\"{}\"", field.replace('"', "\"\""))) } else { Cow::Borrowed(field) }
+    if needs_quotes { Cow::Owned(format!("\"{}\"", field.replace('"', "\"\""))) } else { field }
+}
+
+/// Text starting with a character that spreadsheets treat as the start of a
+/// formula, and that is not simply a number.
+fn is_formula_like(field: &str) -> bool {
+    field.starts_with(['=', '+', '-', '@', '\t', '\r']) && field.parse::<f64>().is_err()
 }
 
 /// Formats a value so that it parses back to the same `f64`: integers
@@ -416,6 +429,21 @@ mod tests {
         assert_eq!(escape_csv_field("cr\rhere"), "\"cr\rhere\"");
         assert_eq!(escape_csv_field(" padded"), "\" padded\"");
         assert_eq!(escape_csv_field(""), "");
+    }
+
+    #[test]
+    fn csv_fields_cannot_inject_formulas() {
+        assert_eq!(escape_csv_field("=HYPERLINK(\"x\")"), "\"'=HYPERLINK(\"\"x\"\")\"");
+        assert_eq!(escape_csv_field("+cmd"), "'+cmd");
+        assert_eq!(escape_csv_field("-2+3"), "'-2+3");
+        assert_eq!(escape_csv_field("@SUM(A1)"), "'@SUM(A1)");
+        assert_eq!(escape_csv_field("\tx"), "'\tx");
+        // Numbers and ordinary text are untouched.
+        assert_eq!(escape_csv_field("-3"), "-3");
+        assert_eq!(escape_csv_field("-1e-7"), "-1e-7");
+        assert_eq!(escape_csv_field("+4.5"), "+4.5");
+        assert_eq!(escape_csv_field("population"), "population");
+        assert_eq!(escape_csv_field("a=b"), "a=b");
     }
 
     #[test]

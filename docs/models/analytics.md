@@ -501,8 +501,10 @@ environment, which would require `unsafe` in edition 2024.
   text files.
 * **TOML** has no null and no unit values, and its integers are limited to
   `i64`. A value that TOML cannot represent produces an `Encode` error.
-* **CSV** files contain no formula-injection protection. A metric key
-  starting with `=` is written as-is.
+* **CSV** text fields that a spreadsheet would evaluate (starting with `=`,
+  `+`, `-`, `@`, a tab or a carriage return, and not a number) are written
+  with a leading `'`, so a metric key such as `=SUM(A1)` is exported as
+  `'=SUM(A1)`. Numbers, including negative ones, are written unchanged.
 * **Atomic writes** are only atomic within one file system, which holds
   because the temporary file is created next to the destination. A crash
   can leave a `.<name>.<pid>.<n>.tmp` file behind. Such files are

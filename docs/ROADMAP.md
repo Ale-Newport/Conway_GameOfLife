@@ -181,7 +181,6 @@ items" sections of the docs. The linked documents have the details.
   * capping raw samples drops data permanently;
   * the period estimator assumes stationary data;
   * binary snapshots cannot be migrated;
-  * CSV has no formula-injection protection;
   * atomic writes are atomic within one file system only.
 * **Floating point.** Every floating-point model is reproducible only on the
   same platform and build.
