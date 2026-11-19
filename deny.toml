@@ -5,8 +5,11 @@
 all-features = false
 
 [advisories]
-# RustSec advisories. Unmaintained crates are reported for direct and
-# transitive dependencies; yanked versions are errors.
+# RustSec advisories. Vulnerabilities and unsound code fail for any crate in
+# the graph; unmaintained crates only when we depend on them directly
+# (transitive ones, e.g. ttf-parser via egui and smartstring via Rhai, have no
+# maintained replacement upstream yet). Yanked versions are errors.
+unsound = "all"
 unmaintained = "workspace"
 yanked = "deny"
 ignore = []
