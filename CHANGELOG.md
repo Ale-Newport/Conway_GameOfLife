@@ -116,6 +116,14 @@ First public release. The entries below summarise the commit history from
 
 ### Fixed
 
+- The dependency graph no longer contains unsound `heapless` versions
+  (RUSTSEC-2026-0574 to -0582) or the unmaintained `atomic-polyfill`:
+  postcard's unused `heapless-cas` feature is disabled and Bevy's `heapless`
+  is updated to 0.9.4.
+- Tests that assumed one platform now pass on Linux, macOS and Windows: path
+  separators in the asset and data-folder tests, and two chaotic
+  floating-point experiments (SmoothLife soup, predator selection) whose
+  outcomes differ between x86_64 and aarch64.
 - CSV exports (`analytics`) neutralise spreadsheet formula injection: text
   fields starting with `=`, `+`, `-`, `@`, a tab or a carriage return (and not
   a number) get a leading `'`.
