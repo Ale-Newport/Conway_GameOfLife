@@ -392,9 +392,9 @@ impl LifeEngine for SparseEngine {
             let mask = bit_range((clip.x0.max(bx) - bx) as u32, (clip.x1.min(bx + 63) - bx) as u32);
             let (r0, r1) = ((clip.y0.max(by) - by) as usize, (clip.y1.min(by + 63) - by) as usize);
             let tile = self.tile(key);
-            for r in r0..=r1 {
+            for (r, &row) in tile.rows.iter().enumerate().take(r1 + 1).skip(r0) {
                 let base = grid.row(by + r as i64) * width;
-                count_word(tile.rows[r] & mask, bx, grid, &mut out[base..base + width]);
+                count_word(row & mask, bx, grid, &mut out[base..base + width]);
             }
         }
     }
