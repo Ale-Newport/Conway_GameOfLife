@@ -41,7 +41,6 @@ view-conway = { path = "crates/view-conway" }
 view-ca-lab = { path = "crates/view-ca-lab" }
 view-metapixel = { path = "crates/view-metapixel" }
 view-ecosystem = { path = "crates/view-ecosystem" }
-emergence-web = { path = "apps/web" }
 
 # --- simulation-side third-party crates (no Bevy) --------------------------
 serde = { version = "1.0", features = ["derive"] }
