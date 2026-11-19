@@ -41,6 +41,7 @@ view-conway = { path = "crates/view-conway" }
 view-ca-lab = { path = "crates/view-ca-lab" }
 view-metapixel = { path = "crates/view-metapixel" }
 view-ecosystem = { path = "crates/view-ecosystem" }
+emergence-web = { path = "apps/web" }
 
 # --- simulation-side third-party crates (no Bevy) --------------------------
 serde = { version = "1.0", features = ["derive"] }
@@ -64,6 +65,7 @@ bevy_egui = "0.43.1"
 egui_plot = "0.37.0"
 bevy_panorbit_camera = "0.36.0"
 memory-stats = "1.2"
+wasm-bindgen = "0.2"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

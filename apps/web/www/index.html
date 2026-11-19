@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emergence Lab — Game of Life in your browser</title>
+  <meta name="description" content="Conway's Game of Life running on Emergence Lab's Rust engines compiled to WebAssembly: 11 Life-like rule presets, 18 classic patterns, drawing and a live engine readout.">
+  <meta property="og:title" content="Emergence Lab — Game of Life in your browser">
+  <meta property="og:description" content="Rust cellular-automata engines compiled to WebAssembly. Part of Emergence Lab, a desktop laboratory for artificial life.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://ale-newport.github.io/Conway_GameOfLife/social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 3 3'%3E%3Cpath fill='%2348e5c2' d='M1 0h1v1H1zM2 1h1v1H2zM0 2h3v1H0z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 3 3" aria-hidden="true"><path d="M1 0h1v1H1zM2 1h1v1H2zM0 2h3v1H0z"/></svg>
+      <div>
+        <h1>Emergence Lab</h1>
+        <p>Conway's Game of Life on the project's Rust engines, compiled to WebAssembly.</p>
+      </div>
+    </div>
+    <a class="gh" href="https://github.com/Ale-Newport/Conway_GameOfLife">Source on GitHub</a>
+  </header>
+
+  <main>
+    <div class="stage">
+      <canvas id="world" aria-label="Life world. Click or drag to draw cells; right-click or Shift-drag to erase." role="img"></canvas>
+      <p id="error" class="error" hidden></p>
+    </div>
+
+    <aside class="panel" aria-label="Controls">
+      <div class="row buttons">
+        <button id="play" class="primary" aria-keyshortcuts="Space">Pause</button>
+        <button id="step" aria-keyshortcuts="N">Step</button>
+        <button id="random" aria-keyshortcuts="R">Random</button>
+        <button id="clear" aria-keyshortcuts="C">Clear</button>
+      </div>
+
+      <label for="speed">Generations per frame <output id="speed-out">1</output></label>
+      <input id="speed" type="range" min="0" max="7" value="0" step="1">
+
+      <label for="pattern">Pattern</label>
+      <select id="pattern"></select>
+      <p id="pattern-desc" class="hint"></p>
+
+      <label for="preset">Rule</label>
+      <select id="preset"></select>
+
+      <dl class="stats" aria-live="off">
+        <div><dt>Generation</dt><dd id="gen">0</dd></div>
+        <div><dt>Population</dt><dd id="pop">0</dd></div>
+        <div><dt>Generations/s</dt><dd id="rate">0</dd></div>
+        <div><dt>Engine</dt><dd id="engine">–</dd></div>
+      </dl>
+
+      <p class="hint">Click or drag to draw, right-click or Shift-drag to erase. Keys: <kbd>Space</kbd> play/pause,
+        <kbd>N</kbd> step, <kbd>R</kbd> random, <kbd>C</kbd> clear.</p>
+      <p class="hint">This page runs the Classic Conway engines only. The desktop app has nine laboratories, Hashlife,
+        the OTCA metapixel, ecosystems, Lenia and more: see the <a href="https://github.com/Ale-Newport/Conway_GameOfLife#quick-start">quick start</a>.</p>
+    </aside>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

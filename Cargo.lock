@@ -2978,6 +2978,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "emergence-web"
+version = "0.1.0"
+dependencies = [
+ "cellular-automata",
+ "patterns",
+ "simulation-core",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "encase"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
