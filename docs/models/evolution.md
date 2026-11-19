@@ -596,8 +596,12 @@ the 6 preset calibration checks run in ≈ 25 s in release.
   prey were slower than the population by `S = −0.046` speed units
   (n = 514 kills, z = −7.1), while the random culls were unselective
   (`S = −0.004`, n = 3348, z = −1.5). Response: predators > no predators for
-  every seed; averaged over the seeds +0.094 vs no predators, +0.117 vs
-  random deaths and +0.084 vs the founders (all required > 0.05). Replicate
+  every seed on Apple silicon (the test requires at least three of the four
+  seeds, because on x86_64 seed 1 ends 0.709 with predators vs 0.737
+  without: the model is only bit-reproducible on one platform); averaged
+  over the seeds +0.094 vs no predators, +0.117 vs random deaths and +0.084
+  vs the founders (all required > 0.05). On x86_64 (GitHub's Linux runner)
+  the pooled kill selection is `S = −0.050` (n = 538, z = −8.5). Replicate
   runs vary a lot, so the random-deaths comparison is asserted on the
   average, not per seed (seed 2: +0.017). In 8 further exploratory seeds
   (5–12, not part of the test) predators beat no predators in 8 of 8 and
