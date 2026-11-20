@@ -25,8 +25,19 @@
 *.p12
 *.pfx
 *.local.md
-.claude/settings.local.json
-.claude/launch.json
+
+# --- private notes, promotion drafts and AI-agent files (kept locally) -------
+LAUNCH*.md
+LAUNCH_KIT.md
+LAUNCH_POSTS*.md
+/launch/
+/docs/launch/
+/.claude/
+CLAUDE.md
+CLAUDE.local.md
+/.cursor/
+/.aider*
+/.codex/
 
 # --- editors and operating systems ---------------------------------------------
 .DS_Store
