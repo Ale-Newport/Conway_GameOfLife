@@ -51,7 +51,7 @@ postcard = { version = "1.1", default-features = false, features = ["use-std"] }
 thiserror = "2.0"
 anyhow = "1.0"
 rayon = "1.12"
-glam = { version = "0.33", features = ["serde"] }
+glam = { version = "0.34", features = ["serde"] }
 noise = "0.9"
 rustfft = "6.4"
 rhai = { version = "1.27", features = ["sync"] }

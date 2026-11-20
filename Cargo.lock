@@ -1354,7 +1354,7 @@ dependencies = [
  "approx",
  "bevy_reflect",
  "derive_more",
- "glam",
+ "glam 0.33.12",
  "libm",
  "rand 0.10.3",
  "serde",
@@ -1383,7 +1383,7 @@ dependencies = [
  "bytemuck",
  "derive_more",
  "encase",
- "glam",
+ "glam 0.33.12",
  "half",
  "hexasphere",
  "serde",
@@ -1549,7 +1549,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "erased-serde",
  "foldhash 0.2.0",
- "glam",
+ "glam 0.33.12",
  "indexmap",
  "inventory",
  "petgraph",
@@ -1614,7 +1614,7 @@ dependencies = [
  "derive_more",
  "downcast-rs 2.0.2",
  "encase",
- "glam",
+ "glam 0.33.12",
  "image",
  "indexmap",
  "itertools 0.14.0",
@@ -3418,6 +3418,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.34.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "627003914c6057c9c8f0832ee4f870b5a4f599d0cfa83f4072675114860cd0ff"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "glifo"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3625,7 +3634,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "163385eff5a0cf606ebe2c10b3a44ab02f4306e83fbd068a64f5e1d72a3049ac"
 dependencies = [
  "constgebra",
- "glam",
+ "glam 0.33.12",
  "tinyvec",
 ]
 
@@ -5896,7 +5905,7 @@ dependencies = [
 name = "simulation-core"
 version = "0.1.0"
 dependencies = [
- "glam",
+ "glam 0.34.3",
  "postcard",
  "serde",
  "serde_json",
