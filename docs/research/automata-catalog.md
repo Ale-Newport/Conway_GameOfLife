@@ -10,7 +10,7 @@ Status: research document, written 2026-11-09. Nothing here is code; all pattern
 
 Every behavioural claim marked **[SIM]** was reproduced by an independent throw-away reference
 simulator (Python + numpy, written from scratch, not derived from Golly code) kept outside the repository in
-the session scratchpad (`.../scratchpad/verify/*.py`). These simulators are **not** part of the project. Treat their
+the local scratchpad (`.../scratchpad/verify/*.py`). These simulators are **not** part of the project. Treat their
 numbers as golden test vectors only after the Rust implementation reproduces them as well. Two
 implementations agreeing is the bar.
 

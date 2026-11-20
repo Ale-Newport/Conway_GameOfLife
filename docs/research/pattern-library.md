@@ -148,8 +148,8 @@ Things not verified (marked UNVERIFIED or left blank):
 
 ## 4. Verification method
 
-All verification code lives in the session scratchpad, on purpose **not in the repo**:
-`/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/patterns-verify/`
+All verification code lives in the local scratchpad, on purpose **not in the repo**:
+`scratchpad/patterns-verify/`
 (`lifelib.py`, `specs.py`, `build.py`, `check_assets.py`, `lexget.py`, `mktable.py`).
 That directory is temporary, so section 7 recommends porting the checks to Rust. The simulator is a
 from-scratch Python implementation: no Golly code was used or translated. It has two

@@ -512,7 +512,7 @@ its own page. CC0 1.0 §2 is an irrevocable waiver, and QAL §7 says changes do 
 ## 9. Reproduction
 
 The scratchpad scripts, all our own code, are in
-`/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/assets-work/`:
+`scratchpad/assets-work/`:
 
 | Script | Purpose |
 |---|---|

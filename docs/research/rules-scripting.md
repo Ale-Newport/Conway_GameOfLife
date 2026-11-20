@@ -706,7 +706,7 @@ egui_graphs caveats (from source):
 
 ## 5. Verification artifacts
 
-All paths are under `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/rhai-check/`.
+All paths are under `scratchpad/rhai-check/`.
 
 | Path | What it checks | Result |
 |---|---|---|

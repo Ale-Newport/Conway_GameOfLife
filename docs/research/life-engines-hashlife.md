@@ -13,7 +13,7 @@ Sources and how they were used:
   algorithms in my own words, so the project stays clean-room (MIT OR Apache-2.0).
 - **LifeWiki** (`conwaylife.com`) returns HTTP 403 (Cloudflare bot check) to WebFetch, and I did not try to get around it.
   Format pages were read from the older public mirror `conwaylife.njohnston.ca`, which may be **out of date**.
-- **Validation done for this note.** All of these are my own code in the session scratchpad, not project code:
+- **Validation done for this note.** All of these are my own code in the local scratchpad, not project code:
   - `proto/hl.py`, `hl2.py`, `hl3.py`: a Python Hashlife prototype that implements Section 3 directly. It was checked
     against a naive simulator and against published test vectors (Section 3.12).
   - `proto/swar.rs`: a Rust SWAR (SIMD within a register) benchmark (Section 5.1).

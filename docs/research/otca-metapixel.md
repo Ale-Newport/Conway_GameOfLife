@@ -459,7 +459,7 @@ ambiguous. Population at t = 0: galaxy 7 408 195, p216 128 116 349, parity64
   ```
 
 - **Throwaway driver scripts** live in
-  `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/otca-work/`:
+  `scratchpad/otca-work/`:
   - `otca_lib.py` (RLE/MC I/O, bgolly driver)
   - `grid.py` (OR-tiling + sampling)
   - `analyze*.py` (tile/demo comparisons)

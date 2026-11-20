@@ -13,7 +13,7 @@ in this file, check the registry sources before writing it.**
 | **[M]** | From Bevy's own 0.19→0.20 migration-guide drafts (`bevy-0.20.1/_release-content/migration-guides/*.md`), cross-checked against source. |
 | **UNVERIFIED** | Not checked by compiler/runtime/source. Treat as a hint only. |
 
-Scratch project used: `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/depcheck`
+Scratch project used: `scratchpad/depcheck`
 (examples `s01_app_ecs.rs` … `s10_error_handler.rs`, `egui_hover_test.rs`, shaders in `assets/shaders/`). Snippets
 below are extracts of those files; the scratch dir is temporary, so this document is the durable copy.
 
@@ -34,7 +34,7 @@ Runtime results obtained:
 
 ## 1. Cargo / features
 
-Workspace (`/Users/alejandro/Projects/Conway_GameOfLife/Cargo.toml`) already pins:
+Workspace (`Cargo.toml`) already pins:
 ```toml
 bevy = { version = "0.20.1", default-features = false, features = ["2d", "3d", "ui", "mesh_picking"] }
 bevy_egui = "0.43.1"

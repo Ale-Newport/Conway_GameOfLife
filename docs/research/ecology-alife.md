@@ -18,9 +18,9 @@ Every claim carries one of these tags (or the section header carries it for the 
 | **UNVERIFIED** | A specific number or detail that we could not confirm. Treat it as a placeholder to calibrate. |
 
 Downloaded raw material (data and papers only, nothing executed) is in
-`/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/downloads/ecology-*`.
+`scratchpad/downloads/ecology-*`.
 The analysis scripts we wrote are in
-`/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/scripts/`
+`scratchpad/scripts/`
 (`wsp_sim.py`, `wsp_batch.py`, `fit_allometry.py`, `mte_norm.py`, `allo.py`, `species_tables.py`).
 
 ---

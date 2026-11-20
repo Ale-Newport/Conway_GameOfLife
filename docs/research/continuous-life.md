@@ -7,7 +7,7 @@ Scope: exact model equations and parameters from the primary sources, published 
 Status tags used below:
 
 - **VERIFIED (source)**: read directly in the primary paper or reference code at the commit given.
-- **VERIFIED (repro)**: reproduced numerically with our own independent code. The scratch code is in `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/scripts/` (numpy, f64) and `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/fftbench/` (Rust, f32). Neither is project code, and no third-party code was copied into it.
+- **VERIFIED (repro)**: reproduced numerically with our own independent code. The scratch code is in `scratchpad/scripts/` (numpy, f64) and `scratchpad/fftbench/` (Rust, f32). Neither is project code, and no third-party code was copied into it.
 - **UNVERIFIED**: secondary source, memory, or inference. Re-check before relying on it.
 
 ---
@@ -54,10 +54,10 @@ Status tags used below:
 
 Local copies of the downloaded data are kept for reproducibility and are not project files:
 
-- `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/downloads/continuous-life-papers/`: PDFs and extracted text.
-- `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/downloads/lenia-animals/`: `animals.json` and `LeniaNDKC.py`.
-- `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/downloads/lenia-tutorial/`: the tutorial notebook and its LICENSE.
-- `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/downloads/smoothlife-readme/readme.txt`
+- `scratchpad/downloads/continuous-life-papers/`: PDFs and extracted text.
+- `scratchpad/downloads/lenia-animals/`: `animals.json` and `LeniaNDKC.py`.
+- `scratchpad/downloads/lenia-tutorial/`: the tutorial notebook and its LICENSE.
+- `scratchpad/downloads/smoothlife-readme/readme.txt`
 
 ---
 
@@ -384,7 +384,7 @@ All entries have T=10 and kn=gn=1.
   - mass Σf = **799.4 ± 1.5**
   - speed **5.281 ± 0.008 cells/step** (≈ 0.251 rₐ per step), constant over steps 200–1500
 - Sparse initial disks die out, and denser soups produce gliders plus irregular blobs.
-- The isolated glider state is saved at `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/smoothglider_ra21_state.npy` (256² f64). Regenerate it from the project's own engine as a fixture rather than vendoring this file.
+- The isolated glider state is saved at `scratchpad/smoothglider_ra21_state.npy` (256² f64). Regenerate it from the project's own engine as a fixture rather than vendoring this file.
 
 ### 5.5 Relation to Lenia
 
@@ -552,7 +552,7 @@ I_i(p', p)    = ∫_{Ω(p)} D(p''_i, s),     p''_i = p' + dt·F_i^t(p')
 
 ### 7.6 Measured cost per step on this machine
 
-Setup: Apple M2 Max (8P + 4E cores), Rust 1.98.1, `--release` (thin LTO, codegen-units 1), f32, single-kernel Lenia with a gaussian growth step and clip. Each value is the best of 5 × k iterations, and the minimum over 3 runs. The machine was **heavily loaded by other jobs** (load average 99–255), so treat these as upper bounds. Benchmark source: `/private/tmp/claude-501/-Users-alejandro-Projects-Conway-GameOfLife/d26793ef-30fe-4239-b1fb-77f42d831735/scratchpad/fftbench/src/main.rs`.
+Setup: Apple M2 Max (8P + 4E cores), Rust 1.98.1, `--release` (thin LTO, codegen-units 1), f32, single-kernel Lenia with a gaussian growth step and clip. Each value is the best of 5 × k iterations, and the minimum over 3 runs. The machine was **heavily loaded by other jobs** (load average 99–255), so treat these as upper bounds. Benchmark source: `scratchpad/fftbench/src/main.rs`.
 
 | grid | realfft conv, 1 thread | growth+clip, 1 thread | **full step, 1 thread** | realfft conv, rayon | **full step, rayon** | c2c rustfft conv, rayon | direct R=13 conv, 1 thread / rayon | 3 ch × 15 kernels conv, rayon |
 |---|---|---|---|---|---|---|---|---|

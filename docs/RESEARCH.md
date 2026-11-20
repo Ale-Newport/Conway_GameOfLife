@@ -18,7 +18,7 @@ derivations, grammars, data tables and reproduction steps:
 
 **Evidence labels.** This document keeps the labels of the notes. *Measured* means run on the development machine
 (Apple M2 Max, 8 performance + 4 efficiency cores, 64 GB, Rust 1.98.1). *[SIM]* means reproduced with a throw-away
-reference simulator kept in the session scratchpad, not in the repository. *Verified (source)* means read in the
+reference simulator kept in the local scratchpad, not in the repository. *Verified (source)* means read in the
 primary source or crate source. **UNVERIFIED** marks anything not confirmed; it is carried over unchanged from the notes.
 The scratchpad prototypes (Python Hashlife, Python pattern verifier, numpy Lenia, Rust benchmarks) are temporary and are
 not project code. The Lenia benchmarks ran while the machine was heavily loaded, so they are upper bounds.
